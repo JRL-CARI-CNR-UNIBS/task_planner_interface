@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+
+<launch>
+
+  <arg name="recipe" value="$(find task_planner_dispatcher)/plans/example.yaml" />
+  <param name="recipe" value="$(arg recipe)" />
+
+  <arg name="robot_request_from_planner" value="/sharework/test/stiima/motion" />
+  <arg name="human_request_from_planner" value="/sharework/test/stiima/human" />
+  <arg name="robot_feedback_to_planner" value="/sharework/test/stiima/motion/feedback" />
+  <arg name="human_feedback_to_planner" value="/sharework/test/stiima/human/feedback" />
+
+  <node pkg="task_planner_dispatcher" type="dispatcher_double_async" name="dispatcher_double_async" output="screen" >
+      <param name="robot_request_from_planner" value="$(arg robot_request_from_planner)" />
+      <param name="robot_feedback_to_planner" value="$(arg robot_feedback_to_planner)" />
+      <param name="human_request_from_planner" value="$(arg human_request_from_planner)" />
+      <param name="human_feedback_to_planner" value="$(arg human_feedback_to_planner)" />
+  </node>
+
+</launch>

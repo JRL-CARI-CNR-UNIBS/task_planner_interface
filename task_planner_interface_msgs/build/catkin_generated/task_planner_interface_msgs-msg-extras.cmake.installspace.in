@@ -1,0 +1,2 @@
+set(task_planner_interface_msgs_MESSAGE_FILES "msg/MotionTaskExecutionFeedback.msg;msg/MotionTaskExecutionRequest.msg;msg/MotionTaskExecutionRequestArray.msg;msg/TaskExecuteAction.msg;msg/TaskExecuteActionGoal.msg;msg/TaskExecuteActionResult.msg;msg/TaskExecuteActionFeedback.msg;msg/TaskExecuteGoal.msg;msg/TaskExecuteResult.msg;msg/TaskExecuteFeedback.msg")
+set(task_planner_interface_msgs_SERVICE_FILES "srv/TaskResult.srv;srv/TaskType.srv;srv/BasicSkill.srv;srv/PickPlaceSkill.srv;srv/PauseSkill.srv")

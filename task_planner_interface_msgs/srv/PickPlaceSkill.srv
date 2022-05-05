@@ -1,0 +1,10 @@
+string name
+---
+bool error
+string name
+string type
+string description
+string[] agent
+string[] pick_goal
+string[] place_goal
+string job_name

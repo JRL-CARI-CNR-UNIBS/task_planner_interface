@@ -1,0 +1,9 @@
+string name
+---
+bool error
+string name
+string type
+string description
+string[] agent
+string[] goal
+string job_name

@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="agent1" default="motion"/>
+  <arg name="agent2" default="human"/>
+
+  <node name="$(arg agent1)_executor" pkg="task_planner_interface" type="actionServerTaskPlanner.py" output="screen">
+    <param name="agent" type="str" value="$(arg agent1)"/>
+  </node>
+
+  <node name="$(arg agent2)_executor" pkg="task_planner_interface" type="actionServerTaskPlanner.py" output="screen">
+    <param name="agent" type="str" value="$(arg agent2)"/>
+  </node>
+
+</launch>

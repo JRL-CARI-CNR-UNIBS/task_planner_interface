@@ -1,0 +1,7 @@
+string name
+---
+bool error
+string name
+string type
+int32 idle_time
+

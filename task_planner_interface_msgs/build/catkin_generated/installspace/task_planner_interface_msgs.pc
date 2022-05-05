@@ -1,0 +1,8 @@
+prefix=/usr/local
+
+Name: task_planner_interface_msgs
+Description: Description of task_planner_interface_msgs
+Version: 0.0.0
+Cflags: -I${prefix}/include
+Libs: -L${prefix}/lib 
+Requires: std_msgs actionlib_msgs

@@ -1,0 +1,14 @@
+string name
+string type
+string agent
+int8 outcome
+float64 duration_planned
+float64 duration_real
+float64 planning_time
+float64 path_length
+string recipe
+time t_start
+time t_end
+---
+bool success
+string message

@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+
+<launch>
+  <arg name="real" default="false"/>
+  <arg name="topic_safety_override" value="/sharework/test/stiima/motion/safe_ovr" />
+  <arg name="topic_motion_feedback_gui" value="/sharework/test/stiima/human/feedback" />
+  <param name="topic_motion_feedback_gui" value="$(arg topic_motion_feedback_gui)" />
+
+  <!-- <remap from="topic_motion_feedback_gui" to="sharework/test/stiima/human/feedback"/> -->
+
+  <node pkg="task_planner_gui" type="task_interface_gui" name="task_interface_gui" output="screen" >
+    <param name="topic_safety_override" value="$(arg topic_safety_override)" />
+    <param name="topic_motion_feedback" value="$(arg topic_motion_feedback_gui)" />
+  </node>
+</launch>
