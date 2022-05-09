@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import numpy as np
 import pprint
+import os
 
 GREEN = '\033[92m'
 YELLOW = '\033[93m'
@@ -32,12 +33,12 @@ DURATION_OK = "Duration computed correctly"
 COMPUTE_DURATION_SERVICE = "mongo_statistics/compute_durations"
 COMPUTE_DYNAMIC_RISK_SERVICE = "mongo_statistics/compute_dynamic_risk"
 COMPUTE_DYNAMIC_RISK_SERVICE_V2 = "mongo_statistics/compute_dynamic_risk_v2"
-MAKE_CHART_SERVICE = "/mongo_statistics/make_chart"
+MAKE_CHART_SERVICE = "/mongo_statistics/make_timeline_chart"
 MAKE_DR_CHART_SERVICE = "/mongo_statistics/make_dr_chart"
 
 class MongoStatistics:
     
-    def __init__(self,db_name,coll_properties_name,coll_results_name,coll_duration_name,coll_risk_name):
+    def __init__(self,db_name,coll_properties_name,coll_results_name,coll_duration_name,coll_risk_name,results_folder_path):
         """Constructor
 
         Args:
@@ -72,7 +73,9 @@ class MongoStatistics:
 
     
         self.coll_utils_results = self.db[self.utils_results_name]       
-
+        
+        self.results_folder_path = results_folder_path
+        
 
     def computeDurations(self,request):
         """_summary_
@@ -85,6 +88,7 @@ class MongoStatistics:
         """
         
         rospy.loginfo(SERVICE_CALLBACK.format(COMPUTE_DURATION_SERVICE))
+        
         
         pipeline = [
         {
@@ -166,6 +170,7 @@ class MongoStatistics:
         }
         ]
         try:
+            self.coll_durations.delete_many({})
             results = self.coll_results.aggregate(pipeline)
             rospy.loginfo(DURATION_OK)
             return SetBoolResponse(True,SUCCESSFUL)
@@ -277,15 +282,22 @@ class MongoStatistics:
         Returns:
             SetBoolResponse: _description_
         """
+        
         t_start = rospy.Time.now()
+        
+        # Delete older dynamic risk collection
+        try:
+            self.coll_interaction.delete_many({})
+        except pymongo.errors.AutoReconnect:
+            rospy.logerr(CONNECTION_LOST)
+            return SetBoolResponse(False,NOT_SUCCESSFUL)
         
         # Create collection with results task + task mean information
         if not self.createUtilsResults():
             return SetBoolResponse(False,NOT_SUCCESSFUL)
         
-        input("stoppa qui...")
         # Pipeline for: retriving task name, unwinded for agents, each task only 1 agents
-        pipeline =[
+        pipeline_agents_task_name =[
         {
             '$unwind': {
                 'path': '$agent', 
@@ -299,9 +311,9 @@ class MongoStatistics:
             }
         }
         ]
-    
+
         try:
-            cursor_task_properties = self.coll_skills.aggregate(pipeline)
+            cursor_task_properties = self.coll_skills.aggregate(pipeline_agents_task_name)
         except pymongo.errors.AutoReconnect:
             rospy.logerr(CONNECTION_LOST)
             return SetBoolResponse(False,NOT_SUCCESSFUL)
@@ -316,7 +328,8 @@ class MongoStatistics:
                                     
         task_index = {key: list(values) for key, values in task_index.items()}       # Convert agents tasks from set to list (for have index)
         
-        print(task_index)
+        rospy.loginfo("Dizionario: agente->task list: ")
+        rospy.loginfo(task_index)
         rospy.loginfo(RED + "OK FINO TASK RETRIEVE INFO" + END)
         # input("wait...")
         
@@ -529,7 +542,7 @@ class MongoStatistics:
             t_start = rospy.Time.now()
             results = self.coll_utils_results.aggregate(pipeline)
             t_end = (rospy.Time.now() - t_start).to_sec()
-            print(t_end)
+            rospy.loginfo("Computational time for dynamic risk" + str(t_end))
         except pymongo.errors.AutoReconnect:
             rospy.logerr(CONNECTION_LOST)
             return SetBoolResponse(False,NOT_SUCCESSFUL)
@@ -537,22 +550,21 @@ class MongoStatistics:
         rospy.loginfo(YELLOW + "Iterating results" + END)
         
 
-        print(agents)
+        rospy.loginfo(GREEN + "Agents: {}".format(agents) + END)
         for task_group in results:          #A task_group contains vector of all (task_j, agent_i) same task computed by same agent
             input("New task group...")
-            print("--------------------------------------------------------------------------------")
+            
             #Number of rows of regression matrix
             n_rows = len(task_group['grouped_task_agent'])
             
-            # n_rosw_outcome_true = len(list(filter(lambda elem: elem["outcome"] or elem["outcome"],task_group['grouped_task_agent'])))
             # print(agents)
             
             #Compute other agents different from current task agent
             agent = task_group["_id"][1]                                    #First element of _id is name
             concurrent_agent = list(set(agents).difference(set([agent])))[0]         # If only one agent ok, otherwise there is also others agents in the set.
             
-            print("Principal agent: {}".format(agent))
-            print("Concurrent agent: {}".format(concurrent_agent))
+            rospy.loginfo("Principal agent: {}".format(agent))
+            rospy.loginfo("Concurrent agent: {}".format(concurrent_agent))
                         
                        
             #for concurrent_agent in other_agents:                   #If more than one agents
@@ -565,23 +577,23 @@ class MongoStatistics:
             #regression_mat = np.zeros((n_rows,n_col))                       # To change: non è detto che per un task ce ne sia uno parallelo
             #row_vect = np.zeros((1,n_col))
             
-            add_task_to_regmat = False
             regression_mat = np.empty((0,n_col)) 
             known_vect = np.empty((0,1))
             
-            print("////////////////////////")
-            print(regression_mat)
-            print("////////////////////////")
+            # print("////////////////////////")
+            # # print(regression_mat)
+            # print("////////////////////////")
             # print(n_col)
             # print(n_rows)
             # print("-----------------------")
 
-            rospy.loginfo(GREEN + "Fondamental task:" + END)
-            print(task_group["_id"][0])
+            rospy.loginfo(GREEN + "Fondamental task: {}".format(task_group["_id"][0]) + END)
             
             self.resetConcurrentTaskCounters()
-            input("Check dimensions...")
+            # if not(agent == "ur5_on_guide" and concurrent_agent == "human_right_arm" and task_group["_id"][0]=="pick_blue_box"):
+            #     continue
             for row, single_task in enumerate(task_group['grouped_task_agent']):
+                add_task_to_regmat = False
                 row_vect = np.zeros((1,n_col))
                 # print(single_task)
                 # print("task")
@@ -599,15 +611,16 @@ class MongoStatistics:
                 p_final_task = single_task['partial_task_final']
                 # inner_tasks = single_task['inner_task']
                 global_outer_task = single_task['outer_task']
-                
+
                 overlapping_initial_time = 0.0
                 overlapping_final_time = 0.0
                 overlapping_inner_tasks = 0.0
                 overlapping_global_outer_task = 0.0
                 
-                print(p_initial_task)
-                print(p_final_task)
+                # print(p_initial_task)
+                # print(p_final_task)
                 print("**************************************************")
+                rospy.loginfo(RED + "DURATION: {}".format(single_task["delta_time"]) + END)
                 #Insert partial initial task
                 if p_initial_task:          # Not empty
                     if len(p_initial_task)>1:                                               #Future note: It can be more than one agents in parallel, in that case filter to consider only concurrent task of concurrent agent
@@ -615,15 +628,14 @@ class MongoStatistics:
                     else:
                         if p_initial_task[0]["outcome"] == 1:
                             # print("initial")
-                            rospy.loginfo(RED + "Initial task:" + END)
-                            print(p_initial_task[0]["name"])
+                            rospy.loginfo(RED + "Initial task: {}".format(p_initial_task[0]["name"]) + END)
                             
                             overlapping_initial_time = p_initial_task[0]["t_end"] - single_task["t_start"] 
                             delta_initial = overlapping_initial_time / p_initial_task[0]["delta_time"]
-                            print(p_initial_task[0])
-                            print(p_initial_task[0]["task_mean_informations"])
-                            print(p_initial_task[0]["task_mean_informations"][0])
-                            print(p_initial_task[0]["task_mean_informations"][0]["expected_duration"])
+                            # print(p_initial_task[0])
+                            # print(p_initial_task[0]["task_mean_informations"])
+                            # print(p_initial_task[0]["task_mean_informations"][0])
+                            # print(p_initial_task[0]["task_mean_informations"][0]["expected_duration"])
                             t_initial_mean = p_initial_task[0]["task_mean_informations"][0]["expected_duration"] #"task_mean_informations":[{"exp_dur":**}]
                             # print(task_index[concurrent_agent])
                             col_index_reg_mat = task_index[concurrent_agent].index(p_initial_task[0]["name"])
@@ -653,13 +665,13 @@ class MongoStatistics:
                         rospy.loginfo(RED + "More than one partial final task" + END)        #Future note: It can be more than one agents in parallel, in that case filter to consider only concurrent task of concurrent agent
                     else:
                         if p_final_task[0]["outcome"] == 1:          
-                            rospy.loginfo(RED + "Final task:" + END)
-                            print(p_final_task[0]["name"])
+                            rospy.loginfo(RED + "Final task: {}".format(p_final_task[0]["name"]) + END)
+
                             overlapping_final_time = single_task["t_end"] - p_final_task[0]["t_start"]
                             delta_final = overlapping_final_time / p_final_task[0]["delta_time"]
-                            print(p_final_task[0]["task_mean_informations"])
-                            print(p_final_task[0]["task_mean_informations"][0])
-                            print(p_final_task[0]["task_mean_informations"][0]["expected_duration"])
+                            # print(p_final_task[0]["task_mean_informations"])
+                            # print(p_final_task[0]["task_mean_informations"][0])
+                            # print(p_final_task[0]["task_mean_informations"][0]["expected_duration"])
                             t_final_mean = p_final_task[0]["task_mean_informations"][0]["expected_duration"] #"task_mean_informations":[{"exp_dur":**}]
                             # print(concurrent_agent)
                             col_index_reg_mat = task_index[concurrent_agent].index(p_final_task[0]["name"])
@@ -683,39 +695,37 @@ class MongoStatistics:
                 
                                   
                 if single_task['inner_task']:
-                    rospy.loginfo(RED + "Inner tasks:" + END)
-                    print(single_task['inner_task'])
-                    print("...............................................")
-                    print(single_task['inner_task'])
-                    print(type(single_task['inner_task']))
+                    rospy.loginfo(RED + "Inner tasks: " + END)
+                    # print(single_task['inner_task'])
+                    # print("...............................................")
+                    # print(single_task['inner_task'])
+                    # print(type(single_task['inner_task']))
                     for inner_task in single_task['inner_task']:
-                        print(inner_task)
+                        # print(inner_task)
                         if inner_task["outcome"] == 1:               #QUesto [0] non sono sicuro
                             col_index_reg_mat = task_index[concurrent_agent].index(inner_task["name"])
-                            print("another inner tasks")
-                            print(inner_task)
-                            print(inner_task["task_mean_informations"])
-                            print(inner_task["task_mean_informations"][0]["expected_duration"])                        
-                            print(inner_task["task_mean_informations"][0])
+                            # print("another inner tasks")
+                            print(inner_task["name"])
+                            # print(inner_task["task_mean_informations"])
+                            # print(inner_task["task_mean_informations"][0]["expected_duration"])                        
+                            # print(inner_task["task_mean_informations"][0])
                             #regression_mat[row, col_index_reg_mat] = inner_task["task_mean_informations"][0]["expected_duration"]
                             
                             row_vect[0,col_index_reg_mat] += inner_task["task_mean_informations"][0]["expected_duration"]
                             
                             overlapping_inner_tasks += inner_task["delta_time"]
-                            print(inner_task["outcome"])
                             add_task_to_regmat = True
+                        
                         self.updateConcurrentTaskCounters(inner_task["name"], inner_task["outcome"])
                         # input("guarda inner task")
-                        print(inner_task["name"])
+                        # print(inner_task["name"])
                 
                 if global_outer_task:
                     if len(global_outer_task)>1:
                         rospy.loginfo(RED + "More than one global outside final task" + END)        #Future note: It can be more than one agents in parallel, in that case filter to consider only concurrent task of concurrent agent
                     else:
-                        print(global_outer_task)
                         if global_outer_task[0]["outcome"] == 1:          
-                            rospy.loginfo(RED + "Global outside task:" + END)
-                            print(global_outer_task[0]["name"])
+                            rospy.loginfo(RED + "Global outside task: {}".format(global_outer_task[0]["name"]) + END)
 
                             delta_global_outside = single_task["delta_time"] / global_outer_task[0]["delta_time"]
                             
@@ -729,25 +739,31 @@ class MongoStatistics:
                             overlapping_global_outer_task = single_task["delta_time"]                                      # All the little task   |---|
                             add_task_to_regmat = True                                                                                                   # |--------|
                         self.updateConcurrentTaskCounters(global_outer_task[0]["name"], global_outer_task[0]["outcome"])
+                print(row_vect)
+                print(overlapping_initial_time)
+                print(overlapping_inner_tasks)
+                print(overlapping_final_time)
+                print(overlapping_global_outer_task)
                 if add_task_to_regmat:
                     #Nota TODO solo se almeno uno di quelli sopra
                     regression_mat = np.append(regression_mat, row_vect,axis=0)
-                    print("------------------")
-                    print(regression_mat)
-                    print("------------------")
+                    # print("------------------")
+                    # print(regression_mat)
+                    # print("------------------")
                     
                     known_vect = np.append(known_vect, overlapping_initial_time + overlapping_final_time + overlapping_inner_tasks + overlapping_global_outer_task)
-                    print("------------------")
-                    print(known_vect)
-                    print("------------------")
+                    # print(known_vect)
+                    # print("------------------")
                     # known_vect[row] = overlapping_initial_time + overlapping_final_time + overlapping_inner_tasks + overlapping_global_outer_task  # = single_task["delta_time"]-t_idle : t_idle = single_task["delta_time"] - overlapping_inner -overl_initial-over_final 
-
-            input("Regression")
+                # print(known_vect)
+                print(known_vect)
+                input("COntrolla")
+            input("Regression...")
             print(regression_mat)
             print(known_vect)
-            print(regression_mat.shape)
-            print(known_vect.shape)
-            input("Attendi...")
+            # print(regression_mat.shape)
+            # print(known_vect.shape)
+            
             t_start=rospy.Time.now()
             try:
                 lstsq_results=np.linalg.lstsq(regression_mat, known_vect, rcond=None)
@@ -756,20 +772,28 @@ class MongoStatistics:
             except np.linalg.LinAlgError:
                 rospy.loginfo(RED + "Least square does not converge" + END)
                 return SetBoolResponse(False,NOT_SUCCESSFUL)        
+            
             # Here agent and concurrent_agent change role for dynamic risk 
             for index, task in enumerate(task_index[concurrent_agent]):
                 counter, success_rate = self.getConcurrentTaskStatistics(task)
-                self.coll_interaction.insert_one({"agent": concurrent_agent, 
-                                                  "concurrent_agent": agent,
-                                                  "agent_skill": task, 
-                                                  "concurrent_skill": task_group["_id"][0],
-                                                  "success_rate": success_rate,
-                                                  "dynamic_risk": dynamic_risk[index],
-                                                  "counter": counter})
+                try:
+                    results = self.coll_utils_results.aggregate(pipeline)
+                    self.coll_interaction.insert_one({"agent": concurrent_agent, 
+                                                    "concurrent_agent": agent,
+                                                    "agent_skill": task, 
+                                                    "concurrent_skill": task_group["_id"][0],
+                                                    "success_rate": success_rate,
+                                                    "dynamic_risk": dynamic_risk[index],
+                                                    "counter": counter})
+                except pymongo.errors.AutoReconnect:
+                    rospy.logerr(CONNECTION_LOST)
+                    return SetBoolResponse(False,NOT_SUCCESSFUL)
+                
             rospy.loginfo(GREEN + "Fondamental task:" + END)
             print(single_task["name"])
             print(task_index[concurrent_agent])
             print(dynamic_risk)
+            input("Leggi i risultati...")
             # for k in coefficient:
             #     input("Prossimo k")
             #     print(k)
@@ -782,10 +806,25 @@ class MongoStatistics:
     
         
     def dynamicRiskChart(self,request):
+        """Method that is a callback of a service usefull for do dynamic risk heat map
+
+        Args:
+            request (SetBoolRequest): _description_
+
+        Returns:
+            SetBoolResponse: _description_
+        """
+        
+        # Check if the results folder path not exist create it
+        if not os.path.exists(self.results_folder_path):
+            os.makedirs(self.results_folder_path)
+            rospy.loginfo(RED + "The new direcory {} is created!".format(self.results_folder_path) + END)
+        
+        
         import pandas as pd
         import seaborn as sns
-        
-        pipeline = [
+
+        pipeline_dr_grouped_by_agent = [        # Pipeline to group/separate dynamic risk elements by agent  
         {
             '$sort': {
                 'agent_skill': 1, 
@@ -801,11 +840,12 @@ class MongoStatistics:
         }
         ]
         try:
-            dynamic_risk_grouped = self.coll_interaction.aggregate(pipeline)
+            dynamic_risk_grouped = self.coll_interaction.aggregate(pipeline_dr_grouped_by_agent)
         except pymongo.errors.AutoReconnect:
             rospy.logerr(CONNECTION_LOST)
 
-        dynamic_risk_list = []
+        #### --------------- 
+        dynamic_risk_list = []      # It will be a list of dictionaries each made like: {"main_agent":"name", "concurrent_agent":"name", "name_main_agent":[],  "name_concurrent_agent":[], "dynamic_risk":[]}
         
         for index, dynamic_risk_single_agent in enumerate(dynamic_risk_grouped):        # Iterate a group of dynamic_risk element (a group for main agent)
             dynamic_risk_list.append({})
@@ -814,11 +854,12 @@ class MongoStatistics:
             dynamic_risk_list[index]["main_agent"] = dynamic_risk_single_agent["_id"]   # In order to store who is main agent
             for dynamic_risk_single_element in dynamic_risk_single_agent["grouped_task_agent"]: 
                 # print(dynamic_risk_single_element)
+                
+                # Add concurrent agent  
                 if dynamic_risk_single_element["concurrent_agent"] not in dynamic_risk_list[index]:
-                    # Add concurrent agent  
                     dynamic_risk_list[index][dynamic_risk_single_element["concurrent_agent"]] = []                  
                     dynamic_risk_list[index]["concurrent_agent"] = dynamic_risk_single_element["concurrent_agent"]  # In order to store who is concurrent agent
-                    #here dynamic_risk_list[index] = {"main_agent":"name", "concurrent_agent":"name", "name_main_agent":[],  "name_concurrent_agent":[], "dynamic_risk"_[]}
+                    #here dynamic_risk_list[index] = {"main_agent":"name", "concurrent_agent":"name", "name_main_agent":[],  "name_concurrent_agent":[], "dynamic_risk":[]}
                 
                 # Retrieve agent and concurrent agent skills 
                 agent_skill = dynamic_risk_single_element["agent_skill"]
@@ -838,121 +879,38 @@ class MongoStatistics:
             print("Main agent: {}".format(dynamic_risk_single_agent["_id"]))
             print("Concurrent agent: {}".format(dynamic_risk_single_element["concurrent_agent"]))
             print(dynamic_risk_list[index])   
+        ##### -------------------
         
         # fig, axs = plt.subplots(1, 2)
         # fig.suptitle('Dynamic Matrix')
+        
         for index, single_agent_dynamic_risk in enumerate(dynamic_risk_list):
             # Retrieve agent name
             main_agent = single_agent_dynamic_risk["main_agent"]
             concurrent_agent = single_agent_dynamic_risk["concurrent_agent"]
+            
             # Remove it for chart data
             single_agent_dynamic_risk.pop("main_agent",None)
             single_agent_dynamic_risk.pop("concurrent_agent",None)
             
             # Create a dataframe
             data = pd.DataFrame(single_agent_dynamic_risk)
+            print(data)
             print(True in data.duplicated())
             if data.duplicated().any():
                 rospy.loginfo(RED + "There are duplicated task" + END)
                 rospy.loginfo(data.duplicated())
                 return SetBoolResponse(False,NOT_SUCCESSFUL)
             
-            # Retrieve key by which do heatmap
-            header = list(single_agent_dynamic_risk.keys())                 # agents name
-            header.remove("dynamic_risk")
-            data_matrix = data.pivot(header[0],header[1],"dynamic_risk")
+            # Prepare data for heatmap
+            data_matrix = data.pivot(main_agent,concurrent_agent,"dynamic_risk")
             
-            print(index)
-            # axs[0,index] = sns.heatmap(data_matrix)
-            # axs[0, index].set_title("Agent: {}".format(main_agent))
             plt.figure(index)
             ax = sns.heatmap(data_matrix)
             plt.title("Dynamic Risk Matrix for agent: {}".format(main_agent))
-            # sns.heatmap(data_matrix)
-        plt.show()
-        # print(dynamic_risk_list)
-            
-
-        #####
-        # for single_dynamic_risk_element in dynamic_risk_elements:
-            
-        #     print(single_dynamic_risk_element)
-        #     if single_dynamic_risk_element["agent"] not in dynamic_risk_dict:
-        #         dynamic_risk_dict[single_dynamic_risk_element["agent"]] = []
-        #     if single_dynamic_risk_element["concurrent_agent"] not in dynamic_risk_dict:
-        #         dynamic_risk_dict[single_dynamic_risk_element["concurrent_agent"]] = []
-        #     if "dynamic_risk" not in dynamic_risk_dict:
-        #         dynamic_risk_dict["dynamic_risk"] = []
-
-        #     agent_skill = single_dynamic_risk_element["agent_skill"]
-        #     concurreent_agent_skill = single_dynamic_risk_element["concurrent_skill"]
-        #     #if "pick_blue_box" in single_dynamic_risk_element["agent_skill"] or "pick_blue_box" in single_dynamic_risk_element["concurrent_skill"]:
-        #     if "pick_blue_box" in single_dynamic_risk_element["agent_skill"]:
-        #         agent_skill += "_" + single_dynamic_risk_element["agent"]
-        #     if "pick_blue_box" in single_dynamic_risk_element["concurrent_skill"]:
-        #         concurreent_agent_skill += "_" + single_dynamic_risk_element["concurrent_agent"]
-                
-        #     dynamic_risk_dict[single_dynamic_risk_element["agent"]].append(agent_skill)
-        #     dynamic_risk_dict[single_dynamic_risk_element["concurrent_agent"]].append(concurreent_agent_skill)
-        #     dynamic_risk_dict["dynamic_risk"].append(single_dynamic_risk_element["dynamic_risk"])
+            plt.savefig(self.results_folder_path + "dynamic_risk_agent_" + main_agent +".png")
+        plt.show()            
         
-        # print("------------------")                          
-        # print(dynamic_risk_dict)
-        # print("----------------------------")
-        
-        # print(len(dynamic_risk_dict[single_dynamic_risk_element["agent"]]))       
-        # print(dynamic_risk_dict[single_dynamic_risk_element["agent"]])
-        # print(dynamic_risk_dict[single_dynamic_risk_element["concurrent_agent"]])
-
-        # print(len(dynamic_risk_dict[single_dynamic_risk_element["concurrent_agent"]]))       
-        # print(len(dynamic_risk_dict["dynamic_risk"]))
-        ##################################
-        # dynamic_risk_dict=dict()
-        # dynamic_risk_dict["agent"] = []
-        # dynamic_risk_dict["concurrent_agent"] = []
-        # dynamic_risk_dict["dynamic_risk"] = []
-        # print(dynamic_risk_dict)
-        # for single_dynamic_risk_element in dynamic_risk_elements:
-            
-        #     print(single_dynamic_risk_element)
-
-        #     if "dynamic_risk" not in dynamic_risk_dict:
-        #         dynamic_risk_dict["dynamic_risk"] = []
-
-        #     agent_skill = single_dynamic_risk_element["agent_skill"]
-        #     concurreent_agent_skill = single_dynamic_risk_element["concurrent_skill"]
-        #     #if "pick_blue_box" in single_dynamic_risk_element["agent_skill"] or "pick_blue_box" in single_dynamic_risk_element["concurrent_skill"]:
-        #     if "pick_blue_box" in single_dynamic_risk_element["agent_skill"]:
-        #         agent_skill += "_" + single_dynamic_risk_element["agent"]
-        #     if "pick_blue_box" in single_dynamic_risk_element["concurrent_skill"]:
-        #         concurreent_agent_skill += "_" + single_dynamic_risk_element["concurrent_agent"]
-                
-        #     dynamic_risk_dict["agent"].append(agent_skill)
-        #     dynamic_risk_dict["concurrent_agent"].append(concurreent_agent_skill)
-        #     dynamic_risk_dict["dynamic_risk"].append(single_dynamic_risk_element["dynamic_risk"])
-        #     ############################
-        
-        
-        # data = pd.DataFrame(dynamic_risk_dict)
-        # print(data.duplicated())
-        
-    
-        
-        # header = list(dynamic_risk_dict.keys())
-        # header.remove("dynamic_risk")
-        # print(header)
-        # print(data)
-        # print("--------------------")
-        # data_matrix = data.pivot(header[0],header[1],"dynamic_risk")
-        # print("-----------")
-        # print(data_matrix)
-        # print("------------")
-        # print("ok")
-        
-        
-        # ax = sns.heatmap(data_matrix)
-        # plt.title("Dynamic Risk Matrix")
-        # plt.show()
         return SetBoolResponse(True,SUCCESSFUL)
                                                        
     def computeDynamicRiskNoAddInfo(self,request):     #senza medie nei concurrent
@@ -1209,7 +1167,7 @@ class MongoStatistics:
                         #print(single_task)
                         #print((single_task['t_start'], single_task['delta_time'], single_task['agent']))
                         single_task['t_start']
-                        if single_task['agent']=="motion":
+                        if single_task['agent']=="ur5_on_guide":
                             recipe_robot_task.append((single_task['t_start'], single_task['delta_time']))
                         else:
                             recipe_human_task.append((single_task['t_start'], single_task['delta_time']))
@@ -1287,7 +1245,11 @@ class MongoStatistics:
 
                     ax.grid(True)
                     ax.set_title("Recipe: {}".format(n_recipe))
-                    plt.savefig("recipe" + str(n_recipe) +".png")
+                    
+                    if not os.path.exists(self.results_folder_path):
+                        os.makedirs(self.results_folder_path)
+                        rospy.loginfo(RED + "The new direcory {} is created!".format(self.results_folder_path) + END)
+                    plt.savefig(self.results_folder_path + "recipe" + str(n_recipe) +".png")
                     rospy.loginfo(RED + "Recipe: {}".format(n_recipe) + END)
                     
                     # print(recipe_task)
@@ -1305,6 +1267,353 @@ class MongoStatistics:
             return SetBoolResponse(False,NOT_SUCCESSFUL)
         
         pass
+
+    def makeDurationChart(self,request):   #Compute dynamic risk with concurrent and mean information
+        """Method 
+
+        Args:
+            request (SetBoolRequest): 
+
+        Returns:
+            SetBoolResponse: 
+        """
+        import pandas as pd
+        import seaborn as sns
+        
+        if not self.createUtilsResults():
+            return SetBoolResponse(False,NOT_SUCCESSFUL)
+        
+        agents = self.getAgents()
+        
+        task_results = dict()           
+        task_results["duration"] = []
+        for agent in agents:
+            task_results[agent] =[]
+        
+        # try:
+        #     cursor_task_results= self.coll_durations.find({})
+        # except pymongo.errors.AutoReconnect:
+        #     rospy.logerr(CONNECTION_LOST)
+        #     return SetBoolResponse(False,NOT_SUCCESSFUL)
+        
+        # for cursor_result in cursor_task_results:
+
+        pipeline = [
+        {
+            '$lookup': {
+                'from': self.utils_results_name, 
+                'let': {
+                    'local_name': '$name', 
+                    'local_agent': '$agent', 
+                    'local_recipe': '$recipe', 
+                    'local_t_start': '$t_start', 
+                    'local_t_end': '$t_end'
+                }, 
+                'pipeline': [
+                    {
+                        '$match': {
+                            '$expr': {
+                                '$and': [
+                                    {
+                                        '$ne': [
+                                            '$agent', '$$local_agent'
+                                        ]
+                                    }, {
+                                        '$eq': [
+                                            '$recipe', '$$local_recipe'
+                                        ]
+                                    }, {
+                                        '$lte': [
+                                            '$$local_t_start', '$t_start'
+                                        ]
+                                    }, {
+                                        '$gte': [
+                                            '$$local_t_end', '$t_end'
+                                        ]
+                                    }
+                                ]
+                            }
+                        }
+                    }, {
+                        '$project': {
+                            'stock_item': 0, 
+                            '_id': 0
+                        }
+                    }
+                ], 
+                'as': 'inner_task'
+            }
+        }, {
+            '$lookup': {
+                'from': self.utils_results_name, 
+                'let': {
+                    'local_name': '$name', 
+                    'local_agent': '$agent', 
+                    'local_recipe': '$recipe', 
+                    'local_t_start': '$t_start', 
+                    'local_t_end': '$t_end'
+                }, 
+                'pipeline': [
+                    {
+                        '$match': {
+                            '$expr': {
+                                '$and': [
+                                    {
+                                        '$ne': [
+                                            '$agent', '$$local_agent'
+                                        ]
+                                    }, {
+                                        '$eq': [
+                                            '$recipe', '$$local_recipe'
+                                        ]
+                                    }, {
+                                        '$lt': [
+                                            '$$local_t_start', '$t_end'
+                                        ]
+                                    }, {
+                                        '$gt': [
+                                            '$$local_t_start', '$t_start'
+                                        ]
+                                    }, {
+                                        '$lt': [
+                                            '$t_end', '$$local_t_end'
+                                        ]
+                                    }
+                                ]
+                            }
+                        }
+                    }, {
+                        '$project': {
+                            'stock_item': 0, 
+                            '_id': 0
+                        }
+                    }
+                ], 
+                'as': 'partial_task_initial'
+            }
+        }, {
+            '$lookup': {
+                'from': self.utils_results_name, 
+                'let': {
+                    'local_name': '$name', 
+                    'local_agent': '$agent', 
+                    'local_recipe': '$recipe', 
+                    'local_t_start': '$t_start', 
+                    'local_t_end': '$t_end'
+                }, 
+                'pipeline': [
+                    {
+                        '$match': {
+                            '$expr': {
+                                '$and': [
+                                    {
+                                        '$ne': [
+                                            '$agent', '$$local_agent'
+                                        ]
+                                    }, {
+                                        '$eq': [
+                                            '$recipe', '$$local_recipe'
+                                        ]
+                                    }, {
+                                        '$gt': [
+                                            '$$local_t_end', '$t_start'
+                                        ]
+                                    }, {
+                                        '$lt': [
+                                            '$$local_t_end', '$t_end'
+                                        ]
+                                    }, {
+                                        '$lt': [
+                                            '$$local_t_start', '$t_start'
+                                        ]
+                                    }
+                                ]
+                            }
+                        }
+                    }, {
+                        '$project': {
+                            'stock_item': 0, 
+                            '_id': 0
+                        }
+                    }
+                ], 
+                'as': 'partial_task_final'
+            }
+        }, {
+            '$lookup': {
+                'from': self.utils_results_name, 
+                'let': {
+                    'local_name': '$name', 
+                    'local_agent': '$agent', 
+                    'local_recipe': '$recipe', 
+                    'local_t_start': '$t_start', 
+                    'local_t_end': '$t_end'
+                }, 
+                'pipeline': [
+                    {
+                        '$match': {
+                            '$expr': {
+                                '$and': [
+                                    {
+                                        '$ne': [
+                                            '$agent', '$$local_agent'
+                                        ]
+                                    }, {
+                                        '$eq': [
+                                            '$recipe', '$$local_recipe'
+                                        ]
+                                    }, {
+                                        '$lt': [
+                                            '$$local_t_end', '$t_end'
+                                        ]
+                                    }, {
+                                        '$gt': [
+                                            '$$local_t_start', '$t_start'
+                                        ]
+                                    }
+                                ]
+                            }
+                        }
+                    }, {
+                        '$project': {
+                            'stock_item': 0, 
+                            '_id': 0
+                        }
+                    }
+                ], 
+                'as': 'outer_task'
+            }
+        }, {
+            '$group': {                     # Il group molto lento 0.1 -> 0.7
+                '_id': [
+                    '$name', '$agent'
+                ], 
+                'grouped_task_agent': {
+                    '$push': '$$ROOT'
+                }
+            }
+        }
+        ]
+
+        try:
+            results = self.coll_utils_results.aggregate(pipeline)
+        except pymongo.errors.AutoReconnect:
+            rospy.logerr(CONNECTION_LOST)
+            return SetBoolResponse(False,NOT_SUCCESSFUL)
+        
+        rospy.loginfo(YELLOW + "Iterating results" + END)
+        
+
+        rospy.loginfo(GREEN + "Agents: {}".format(agents) + END)
+        for task_group in results:          #A task_group contains vector of all (task_j, agent_i) same task computed by same agent
+            # input("New task group...")
+            
+            #Number of rows of regression matrix
+            
+            #Compute other agents different from current task agent
+            agent = task_group["_id"][1]                                    #First element of _id is name
+            concurrent_agent = list(set(agents).difference(set([agent])))[0]         # If only one agent ok, otherwise there is also others agents in the set.
+            
+            rospy.loginfo("Principal agent: {}".format(agent))
+            rospy.loginfo("Concurrent agent: {}".format(concurrent_agent))
+
+            rospy.loginfo(GREEN + "Fondamental task: {}".format(task_group["_id"][0]) + END)
+            
+            for row, single_task in enumerate(task_group['grouped_task_agent']):
+                add_task_to_regmat = False                
+
+                p_initial_task = single_task['partial_task_initial']
+                p_final_task = single_task['partial_task_final']
+                global_outer_task = single_task['outer_task']
+
+                rospy.loginfo(RED + "DURATION: {}".format(single_task["delta_time"]) + END)
+                #Insert partial initial task
+                if p_initial_task:          # Not empty
+                    if len(p_initial_task)>1:                                               #Future note: It can be more than one agents in parallel, in that case filter to consider only concurrent task of concurrent agent
+                        rospy.loginfo(RED + "More than one partial initial task" + END)
+                    else:
+                        if p_initial_task[0]["outcome"] == 1:
+                            rospy.loginfo(RED + "Initial task: {}".format(p_initial_task[0]["name"]) + END)
+                            task_results[agent].append(single_task["name"])
+                            task_results[concurrent_agent].append(p_initial_task[0]["name"])                    
+                            task_results["duration"].append(single_task["delta_time"])
+                #Insert partial final task
+                if p_final_task:          # Not empty
+                    if len(p_final_task)>1:
+                        rospy.loginfo(RED + "More than one partial final task" + END)        #Future note: It can be more than one agents in parallel, in that case filter to consider only concurrent task of concurrent agent
+                    else:
+                        if p_final_task[0]["outcome"] == 1:          
+                            rospy.loginfo(RED + "Final task: {}".format(p_final_task[0]["name"]) + END)
+                            task_results[agent].append(single_task["name"])
+                            task_results[concurrent_agent].append(p_final_task[0]["name"])                    
+                            task_results["duration"].append(single_task["delta_time"])        
+                                  
+                if single_task['inner_task']:
+                    rospy.loginfo(RED + "Inner tasks: " + END)
+                    for inner_task in single_task['inner_task']:
+                        # print(inner_task)
+                        if inner_task["outcome"] == 1:               #QUesto [0] non sono sicuro
+                            print(inner_task["name"])
+                    
+                            task_results[agent].append(single_task["name"])
+                            task_results[concurrent_agent].append(inner_task["name"])                    
+                            task_results["duration"].append(single_task["delta_time"])       
+                            
+                if global_outer_task:
+                    if len(global_outer_task)>1:
+                        rospy.loginfo(RED + "More than one global outside final task" + END)        #Future note: It can be more than one agents in parallel, in that case filter to consider only concurrent task of concurrent agent
+                    else:
+                        if global_outer_task[0]["outcome"] == 1:          
+                            rospy.loginfo(RED + "Global outside task: {}".format(global_outer_task[0]["name"]) + END)
+                            task_results[agent].append(single_task["name"])
+                            task_results[concurrent_agent].append(global_outer_task[0]["name"])                    
+                            task_results["duration"].append(single_task["delta_time"])                                   
+                            
+        print(task_results)
+                    
+        dati = pd.DataFrame(task_results)
+        print(dati)
+        sns.set_theme()
+        sns.catplot(data=dati, x="ur5_on_guide", y="duration", hue="human_right_arm")
+        plt.figure()
+        sns.catplot(data=dati, kind="bar", x="ur5_on_guide", y="duration", hue="human_right_arm")
+        plt.figure()
+        sns.catplot(data=dati, kind="violin", x="ur5_on_guide", y="duration", hue="human_right_arm")
+
+        plt.figure()
+        sns.boxplot(data=dati, x="ur5_on_guide", y="duration", hue="human_right_arm")
+
+        plt.show()
+        return SetBoolResponse(True,SUCCESSFUL)
+
+    def getAgents(self):
+        """Utility method that group all agents in task_properties db and return it in a list
+
+        Raises:
+            pymongo.errors.AutoReconnect: If the connection is lost
+
+        Returns:
+            _type_: A list containing all agents name 
+        """
+        pipeline = [
+        {
+            '$unwind': {
+                'path': '$agent', 
+                'preserveNullAndEmptyArrays': False
+            }
+        }, {
+            '$group': {
+                '_id': '$agent'
+            }
+        }
+        ]
+        try:
+            agents_cursor = self.coll_utils_results.aggregate(pipeline)
+        except pymongo.errors.AutoReconnect:
+            rospy.logerr(CONNECTION_LOST)
+            raise pymongo.errors.AutoReconnect
+        
+        return [agent["_id"] for agent in list(agents_cursor)]
 
 def main():
 
@@ -1329,7 +1638,13 @@ def main():
     # except KeyError:        
     #     rospy.logerr(RED + PARAM_NOT_DEFINED_ERROR.format("coll_risk_name") + END)
     #     return 0    
-    
+    try:
+        fig_folder=rospy.get_param("~fig_folder_path")   
+    except KeyError:        
+        rospy.logerr(RED + PARAM_NOT_DEFINED_ERROR.format("fig_folder_path") + END)
+        fig_folder = "file"
+        rospy.logerr("fig_folder set to: " + fig_folder)
+        
     db_name = "agents_synergy"
     coll_properties_name = "tasks_properties_test"
     coll_results_name = "sinergy_results_test"  #"results_test"
@@ -1337,7 +1652,7 @@ def main():
     coll_risk_name = "dynamics"
     
     try:
-        mongo_statistics = MongoStatistics(db_name,coll_properties_name,coll_results_name,coll_duration_name,coll_risk_name)
+        mongo_statistics = MongoStatistics(db_name,coll_properties_name,coll_results_name,coll_duration_name,coll_risk_name,fig_folder)
     except:
         return 0     #Connection to db failed 
     
@@ -1348,6 +1663,9 @@ def main():
     rospy.Service(COMPUTE_DYNAMIC_RISK_SERVICE_V2,SetBool,mongo_statistics.computeDynamicRiskNoAddInfo) 
     rospy.Service(MAKE_CHART_SERVICE,SetBool,mongo_statistics.drawTimeline) 
     rospy.Service(MAKE_DR_CHART_SERVICE,SetBool,mongo_statistics.dynamicRiskChart) 
+    rospy.Service("prova",SetBool,mongo_statistics.makeDurationChart) 
+
+    
     
     
     rospy.loginfo(READY)
