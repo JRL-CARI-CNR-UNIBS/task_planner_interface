@@ -108,7 +108,7 @@ namespace taskPlannerInterface
 
               m_pub_task_request.publish(human_command_msg);
 
-              ros::WallTime t_send = ros::WallTime::now();
+              ros::Time t_send = ros::Time::now();
               ROS_INFO("cmd sent. time = %f", t_send.toSec() );
 
               ROS_WARN("Waiting skill result...");
@@ -127,13 +127,13 @@ namespace taskPlannerInterface
                 if (m_sub_task_result->isANewDataAvailable())
                 {
                    skill_feedback = m_sub_task_result->getData();
-                   ros::WallTime t_msg;
+                   ros::Time t_msg;
                    m_sub_task_result->getMsgReceivedTime()->get(t_msg);
-                   ROS_INFO("new msg. time = %f", t_msg.toSec() );
+                   //ROS_INFO("new msg. time = %f", t_msg.toSec() );
 
 
-                   //if ((t_msg - t_send).toSec()>0.0)
-                   fdk_received = true;
+                   if ((t_msg - t_send).toSec()>0.0)
+                     fdk_received = true;
                 }
                 r.sleep();
               }
@@ -170,5 +170,3 @@ namespace taskPlannerInterface
     }
 
 } //end namespace
-
-
