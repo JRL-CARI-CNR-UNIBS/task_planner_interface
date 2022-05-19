@@ -20,7 +20,6 @@ public:
   void setObjectInHand(const std::string& id, const std::string& type);
   std::string getObjectInHandId() const;
   std::string getObjectInHandType() const;
-  void resetObjectInHand();
 };
 typedef std::shared_ptr<AgentStatus> AgentStatusPtr;
 typedef std::shared_ptr<AgentStatus const> AgentStatusConstPtr;
