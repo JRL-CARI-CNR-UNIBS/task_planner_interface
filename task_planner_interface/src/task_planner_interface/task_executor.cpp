@@ -169,8 +169,9 @@ namespace taskPlannerInterface
                   }
 
                   if(!skill_name.compare("end"))  /*If task_name is end, i reset object in hand in order to allow to execute new recipe if older task failed with obj in hand*/
-                    m_agent_status->resetObjectInHand();
-
+                  {
+                    // m_agent_status->resetObjectInHand();
+                  }
                   /* Send action result to service to action client */
                   task_planner_interface_msgs::TaskExecuteResult m_result = current_skill->getResultsAsTaskExecuteResult(m_group_name);
                   ROS_INFO("Execution finished: %s", skill_name.c_str());

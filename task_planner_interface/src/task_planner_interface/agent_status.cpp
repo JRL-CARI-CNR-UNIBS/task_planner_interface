@@ -25,6 +25,9 @@ std::string AgentStatus::getObjectInHandType() const { return m_object_in_hand_t
 
 void AgentStatus::resetObjectInHand()
 {
+  ROS_ERROR_STREAM(m_agent_namespace);
+  ROS_ERROR_STREAM(m_object_in_hand_id);
+  ROS_ERROR_STREAM(m_object_in_hand_type);
   m_object_in_hand_id.clear();
   m_object_in_hand_type.clear();
 }
