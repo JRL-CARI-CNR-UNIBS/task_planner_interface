@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+
+<launch>
+
+  <arg name="with_human" default="false"/>
+
+  <arg name="mongo_db" default="test"/>
+  <param name="mongo_db" value="$(arg mongo_db)"/>
+
+
+  <node name="task_planner_statistics_node" pkg="task_planner_statistics" type="mongoStatistics.py"  output="screen" >
+    <param name="fig_folder_path" value="$(find task_planner_statistics)/file/" />
+
+  </node>
+
+
+</launch>
