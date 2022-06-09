@@ -10,10 +10,14 @@ import pymongo.errors
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 
+
 import numpy as np
 import pprint
 import os
 import copy
+
+import pandas as pd
+import seaborn as sns
 
 GREEN = '\033[92m'
 YELLOW = '\033[93m'
@@ -1837,6 +1841,8 @@ class MongoStatistics:
                 
                 recipe_robot_task = []
                 recipe_human_task = []
+                recipe_robot_task_name = []
+                recipe_human_task_name = []
                 rospy.loginfo(RED + "--------------------------------------------" + END)
                 if "recipe_tasks" in task.keys():
                     fig, ax = plt.subplots()
@@ -1846,8 +1852,10 @@ class MongoStatistics:
                         single_task['t_start']
                         if single_task['agent']=="ur5_on_guide":
                             recipe_robot_task.append((single_task['t_start'], single_task['delta_time']))
+                            recipe_robot_task_name.append(single_task["name"])
                         else:
                             recipe_human_task.append((single_task['t_start'], single_task['delta_time']))
+                            recipe_human_task_name.append(single_task["name"])
                         recipe_task.append((single_task['t_start'], single_task['delta_time'], single_task['agent']))
                     print(recipe_robot_task)
                     print(recipe_human_task)
@@ -1872,7 +1880,49 @@ class MongoStatistics:
                         rospy.loginfo(t_end_recipe)
                         recipe_robot_task = list(map(lambda single_task : (single_task[0]-t_start_recipe,single_task[1]),recipe_robot_task))
                         recipe_human_task = list(map(lambda single_task : (single_task[0]-t_start_recipe,single_task[1]),recipe_human_task))
-                
+
+                    rospy.loginfo(RED + "-----------------" + END)
+                    # print(recipe_robot_task_name)
+                    # print(recipe_human_task_name)
+                    color_robot_task =[]
+                    color_human_task =[]
+                    for robot_task_name in recipe_robot_task_name:
+                        if "orange" in robot_task_name:
+                            if "pick" in robot_task_name:
+                                color_robot_task.append([0.9,0.4,0.1,1])
+                            else:
+                                color_robot_task.append([0.9,0.5,0.0,0.8])
+                        elif "blue" in robot_task_name:
+                            if "pick" in robot_task_name:
+                                color_robot_task.append([0,0.4,0.6,1])
+                            else:
+                                color_robot_task.append([0,0.6,0.9,0.8])
+                        elif "white" in robot_task_name:
+                            if "pick" in robot_task_name:
+                                color_robot_task.append([0.7,0.7,0.7,1])
+                            else:
+                                color_robot_task.append([0.9,0.9,0.9,0.8])
+                    for human_task_name in color_human_task:
+                        if "orange" in human_task_name:
+                            if "pick" in human_task_name:
+                                color_human_task.append([0.9,0.4,0.1,1])
+                            else:
+                                color_human_task.append([0.9,0.5,0.0,0.8])
+                        elif "blue" in human_task_name:
+                            if "pick" in robot_task_name:
+                                color_human_task.append([0,0.4,0.6,1])
+                            else:
+                                color_human_task.append([0,0.6,0.9,0.8])
+                        elif "white" in human_task_name:
+                            if "pick" in robot_task_name:
+                                color_human_task.append([0.2,0.7,0.2,1])
+                            else:
+                                color_human_task.append([0.9,0.7,0.2,0.8])
+                    colors_robot_task = np.array(color_robot_task)
+                    colors_human_task = np.array(color_human_task)
+                    print(colors_robot_task)
+                    print(colors_human_task)
+                    rospy.loginfo(RED + "-----------------" + END)
                     # print("robot task: ")
                     # print(recipe_robot_task)
                     # print("human task: ")
@@ -1892,10 +1942,10 @@ class MongoStatistics:
                     # Setting graph attribute
                     ax.grid(True)
                     
-                    colors_robot_task = plt.cm.BuPu(np.linspace(0, 0.5, len(recipe_robot_task)))
-                    colors_human_task = plt.cm.BuPu(np.linspace(0, 0.5, len(recipe_human_task)))
+                    # colors_robot_task = plt.cm.BuPu(np.linspace(0, 0.5, len(recipe_robot_task)))
+                    # colors_human_task = plt.cm.BuPu(np.linspace(0, 0.5, len(recipe_human_task)))
                     
-                    
+                    print(colors_robot_task)
 
                     # mcolors.BASE_COLORS #these colors can be called with a single character
 
@@ -1911,18 +1961,19 @@ class MongoStatistics:
                         print(len(recipe_robot_task))
                         ax.broken_barh(recipe_robot_task,
                                 (0, 2), 
-                                facecolors=mcolors.TABLEAU_COLORS)
+                                facecolors=colors_robot_task)
                     if recipe_human_task:
                         print("Human task")
                         print(recipe_human_task)
                         print(len(recipe_human_task))
                         ax.broken_barh(recipe_human_task,
                                 (3, 2),                     
-                                facecolors=mcolors.TABLEAU_COLORS)
+                                facecolors=colors_human_task)
 
                     ax.grid(True)
                     ax.set_title("Recipe: {}".format(n_recipe))
-                    
+                    self.results_folder_path="/home/samuele/projects/planning_ws/src/task-planner-interface/task_planner_statistics/file/recipe/"
+
                     if not os.path.exists(self.results_folder_path):
                         os.makedirs(self.results_folder_path)
                         rospy.loginfo(RED + "The new direcory {} is created!".format(self.results_folder_path) + END)
@@ -1945,7 +1996,7 @@ class MongoStatistics:
         
         pass
 
-    def makeDurationChart(self,request):   #Compute dynamic risk with concurrent and mean information
+    def groupedDurationChart(self,request):   #Compute dynamic risk with concurrent and mean information
         """Method 
 
         Args:
@@ -2783,13 +2834,13 @@ class MongoStatistics:
                             overlapping_global_outer_task = single_task["delta_time"]                                      # All the little task   |---|
                             add_task_to_regmat = True                                                                                                   # |--------|
                         self.updateConcurrentTaskCounters(global_outer_task[0]["name"], global_outer_task[0]["outcome"])
-                print(row_vect)
-                print(overlapping_initial_time)
-                print(overlapping_inner_tasks)
-                print(overlapping_final_time)
-                print(overlapping_global_outer_task)
+                # print(row_vect)
+                # print(overlapping_initial_time)
+                # print(overlapping_inner_tasks)
+                # print(overlapping_final_time)
+                # print(overlapping_global_outer_task)
                 if add_task_to_regmat:
-                    #Nota TODO solo se almeno uno di quelli sopra
+                    # Nota TODO solo se almeno uno di quelli sopra
                     regression_mat = np.append(regression_mat, row_vect,axis=0)
                     # print("------------------")
                     # print(regression_mat)
@@ -2800,11 +2851,15 @@ class MongoStatistics:
                     # print("------------------")
                     # known_vect[row] = overlapping_initial_time + overlapping_final_time + overlapping_inner_tasks + overlapping_global_outer_task  # = single_task["delta_time"]-t_idle : t_idle = single_task["delta_time"] - overlapping_inner -overl_initial-over_final 
                 # print(known_vect)
-                print(known_vect)
+                # print(known_vect)
                 # input("COntrolla")
             #input("Regression...")
             print(regression_mat)
             print(known_vect)
+            rospy.loginfo(YELLOW + "****************"+ END)
+            print(np.abs(known_vect-np.mean(known_vect))>np.std(known_vect)*2)
+            rospy.loginfo(YELLOW + "****************"+ END)
+
             # print(regression_mat.shape)
             # print(known_vect.shape)
             
@@ -2845,15 +2900,16 @@ class MongoStatistics:
                 print(task)
                 print(reg_result.bse[task])
                 try:
+                    pass
                     # results = self.coll_utils_results.aggregate(pipeline)
-                    self.coll_interaction.insert_one({"agent": concurrent_agent, 
-                                                    "concurrent_agent": agent,
-                                                    "agent_skill": task, 
-                                                    "concurrent_skill": task_group["_id"][0],
-                                                    "success_rate": success_rate,
-                                                    "dynamic_risk": dynamic_risk[index],
-                                                    "std_err": reg_result.bse[task],
-                                                    "counter": counter})
+                    # self.coll_interaction.insert_one({"agent": concurrent_agent, 
+                    #                                 "concurrent_agent": agent,
+                    #                                 "agent_skill": task, 
+                    #                                 "concurrent_skill": task_group["_id"][0],
+                    #                                 "success_rate": success_rate,
+                    #                                 "dynamic_risk": dynamic_risk[index],
+                    #                                 "std_err": reg_result.bse[task],
+                    #                                 "counter": counter})
                 except pymongo.errors.AutoReconnect:
                     rospy.logerr(CONNECTION_LOST)
                     return SetBoolResponse(False,NOT_SUCCESSFUL)
@@ -4136,8 +4192,7 @@ class MongoStatistics:
         Returns:
             SetBoolResponse: 
         """
-        import pandas as pd
-        import seaborn as sns
+
         
         
         agents = self.getAgents()
@@ -4210,7 +4265,74 @@ class MongoStatistics:
         # for agent in agents:
         #     task_results[agent] =[]
         
-    def make
+    def taskDurationChart(self,request):
+        """Method 
+
+        Args:
+            request (SetBoolRequest): 
+
+        Returns:
+            SetBoolResponse: 
+        """
+
+        
+        
+        agents = self.getAgents()
+
+        task_results={"task_name":[],"agent_name":[],"duration":[]}
+        for main_agent in agents:
+            # synergy_agent_values = pd.DataFrame(columns=['main_agent','main_task','concurrent_agent','concurrent_task','synergy'],dtype=object)
+            pipeline_get_only_speciefied_agent_elements = [
+            {
+                '$match': {
+                    'agent': main_agent
+                }
+            }
+            ]
+            try:
+                results = self.coll_results.aggregate(pipeline_get_only_speciefied_agent_elements)
+            except pymongo.errors.AutoReconnect:
+                rospy.logerr(CONNECTION_LOST)
+                return SetBoolResponse(False,NOT_SUCCESSFUL)
+            for result_element in results:
+                task_name = result_element["name"]
+                agent_name = result_element["agent"]
+                duration = result_element["t_end"] - result_element["t_start"]
+                
+                paper = True
+                if paper:
+                    task_name = self.getPaperTaskName(self.checkPickPlaceWithAgent(task_name, agent_name))
+                    agent_name = self.getPaperAgentName(agent_name)
+
+                task_results["task_name"].append(task_name)
+                task_results["agent_name"].append(agent_name)
+                task_results["duration"].append(duration)
+            
+        task_results_data = pd.DataFrame(task_results,dtype=object)
+        print(task_results_data)
+        sns.set_theme()
+            # sns.set(rc={'figure.figsize':(11,7)})
+            # sns.catplot(data=dati, x=main_agent, y="duration", hue=concurrent_agent)
+        sns.violin(data=task_results_data, x="agent_name", y="duration", hue="task_name",showmeans=True)
+        plt.figure()
+            # ax = sns.catplot(data=synergy_agent_values, kind="bar", x="main_task", y="synergy", hue="concurrent_task",ci="sd")   
+            # ax.set_xlabels('Main Agent: ' + main_agent_label, fontsize=15,labelpad=15) # not set_label
+            # ax.fig.suptitle("Synergy Matrix Coefficients",y=1)
+            # ax.set_ylabels("Synergy coefficient value")
+            # ax._legend.set_title("Concurrent task ({})".format(concurrent_agent))
+            # # plt.xticks(rotation=, ha="right")
+            # self.results_folder_path="/home/samuele/projects/planning_ws/src/task-planner-interface/task_planner_statistics/file/"
+            # ax.figure.set_size_inches(11, 8)
+            
+            # plt.savefig(self.results_folder_path + "dynamic_risk_coefficient_agent_" + main_agent +".png",)
+            # plt.savefig(self.results_folder_path+"test"+"dynamic_coefficient_risk_agent_"+".pdf",)
+            
+        # plt.figure()
+        plt.show()
+            # print(synergy_agent_values)      
+              
+        return SetBoolResponse(True,"ok")
+        
 
     def checkPickPlaceWithAgent(self,task_name,agent):
         if task_name == "pick_blue_box":
@@ -4297,7 +4419,7 @@ def main():
     rospy.Service(COMPUTE_DYNAMIC_RISK_SERVICE_V2,SetBool,mongo_statistics.computeDynamicRiskNoAddInfo) 
     rospy.Service(MAKE_CHART_SERVICE,SetBool,mongo_statistics.drawTimeline) 
     rospy.Service(MAKE_DR_CHART_SERVICE,SetBool,mongo_statistics.dynamicRiskChart) 
-    rospy.Service("prova",SetBool,mongo_statistics.makeDurationChart) 
+    rospy.Service("prova",SetBool,mongo_statistics.groupedDurationChart) 
     rospy.Service("prova_regressione",SetBool,mongo_statistics.computeDynamicRiskWithUncertainty) 
     rospy.Service("prova_regressione_min",SetBool,mongo_statistics.computeDynamicRiskWithUncertaintyMin) 
     rospy.Service("prova_regressione_median",SetBool,mongo_statistics.computeDynamicRiskWithUncertaintyMedian) 
@@ -4306,6 +4428,8 @@ def main():
     rospy.Service("mongo_statistics/make_uncertainty_chart",SetBool,mongo_statistics.dynamicRiskUncertaintyChart) 
     
     rospy.Service("mongo_statistics/make_single_dr_coeff_chart",SetBool,mongo_statistics.singleDRCoefficientChart) 
+    rospy.Service("mongo_statistics/make_task_duration_chart",SetBool,mongo_statistics.taskDurationChart) 
+
 
 
     
