@@ -82,6 +82,7 @@ class MongoStatistics:
         
         self.results_folder_path = results_folder_path
         
+        
 
     def computeDurations(self,request):
         """_summary_
@@ -1584,7 +1585,6 @@ class MongoStatistics:
             # plt.title(plot_title)
             ax.set_title(plot_title, pad=20)
         
-            self.results_folder_path="/home/samuele/projects/planning_ws/src/task-planner-interface/task_planner_statistics/file/"
             plt.xticks(rotation=45, ha="right")
             plt.savefig(self.results_folder_path + "dynamic_risk_agent_" + main_agent +".png",bbox_inches='tight')
             plt.savefig(self.results_folder_path+"test"+"dynamic_risk_agent_"+".pdf",bbox_inches='tight')
@@ -2857,7 +2857,25 @@ class MongoStatistics:
             print(regression_mat)
             print(known_vect)
             rospy.loginfo(YELLOW + "****************"+ END)
-            print(np.abs(known_vect-np.mean(known_vect))>np.std(known_vect)*2)
+            # if agent == "human_right_arm":
+            from sklearn.ensemble import IsolationForest
+            clf = IsolationForest(n_estimators=20, warm_start=True)
+            estimator=clf.fit(known_vect.reshape(-1,1))  # fit 10 trees  
+            check = estimator.decision_function(known_vect.reshape(-1,1))
+            outliers = check > 0
+            # print(regression_mat.shape)
+            # print(known_vect.shape)
+            # print(regression_mat[np.array([True]),:])
+            # print(outliers.shape)
+            
+            # outliers=np.abs(known_vect-np.mean(known_vect))<np.std(known_vect)*1.8
+            # outliers = known_vect<15
+            print(outliers)
+            regression_mat=regression_mat[outliers,:]
+            known_vect = known_vect[outliers]
+        
+            
+            # print(outliers)
             rospy.loginfo(YELLOW + "****************"+ END)
 
             # print(regression_mat.shape)
@@ -2902,14 +2920,14 @@ class MongoStatistics:
                 try:
                     pass
                     # results = self.coll_utils_results.aggregate(pipeline)
-                    # self.coll_interaction.insert_one({"agent": concurrent_agent, 
-                    #                                 "concurrent_agent": agent,
-                    #                                 "agent_skill": task, 
-                    #                                 "concurrent_skill": task_group["_id"][0],
-                    #                                 "success_rate": success_rate,
-                    #                                 "dynamic_risk": dynamic_risk[index],
-                    #                                 "std_err": reg_result.bse[task],
-                    #                                 "counter": counter})
+                    self.coll_interaction.insert_one({"agent": concurrent_agent, 
+                                                    "concurrent_agent": agent,
+                                                    "agent_skill": task, 
+                                                    "concurrent_skill": task_group["_id"][0],
+                                                    "success_rate": success_rate,
+                                                    "dynamic_risk": dynamic_risk[index],
+                                                    "std_err": reg_result.bse[task],
+                                                    "counter": counter})
                 except pymongo.errors.AutoReconnect:
                     rospy.logerr(CONNECTION_LOST)
                     return SetBoolResponse(False,NOT_SUCCESSFUL)
@@ -4242,17 +4260,22 @@ class MongoStatistics:
             sns.set(rc={'figure.figsize':(11,7)})
             # sns.catplot(data=dati, x=main_agent, y="duration", hue=concurrent_agent)
 
-            ax = sns.catplot(data=synergy_agent_values, kind="bar", x="main_task", y="synergy", hue="concurrent_task",ci="sd")   
+            ax = sns.catplot(data=synergy_agent_values, kind="bar", x="main_task", y="synergy", hue="concurrent_task",ci="sd",legend=False)   
             ax.set_xlabels('Main Agent: ' + main_agent_label, fontsize=15,labelpad=15) # not set_label
             ax.fig.suptitle("Synergy Matrix Coefficients",y=1)
             ax.set_ylabels("Synergy coefficient value")
-            ax._legend.set_title("Concurrent task ({})".format(concurrent_agent))
+            #     ax._legend.set_title("Concurrent task ({})".format(concurrent_agent))
+            #             ax.set_ylabel("Duration (s)",fontsize=15,labelpad=15)
+            # ax.set_xlabel("Task name",fontsize=15,labelpad=15)
+            # ax.set_title("Task Durations",fontsize=15)
+            plt.legend(title="Concurrent task ({})".format(concurrent_agent), loc='upper left')
+        
             # plt.xticks(rotation=, ha="right")
             self.results_folder_path="/home/samuele/projects/planning_ws/src/task-planner-interface/task_planner_statistics/file/"
             ax.figure.set_size_inches(11, 8)
             
-            plt.savefig(self.results_folder_path + "dynamic_risk_coefficient_agent_" + main_agent +".png",)
-            plt.savefig(self.results_folder_path+"test"+"dynamic_coefficient_risk_agent_"+".pdf",)
+            plt.savefig(self.results_folder_path + "dynamic_risk_coefficient_agent_" + main_agent +".png")
+            plt.savefig(self.results_folder_path+"test"+"dynamic_coefficient_risk_agent_"+".pdf")
             
         # plt.figure()
         plt.show()
@@ -4311,10 +4334,42 @@ class MongoStatistics:
         task_results_data = pd.DataFrame(task_results,dtype=object)
         print(task_results_data)
         sns.set_theme()
+        # sns.set_style("whitegrid")
+
             # sns.set(rc={'figure.figsize':(11,7)})
             # sns.catplot(data=dati, x=main_agent, y="duration", hue=concurrent_agent)
-        sns.violin(data=task_results_data, x="agent_name", y="duration", hue="task_name",showmeans=True)
-        plt.figure()
+        sns.set(rc={'figure.figsize':(17,7)})
+        ax = sns.boxplot(data=task_results_data, x="task_name", y="duration", hue="agent_name",
+                        showmeans=True, 
+                        meanprops={"marker":"o",
+                        "markerfacecolor":"white", 
+                        "markeredgecolor":"black",
+                        "markersize":"8"},
+                        linewidth=1,
+                        showfliers = False) #,
+                        # palette="tab10")
+        # mybox = ax.artists[2]
+
+        # # Change the appearance of that box
+        # mybox.set_facecolor('red')
+        # mybox.set_edgecolor('black')
+        # mybox.set_linewidth(3)
+        # plt.legend([],[], frameon=False)
+
+        ax.set_ylabel("Duration (s)",fontsize=20,labelpad=15)
+        ax.set_xlabel("Task name",fontsize=20,labelpad=15)
+        plt.xticks(fontsize=18, rotation=20)
+        plt.yticks(fontsize=18, rotation=20)
+
+        
+        ax.set_title("Task Durations",fontsize=20)
+        legend = plt.legend(title='Agent Name', loc='upper left',fontsize=18)
+        legend.get_title().set_fontsize('20')
+        
+        
+        ax.figure.set_size_inches(17, 8)
+        # plt.figure()
+        plt.savefig(self.results_folder_path + "task_durations.png",bbox_inches='tight')
             # ax = sns.catplot(data=synergy_agent_values, kind="bar", x="main_task", y="synergy", hue="concurrent_task",ci="sd")   
             # ax.set_xlabels('Main Agent: ' + main_agent_label, fontsize=15,labelpad=15) # not set_label
             # ax.fig.suptitle("Synergy Matrix Coefficients",y=1)
@@ -4326,7 +4381,8 @@ class MongoStatistics:
             
             # plt.savefig(self.results_folder_path + "dynamic_risk_coefficient_agent_" + main_agent +".png",)
             # plt.savefig(self.results_folder_path+"test"+"dynamic_coefficient_risk_agent_"+".pdf",)
-            
+            # sns.catplot(data=dati, x=main_agent, y="duration", hue=concurrent_agent)
+
         # plt.figure()
         plt.show()
             # print(synergy_agent_values)      
@@ -4402,8 +4458,10 @@ def main():
     coll_properties_name = "tasks_properties_test"
     coll_results_name = "sinergy_results_test_long"  #"results_test"
     coll_duration_name = "durations_long_min"
-    coll_risk_name = "dynamics_long_min"
+    coll_risk_name = "dynamics_long_test_outliers"
     
+    fig_folder="/home/samuele/projects/planning_ws/src/task-planner-interface/task_planner_statistics/file/"
+
     try:
         mongo_statistics = MongoStatistics(db_name,coll_properties_name,coll_results_name,coll_duration_name,coll_risk_name,fig_folder)
     except:
