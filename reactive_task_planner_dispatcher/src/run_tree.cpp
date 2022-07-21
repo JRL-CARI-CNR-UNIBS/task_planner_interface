@@ -1,6 +1,28 @@
 #include <ros/ros.h>
 #include <behaviortree_cpp_v3/bt_factory.h>
 #include <reactive_task_planner_dispatcher/single_task_dispatcher.h>
+#include <reactive_task_planner_dispatcher/double_task_dispatcher.h>
+
+class SayRuntimePort : public BT::SyncActionNode
+{
+  public:
+  SayRuntimePort(const std::string& name, const BT::NodeConfiguration& config)
+    : BT::SyncActionNode(name, config)
+  {
+  }
+
+  // You must override the virtual function tick()
+  BT::NodeStatus tick() override
+  {
+    auto msg = getInput<std::string>("message");
+    if (!msg){
+      throw BT::RuntimeError( "missing required input [message]: ", msg.error() );
+    }
+    std::cout << msg.value() << std::endl;
+    return BT::NodeStatus::SUCCESS;
+  }
+};
+
 
 int main(int argc, char **argv)
 {
@@ -21,7 +43,18 @@ int main(int argc, char **argv)
 
     BT::BehaviorTreeFactory factory;
 
+//    BT::PortsList exchange_info = {BT::OutputPort<std::string>("exchange_info_out"),BT::InputPort<std::string>("exchange_info")};
+//    factory.registerBuilder(BT::CreateManifest<SingleTaskDispatcher>("SingleTaskDispatcher", exchange_info),
+//                            BT::CreateBuilder<SingleTaskDispatcher>());
+
     factory.registerNodeType<SingleTaskDispatcher>("SingleTaskDispatcher");
+
+    BT::PortsList say_ports = {BT::InputPort<std::string>("message")};
+    factory.registerNodeType<SayRuntimePort>("SayRuntimePort", say_ports);
+
+    factory.registerNodeType<DoubleTaskDispatcher>("DoubleTaskDispatcher");
+
+
 //    SingleTaskDispatcher("task");
 
 //    factory.registerNodeType<BT::SyncActionNode>("fixture");

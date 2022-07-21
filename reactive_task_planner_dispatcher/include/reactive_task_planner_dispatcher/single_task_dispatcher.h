@@ -16,7 +16,7 @@ private:
   std::string agent_name_;
 
   std::shared_ptr<ros_helper::SubscriptionNotifier <task_planner_interface_msgs::MotionTaskExecutionFeedback>> task_feedback_sub_;
-  ros::Publisher chatter_pub_;
+  ros::Publisher task_request_pub_;
 
   void publishTask(const ros::Publisher &pub,
                                          const std::string &task_name);
@@ -30,22 +30,13 @@ public:
 
   static BT::PortsList providedPorts()
   {
-//    <std::string, PortInfo>
-    return{BT::InputPort<std::string>("task_name"),BT::InputPort<std::string>("agent_name")};
+    return{BT::InputPort<std::string>("task_name"),
+          BT::InputPort<std::string>("agent_name"),
+          BT::InputPort<std::string>("exchange_info"),
+          BT::OutputPort<std::string>("exchange_info_out") };
   }
 
 
 };
-//class FixtureCheck : public BT::SyncActionNode
-//{
-//public:
-//    FixtureCheck(const std::string& name);
 
-//    BT::NodeStatus tick() override;
-
-//private:
-//    ros::NodeHandle n_;
-//    ros::ServiceClient skill_exec_clnt_;
-//};
-
-#endif // FIXTURE_CHECK_H
+#endif // SINGLE_TASK_DISPATCHER_H

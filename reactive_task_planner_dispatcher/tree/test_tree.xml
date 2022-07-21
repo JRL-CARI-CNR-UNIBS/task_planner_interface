@@ -2,8 +2,10 @@
  <root main_tree_to_execute = "MainTree" >
      <BehaviorTree ID="MainTree">
         <Sequence name="root_sequence">
-            <SingleTaskDispatcher task_name="task 1" agent_name="pippo"/>
-            <SingleTaskDispatcher task_name="task 2" agent_name="pluto"/>
+            <!-- <SingleTaskDispatcher task_name="task 1" agent_name="robot" exchange_info_out="{pezzo}"/> -->
+            <DoubleTaskDispatcher first_agent_task_name="task 1" second_agent_task_name="task 2" first_agent_name="robot"  second_agent_name="human" wait_first_agent="true"/>
+            <!--<SingleTaskDispatcher task_name="task 2" agent_name="motion" />-->
+            <!-- <SayRuntimePort message="Nome pezzo: {pezzo}"/> -->
         </Sequence>
      </BehaviorTree>
  </root>

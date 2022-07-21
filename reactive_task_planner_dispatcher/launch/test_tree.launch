@@ -4,6 +4,20 @@
 
   <arg name="tree_path" default="$(find reactive_task_planner_dispatcher)/tree/test_tree.xml"/>
 
+  <arg name="prefix" default="/sharework/test/stiima"/>
+
+  <arg name="task_feedback_robot" default="$(arg prefix)/motion/feedback"/>
+  <arg name="task_feedback_human" default="$(arg prefix)/human/feedback"/>
+
+  <arg name="task_request_robot" default="$(arg prefix)/motion"/>
+  <arg name="task_request_human" default="$(arg prefix)/human"/>
+
+  <param name="task_feedback_robot" value="$(arg task_feedback_robot)" />
+  <param name="task_feedback_human" value="$(arg task_feedback_human)" />
+  <param name="task_request_robot" value="$(arg task_request_robot)" />
+  <param name="task_request_human" value="$(arg task_request_human)" />
+
+
   <node name="run_tree_node" pkg="reactive_task_planner_dispatcher" type="run_tree_node" output="screen" >
     <param name="tree_path" value="$(arg tree_path)" />
   </node>
