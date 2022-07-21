@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+
+<launch>
+
+  <arg name="tree_path" default="$(find reactive_task_planner_dispatcher)/tree/test_tree.xml"/>
+
+  <node name="run_tree_node" pkg="reactive_task_planner_dispatcher" type="run_tree_node" output="screen" >
+    <param name="tree_path" value="$(arg tree_path)" />
+  </node>
+
+
+</launch>

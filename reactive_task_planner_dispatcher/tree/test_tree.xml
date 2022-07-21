@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+ <root main_tree_to_execute = "MainTree" >
+     <BehaviorTree ID="MainTree">
+        <Sequence name="root_sequence">
+            <SingleTaskDispatcher task_name="task 1" agent_name="pippo"/>
+            <SingleTaskDispatcher task_name="task 2" agent_name="pluto"/>
+        </Sequence>
+     </BehaviorTree>
+ </root>

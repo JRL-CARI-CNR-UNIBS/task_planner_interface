@@ -1430,8 +1430,6 @@ class MongoStatistics:
                 print((rospy.Time.now()-t_start).to_sec())
                 
             return SetBoolResponse(True,SUCCESSFUL)
-
-    
         
     def dynamicRiskChart(self,request):
         """Method that is a callback of a service usefull for do dynamic risk heat map
@@ -4261,15 +4259,19 @@ class MongoStatistics:
             # sns.catplot(data=dati, x=main_agent, y="duration", hue=concurrent_agent)
 
             ax = sns.catplot(data=synergy_agent_values, kind="bar", x="main_task", y="synergy", hue="concurrent_task",ci="sd",legend=False)   
-            ax.set_xlabels('Main Agent: ' + main_agent_label, fontsize=15,labelpad=15) # not set_label
+            ax.set_xlabels('Main Agent: ' + main_agent_label, fontsize=20,labelpad=15) # not set_label
             ax.fig.suptitle("Synergy Matrix Coefficients",y=1)
-            ax.set_ylabels("Synergy coefficient value")
+            ax.set_ylabels("Synergy coefficient value",fontsize=20, labelpad=15)
+            plt.xticks(fontsize=16)
+            plt.yticks(fontsize=16)
+            
             #     ax._legend.set_title("Concurrent task ({})".format(concurrent_agent))
             #             ax.set_ylabel("Duration (s)",fontsize=15,labelpad=15)
             # ax.set_xlabel("Task name",fontsize=15,labelpad=15)
             # ax.set_title("Task Durations",fontsize=15)
-            plt.legend(title="Concurrent task ({})".format(concurrent_agent), loc='upper left')
-        
+            legend = plt.legend(title="Concurrent task ({})".format(concurrent_agent), loc='upper left',fontsize='18')
+            legend.get_title().set_fontsize('20')
+            
             # plt.xticks(rotation=, ha="right")
             self.results_folder_path="/home/samuele/projects/planning_ws/src/task-planner-interface/task_planner_statistics/file/"
             ax.figure.set_size_inches(11, 8)
@@ -4356,15 +4358,15 @@ class MongoStatistics:
         # mybox.set_linewidth(3)
         # plt.legend([],[], frameon=False)
 
-        ax.set_ylabel("Duration (s)",fontsize=20,labelpad=15)
-        ax.set_xlabel("Task name",fontsize=20,labelpad=15)
-        plt.xticks(fontsize=18, rotation=20)
-        plt.yticks(fontsize=18, rotation=20)
+        ax.set_ylabel("Duration (s)",fontsize=24,labelpad=15)
+        ax.set_xlabel("Task name",fontsize=24,labelpad=15)
+        plt.xticks(fontsize=20, rotation=20)
+        plt.yticks(fontsize=21, rotation=0)
 
         
         ax.set_title("Task Durations",fontsize=20)
-        legend = plt.legend(title='Agent Name', loc='upper left',fontsize=18)
-        legend.get_title().set_fontsize('20')
+        legend = plt.legend(title='Agent Name', loc='upper left',fontsize=20)
+        legend.get_title().set_fontsize('22')
         
         
         ax.figure.set_size_inches(17, 8)
