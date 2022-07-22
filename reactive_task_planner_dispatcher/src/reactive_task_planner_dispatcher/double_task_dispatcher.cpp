@@ -9,12 +9,7 @@ DoubleTaskDispatcher::DoubleTaskDispatcher(const std::string &name, const BT::No
   getInputWithCheck("task_name_first_agent",task_name_first_agent_);
   getInputWithCheck("first_agent_name",first_agent_name_);
 
-  std::string piece_input;
-  if(DoubleTaskDispatcher::getInput("piece_input",piece_input))
-  {
-    task_name_first_agent_+= "-" + piece_input + "-" + first_agent_name_;
-    DoubleTaskDispatcher::setOutput("piece_output",piece_input);
-  }
+
 //  ROS_INFO_STREAM("Task Name First Agent: " << task_name_first_agent_);
 //  ROS_INFO_STREAM("First Agent Name: " << first_agent_name_);
 
@@ -23,8 +18,7 @@ DoubleTaskDispatcher::DoubleTaskDispatcher(const std::string &name, const BT::No
 //  ROS_INFO_STREAM("Task Name Second Agent: " << task_name_second_agent_);
 //  ROS_INFO_STREAM("Second Agent Name: " << second_agent_name_);
 
-  agents_requests_[first_agent_name_]=task_name_first_agent_;
-  agents_requests_[second_agent_name_]=task_name_second_agent_;
+
 
 
   getInputWithCheck("wait_first_agent",wait_agents_[first_agent_name_]);
@@ -70,6 +64,19 @@ BT::NodeStatus DoubleTaskDispatcher::tick()
 {
   ROS_INFO_STREAM("---------------------------");
   ROS_INFO_STREAM("DoubleTaskDispatcher ticked");
+  std::string piece_first_agent_input, piece_second_agent_input;
+  if(DoubleTaskDispatcher::getInput("piece_first_agent_input",piece_first_agent_input))
+  {
+    task_name_first_agent_+= "-" + piece_first_agent_input + "-" + first_agent_name_;
+    DoubleTaskDispatcher::setOutput("piece_first_agent_output",piece_first_agent_input);
+  }
+  if(DoubleTaskDispatcher::getInput("piece_second_agent_input",piece_first_agent_input))
+  {
+    task_name_second_agent_+= "-" + piece_first_agent_input + "-" + second_agent_name_;
+    DoubleTaskDispatcher::setOutput("piece_second_agent_output",piece_second_agent_input);
+  }
+  agents_requests_[first_agent_name_]=task_name_first_agent_;
+  agents_requests_[second_agent_name_]=task_name_second_agent_;
   ROS_INFO_STREAM("Task Name First Agent: " << task_name_first_agent_);
   ROS_INFO_STREAM("Task Name Second Agent: " << task_name_second_agent_);
 
@@ -108,6 +115,7 @@ BT::NodeStatus DoubleTaskDispatcher::tick()
     ros::Duration(0.1).sleep();
     ros::spinOnce();
   }
+
 
   DoubleTaskDispatcher::setOutput("first_agent_state",task_feedback_sub_[first_agent_name_]->isANewDataAvailable());
   DoubleTaskDispatcher::setOutput("second_agent_state",task_feedback_sub_[second_agent_name_]->isANewDataAvailable());

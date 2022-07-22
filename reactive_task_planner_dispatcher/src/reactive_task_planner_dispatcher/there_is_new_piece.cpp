@@ -18,15 +18,17 @@ ThereIsNewPiece::ThereIsNewPiece(const std::string &name, const BT::NodeConfigur
 
 BT::NodeStatus ThereIsNewPiece::tick()
 {
-  ROS_INFO_STREAM("Waiting task feedback...");
+  ROS_INFO_STREAM("Check trigger new piece...");
   if(task_feedback_sub_->isANewDataAvailable())
   {
     mqtt_scene_integration::Fixture fixture_msg = task_feedback_sub_->getData();
     ThereIsNewPiece::setOutput("piece_output",fixture_msg.content);
+    ROS_INFO_STREAM("There is new piece...");
     return BT::NodeStatus::SUCCESS;
   }
   else
   {
+    ROS_INFO_STREAM("No new piece...");
     return BT::NodeStatus::FAILURE;
   }
 

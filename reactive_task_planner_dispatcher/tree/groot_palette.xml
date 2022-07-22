@@ -1,0 +1,14 @@
+<root>
+    <TreeNodesModel>
+        <Action ID="SingleTaskDispatcher">
+            <input_port name="agent_name"/>
+            <input_port name="piece_input"/>
+            <output_port name="piece_output"/>
+            <input_port name="task_name"/>
+        </Action>
+        <Condition ID="TriggerNewPiece">
+            <output_port name="piece_output"/>
+        </Condition>
+    </TreeNodesModel>
+</root>
+

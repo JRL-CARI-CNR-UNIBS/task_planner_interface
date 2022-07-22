@@ -3,6 +3,8 @@
 #include <reactive_task_planner_dispatcher/single_task_dispatcher.h>
 #include <reactive_task_planner_dispatcher/double_task_dispatcher.h>
 #include <reactive_task_planner_dispatcher/wait_agent_feedback.h>
+#include <reactive_task_planner_dispatcher/trigger_new_piece.h>
+#include <reactive_task_planner_dispatcher/there_is_new_piece.h>
 
 class SayRuntimePort : public BT::SyncActionNode
 {
@@ -39,7 +41,6 @@ int main(int argc, char **argv)
       ROS_ERROR("tree_path not defined");
       return 0;
     }
-
     ROS_INFO("Start running tree");
 
     BT::BehaviorTreeFactory factory;
@@ -55,15 +56,18 @@ int main(int argc, char **argv)
 
     factory.registerNodeType<DoubleTaskDispatcher>("DoubleTaskDispatcher");
     factory.registerNodeType<WaitAgentFeedback>("WaitAgentFeedback");
+    factory.registerNodeType<TriggerNewPiece>("TriggerNewPiece");
+    factory.registerNodeType<ThereIsNewPiece>("ThereIsNewPiece");
 
-
+ROS_INFO("Start running tree");
 //    SingleTaskDispatcher("task");
 
 //    factory.registerNodeType<BT::SyncActionNode>("fixture");
 
 //    ROS_INFO("FixtureCheck registered");
 
-    ROS_INFO_STREAM(tree_path);
+    ROS_INFO_STREAM("Tree path:"<<tree_path);
+    ROS_INFO("Start running tree");
     BT::Tree tree = factory.createTreeFromFile(tree_path);
 
     ROS_INFO("Tree created");

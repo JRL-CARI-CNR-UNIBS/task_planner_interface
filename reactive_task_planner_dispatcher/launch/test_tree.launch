@@ -2,7 +2,7 @@
 
 <launch>
 
-  <arg name="tree_path" default="$(find reactive_task_planner_dispatcher)/tree/test_tree.xml"/>
+  <arg name="tree_path" default="$(find reactive_task_planner_dispatcher)/tree/test_tree_vero.xml"/>
 
   <arg name="prefix" default="/sharework/test/stiima"/>
 
@@ -11,12 +11,14 @@
 
   <arg name="task_request_robot" default="$(arg prefix)/motion"/>
   <arg name="task_request_human" default="$(arg prefix)/human"/>
+  <arg name="trigger_topic_name" default="/JFMX/L1/sharework/station/p0"/>
+
 
   <param name="task_feedback_robot" value="$(arg task_feedback_robot)" />
   <param name="task_feedback_human" value="$(arg task_feedback_human)" />
   <param name="task_request_robot" value="$(arg task_request_robot)" />
   <param name="task_request_human" value="$(arg task_request_human)" />
-
+  <param name="trigger_topic_name" value="$(arg trigger_topic_name)" />
 
   <node name="run_tree_node" pkg="reactive_task_planner_dispatcher" type="run_tree_node" output="screen" >
     <param name="tree_path" value="$(arg tree_path)" />

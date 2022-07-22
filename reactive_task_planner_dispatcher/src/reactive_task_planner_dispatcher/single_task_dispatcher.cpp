@@ -15,12 +15,7 @@ SingleTaskDispatcher::SingleTaskDispatcher(const std::string &name, const BT::No
     ROS_ERROR("Missing required input [task_name_]");
     throw BT::RuntimeError("Missing required input [task_name_]");
   }
-  std::string piece_input;
-  if(SingleTaskDispatcher::getInput("piece_input",piece_input))
-  {
-    task_name_+= "-" + piece_input + "-" + agent_name_;
-    SingleTaskDispatcher::setOutput("piece_output",piece_input);
-  }
+
 //  ROS_INFO_STREAM("Task Name: " << task_name_);
 //  ROS_INFO_STREAM("Agent Name: " << agent_name_);
 
@@ -62,6 +57,16 @@ BT::NodeStatus SingleTaskDispatcher::tick()
 {
   ROS_INFO_STREAM("---------------------------");
   ROS_INFO_STREAM("SingleTaskDispatcher ticked");
+
+  std::string piece_input;
+  if(SingleTaskDispatcher::getInput("piece_input",piece_input))
+  {
+    task_name_+= "-" + piece_input + "-" + agent_name_;
+    SingleTaskDispatcher::setOutput("piece_output",piece_input);
+    ROS_INFO_STREAM(piece_input);
+
+  }
+
   ROS_INFO_STREAM("Task Name: " << task_name_);
   ROS_INFO_STREAM("Agent Name: " << agent_name_);
 
@@ -95,6 +100,9 @@ BT::NodeStatus SingleTaskDispatcher::tick()
   }
   */
   ROS_INFO_STREAM("Task " << task_name_ << " executed.");
+
+
+
   return BT::NodeStatus::SUCCESS;
 }
 
