@@ -32,8 +32,8 @@ public:
   {
     return{BT::InputPort<std::string>("task_name"),
           BT::InputPort<std::string>("agent_name"),
-          BT::InputPort<std::string>("exchange_info"),
-          BT::OutputPort<std::string>("exchange_info_out") };
+          BT::InputPort<std::string>("piece_input"),
+          BT::OutputPort<std::string>("piece_output") };
   }
 
 

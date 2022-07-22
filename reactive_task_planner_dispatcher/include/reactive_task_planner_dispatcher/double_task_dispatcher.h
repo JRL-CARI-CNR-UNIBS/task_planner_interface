@@ -12,8 +12,13 @@ class DoubleTaskDispatcher : public BT::SyncActionNode
 private:
   ros::NodeHandle nh_;
   ros::NodeHandle pnh_;
+  int condition_ = 0b00;
+
   std::string task_name_first_agent_, task_name_second_agent_;
   std::string first_agent_name_, second_agent_name_;
+  std::map<std::string,std::string> agents_requests_; //{first_agent_name_,second_agent_name_};
+  std::map<std::string,bool> wait_agents_;
+
 
   std::map <std::string,std::shared_ptr<ros_helper::SubscriptionNotifier <task_planner_interface_msgs::MotionTaskExecutionFeedback>>> task_feedback_sub_;
   std::map <std::string, ros::Publisher> task_request_pub_;
@@ -42,10 +47,12 @@ public:
           BT::InputPort<std::string>("task_name_second_agent"),
           BT::InputPort<std::string>("first_agent_name"),
           BT::InputPort<std::string>("second_agent_name"),
-          BT::InputPort<std::string>("wait_first_agent"),
-          BT::InputPort<std::string>("wait_second_agent"),
-          BT::InputPort<std::string>("exchange_info"),
-          BT::OutputPort<std::string>("exchange_info_out")};
+          BT::InputPort<bool>("wait_first_agent"),
+          BT::InputPort<bool>("wait_second_agent"),
+          BT::InputPort<std::string>("piece_input"),
+          BT::OutputPort<bool>("first_agent_state"),
+          BT::OutputPort<bool>("second_agent_state"),
+          BT::OutputPort<std::string>("piece_ouput")};
   }
 
 };
