@@ -2,6 +2,7 @@
 #include <behaviortree_cpp_v3/bt_factory.h>
 #include <reactive_task_planner_dispatcher/single_task_dispatcher.h>
 #include <reactive_task_planner_dispatcher/double_task_dispatcher.h>
+#include <reactive_task_planner_dispatcher/wait_agent_feedback.h>
 
 class SayRuntimePort : public BT::SyncActionNode
 {
@@ -53,6 +54,7 @@ int main(int argc, char **argv)
     factory.registerNodeType<SayRuntimePort>("SayRuntimePort", say_ports);
 
     factory.registerNodeType<DoubleTaskDispatcher>("DoubleTaskDispatcher");
+    factory.registerNodeType<WaitAgentFeedback>("WaitAgentFeedback");
 
 
 //    SingleTaskDispatcher("task");

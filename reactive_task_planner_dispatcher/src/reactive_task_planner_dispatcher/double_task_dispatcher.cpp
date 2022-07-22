@@ -15,13 +15,13 @@ DoubleTaskDispatcher::DoubleTaskDispatcher(const std::string &name, const BT::No
     task_name_first_agent_+= "-" + piece_input + "-" + first_agent_name_;
     DoubleTaskDispatcher::setOutput("piece_output",piece_input);
   }
-  ROS_INFO_STREAM("Task Name First Agent: " << task_name_first_agent_);
-  ROS_INFO_STREAM("First Agent Name: " << first_agent_name_);
+//  ROS_INFO_STREAM("Task Name First Agent: " << task_name_first_agent_);
+//  ROS_INFO_STREAM("First Agent Name: " << first_agent_name_);
 
   getInputWithCheck("task_name_second_agent",task_name_second_agent_);
   getInputWithCheck("second_agent_name",second_agent_name_);
-  ROS_INFO_STREAM("Task Name Second Agent: " << task_name_second_agent_);
-  ROS_INFO_STREAM("Second Agent Name: " << second_agent_name_);
+//  ROS_INFO_STREAM("Task Name Second Agent: " << task_name_second_agent_);
+//  ROS_INFO_STREAM("Second Agent Name: " << second_agent_name_);
 
   agents_requests_[first_agent_name_]=task_name_first_agent_;
   agents_requests_[second_agent_name_]=task_name_second_agent_;
@@ -29,8 +29,8 @@ DoubleTaskDispatcher::DoubleTaskDispatcher(const std::string &name, const BT::No
 
   getInputWithCheck("wait_first_agent",wait_agents_[first_agent_name_]);
   getInputWithCheck("wait_second_agent",wait_agents_[second_agent_name_]);
-  ROS_INFO_STREAM("Wait first agent: " << wait_agents_[first_agent_name_]);
-  ROS_INFO_STREAM("Wait second agent: " << wait_agents_[second_agent_name_]);
+//  ROS_INFO_STREAM("Wait first agent: " << wait_agents_[first_agent_name_]);
+//  ROS_INFO_STREAM("Wait second agent: " << wait_agents_[second_agent_name_]);
 
   std::string task_feedback_topic_name,task_request_topic_name;
 
@@ -70,6 +70,8 @@ BT::NodeStatus DoubleTaskDispatcher::tick()
 {
   ROS_INFO_STREAM("---------------------------");
   ROS_INFO_STREAM("DoubleTaskDispatcher ticked");
+  ROS_INFO_STREAM("Task Name First Agent: " << task_name_first_agent_);
+  ROS_INFO_STREAM("Task Name Second Agent: " << task_name_second_agent_);
 
   for(auto it = agents_requests_.begin(); it!= agents_requests_.end();it++)
   {

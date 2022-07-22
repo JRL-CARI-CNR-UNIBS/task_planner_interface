@@ -1,13 +1,16 @@
 <?xml version="1.0"?>
  <root main_tree_to_execute = "MainTree" >
      <BehaviorTree ID="MainTree">
+
+
         <Sequence name="root_sequence">
             <!-- <LeggeFixture out="{pezzo}"> -->
-            <SingleTaskDispatcher task_name="task 1" agent_name="robot" piece_input="A1653" piece_output="{piece_output}"/>
-            <SingleTaskDispatcher task_name="task 1" agent_name="robot" piece_input="{piece_output}" piece_output="{piece_output}"/>
+            <SingleTaskDispatcher task_name="task 1" agent_name="human" piece_input="A1653" piece_output="{piece_output}"/>
+            <!-- <SingleTaskDispatcher task_name="task 1" agent_name="robot" piece_input="{piece_output}" piece_output="{piece_output}"/> -->
 
             <!-- <Compose task="da utente" input_port={pezzo}"" out={task_name}> -->
-            <!-- <DoubleTaskDispatcher task_name_first_agent="task 1 " task_name_second_agent="task 2" first_agent_name="robot"  second_agent_name="human" wait_first_agent="true" wait_second_agent="false"/> -->
+            <DoubleTaskDispatcher task_name_first_agent="task 1 " task_name_second_agent="task 2" first_agent_name="robot"  second_agent_name="human" wait_first_agent="true" wait_second_agent="false"/>
+            <WaitAgentFeedback agent_name="human"/>
             <!-- <SingleTaskDispatcher task_name="task 2" agent_name="human" /> -->
             <SayRuntimePort message="{piece_output}"/>
         </Sequence>
