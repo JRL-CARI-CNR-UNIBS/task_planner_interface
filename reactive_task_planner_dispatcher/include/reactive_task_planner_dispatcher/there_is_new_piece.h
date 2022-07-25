@@ -6,6 +6,7 @@
 #include <behaviortree_cpp_v3/behavior_tree.h>
 #include <task_planner_interface_msgs/MotionTaskExecutionFeedback.h>
 #include <mqtt_scene_integration/Fixture.h>
+#include <std_srvs/Trigger.h>
 
 class ThereIsNewPiece : public BT::ConditionNode
 {
@@ -15,7 +16,7 @@ private:
   std::string trigger_topic_name_;
 
   std::shared_ptr<ros_helper::SubscriptionNotifier <mqtt_scene_integration::Fixture>> task_feedback_sub_;
-
+  ros::ServiceClient check_station_srv_client_;
 
 public:
   ThereIsNewPiece(const std::string &name, const BT::NodeConfiguration& config);

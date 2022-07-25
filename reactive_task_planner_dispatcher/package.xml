@@ -20,6 +20,7 @@
   <build_depend>roscpp</build_depend>
   <build_depend>rospy</build_depend>
   <build_depend>std_msgs</build_depend>
+  <build_depend>std_srvs</build_depend>
   <build_depend>subscription_notifier</build_depend>
   <build_depend>behaviortree_cpp_v3</build_depend>
   <build_depend>task_planner_interface_msgs</build_depend>
@@ -29,6 +30,7 @@
   <build_export_depend>roscpp</build_export_depend>
   <build_export_depend>rospy</build_export_depend>
   <build_export_depend>std_msgs</build_export_depend>
+  <build_export_depend>std_srvs</build_export_depend>
   <build_export_depend>subscription_notifier</build_export_depend>
   <build_export_depend>behaviortree_cpp_v3</build_export_depend>
   <build_export_depend>task_planner_interface_msgs</build_export_depend>
@@ -38,6 +40,7 @@
   <exec_depend>roscpp</exec_depend>
   <exec_depend>rospy</exec_depend>
   <exec_depend>std_msgs</exec_depend>
+  <exec_depend>std_srvs</exec_depend>
   <exec_depend>subscription_notifier</exec_depend>
   <exec_depend>behaviortree_cpp_v3</exec_depend>
   <exec_depend>task_planner_interface_msgs</exec_depend>

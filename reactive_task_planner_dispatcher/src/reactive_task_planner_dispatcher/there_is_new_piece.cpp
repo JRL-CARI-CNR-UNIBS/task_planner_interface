@@ -10,27 +10,36 @@ ThereIsNewPiece::ThereIsNewPiece(const std::string &name, const BT::NodeConfigur
     ROS_ERROR_STREAM("trigger_topic_name not defined");
     throw BT::RuntimeError("Missing required parameter task_feedback_");
   }
+  std::string check_station_srv_name;
+  if (!nh_.getParam("check_station_srv_name",check_station_srv_name))
+  {
+    ROS_ERROR_STREAM("check_station_srv_name not defined");
+    throw BT::RuntimeError("Missing required parameter check_station_srv_name");
+  }
   task_feedback_sub_.reset(new ros_helper::SubscriptionNotifier<mqtt_scene_integration::Fixture> (nh_, trigger_topic_name_,10));
-
+  check_station_srv_client_ = nh_.serviceClient<std_srvs::Trigger>(check_station_srv_name);
 }
 
 
 
 BT::NodeStatus ThereIsNewPiece::tick()
 {
+  ROS_INFO_STREAM("---------------------------");
+  ROS_INFO_STREAM("ThereIsNewPiece ticked");
+
   ROS_INFO_STREAM("Check trigger new piece...");
-  if(task_feedback_sub_->isANewDataAvailable())
+
+  std_srvs::Trigger check_trigger;
+  if(check_station_srv_client_.call(check_trigger))
   {
-    mqtt_scene_integration::Fixture fixture_msg = task_feedback_sub_->getData();
-    ThereIsNewPiece::setOutput("piece_output",fixture_msg.content);
-    ROS_INFO_STREAM("There is new piece...");
-    return BT::NodeStatus::SUCCESS;
+    if(check_trigger.response.success)
+    {
+      ThereIsNewPiece::setOutput("piece_output",check_trigger.response.message);
+      ROS_INFO_STREAM("There is new piece...");
+      return BT::NodeStatus::SUCCESS;
+    }
   }
-  else
-  {
-    ROS_INFO_STREAM("No new piece...");
-    return BT::NodeStatus::FAILURE;
-  }
+  return BT::NodeStatus::FAILURE;
 
 }
 

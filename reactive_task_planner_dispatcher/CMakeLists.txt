@@ -11,6 +11,7 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
   std_msgs
+  std_srvs
   task_planner_interface_msgs
   subscription_notifier
   behaviortree_cpp_v3

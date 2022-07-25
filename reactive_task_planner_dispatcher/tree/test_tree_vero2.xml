@@ -4,7 +4,9 @@
     <BehaviorTree ID="BehaviorTree">
         <Repeat num_cycles="-1">
             <Sequence>
-                <Condition ID="TriggerNewPiece" piece_output="{pezzo}"/>
+                <RetryUntilSuccessful num_attempts="-1">
+                    <Condition ID="ThereIsNewPiece" piece_output="{pezzo}"/>
+                </RetryUntilSuccessful>
                 <Action ID="SingleTaskDispatcher" agent_name="human" piece_input="{pezzo}" piece_output="{pezzo}" task_name="pickplace-p0-01"/>
                 <Action ID="SingleTaskDispatcher" agent_name="robot" piece_input="{pezzo}" piece_output="{pezzo}" task_name="unmount-p1"/>
                 <Fallback>

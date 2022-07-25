@@ -18,6 +18,8 @@ TriggerNewPiece::TriggerNewPiece(const std::string &name, const BT::NodeConfigur
 
 BT::NodeStatus TriggerNewPiece::tick()
 {
+  ROS_INFO_STREAM("---------------------------");
+  ROS_INFO_STREAM("TriggerNewPiece ticked");
   ROS_INFO_STREAM("Waiting trigger of new piece...");
   while(!task_feedback_sub_->isANewDataAvailable() && ros::ok())
   {
