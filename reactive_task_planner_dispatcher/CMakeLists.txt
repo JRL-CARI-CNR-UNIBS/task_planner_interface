@@ -15,7 +15,6 @@ find_package(catkin REQUIRED COMPONENTS
   task_planner_interface_msgs
   subscription_notifier
   behaviortree_cpp_v3
-
   mqtt_scene_integration
 )
 

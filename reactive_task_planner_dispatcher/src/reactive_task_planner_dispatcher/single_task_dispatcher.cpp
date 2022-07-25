@@ -58,16 +58,16 @@ BT::NodeStatus SingleTaskDispatcher::tick()
   ROS_INFO_STREAM("---------------------------");
   ROS_INFO_STREAM("SingleTaskDispatcher ticked");
 
-  std::string piece_input;
+  std::string piece_input, task_name;
   if(SingleTaskDispatcher::getInput("piece_input",piece_input))
   {
-    task_name_+= "-" + piece_input + "-" + agent_name_;
+    task_name = task_name_ +"-" + piece_input + "-" + agent_name_;
     SingleTaskDispatcher::setOutput("piece_output",piece_input);
     ROS_INFO_STREAM(piece_input);
 
   }
 
-  ROS_INFO_STREAM("Task Name: " << task_name_);
+  ROS_INFO_STREAM("Task Name: " << task_name);
   ROS_INFO_STREAM("Agent Name: " << agent_name_);
 
   /* Reset get data */
@@ -77,7 +77,7 @@ BT::NodeStatus SingleTaskDispatcher::tick()
   }
 
   /* Publish task request */
-  publishTask(task_request_pub_,task_name_);
+  publishTask(task_request_pub_,task_name);
 
   /* Wait task response */
   ROS_INFO_STREAM("Waiting task feedback...");
@@ -99,7 +99,7 @@ BT::NodeStatus SingleTaskDispatcher::tick()
     SingleTaskDispatcher::setOutput("exchange_info_out","agente due ciaooo");
   }
   */
-  ROS_INFO_STREAM("Task " << task_name_ << " executed.");
+  ROS_INFO_STREAM("Task " << task_name << " executed.");
 
 
 

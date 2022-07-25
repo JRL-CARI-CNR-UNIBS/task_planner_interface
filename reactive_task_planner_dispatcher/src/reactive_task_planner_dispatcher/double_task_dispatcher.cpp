@@ -64,21 +64,21 @@ BT::NodeStatus DoubleTaskDispatcher::tick()
 {
   ROS_INFO_STREAM("---------------------------");
   ROS_INFO_STREAM("DoubleTaskDispatcher ticked");
-  std::string piece_first_agent_input, piece_second_agent_input;
+  std::string piece_first_agent_input, piece_second_agent_input, task_name_first_agent, task_name_second_agent;
   if(DoubleTaskDispatcher::getInput("piece_first_agent_input",piece_first_agent_input))
   {
-    task_name_first_agent_+= "-" + piece_first_agent_input + "-" + first_agent_name_;
+    task_name_first_agent = task_name_first_agent_ + "-" + piece_first_agent_input + "-" + first_agent_name_;
     DoubleTaskDispatcher::setOutput("piece_first_agent_output",piece_first_agent_input);
   }
   if(DoubleTaskDispatcher::getInput("piece_second_agent_input",piece_first_agent_input))
   {
-    task_name_second_agent_+= "-" + piece_first_agent_input + "-" + second_agent_name_;
+    task_name_second_agent = task_name_second_agent_ + "-" + piece_first_agent_input + "-" + second_agent_name_;
     DoubleTaskDispatcher::setOutput("piece_second_agent_output",piece_second_agent_input);
   }
-  agents_requests_[first_agent_name_]=task_name_first_agent_;
-  agents_requests_[second_agent_name_]=task_name_second_agent_;
-  ROS_INFO_STREAM("Task Name First Agent: " << task_name_first_agent_);
-  ROS_INFO_STREAM("Task Name Second Agent: " << task_name_second_agent_);
+  agents_requests_[first_agent_name_]=task_name_first_agent;
+  agents_requests_[second_agent_name_]=task_name_second_agent;
+  ROS_INFO_STREAM("Task Name First Agent: " << task_name_first_agent);
+  ROS_INFO_STREAM("Task Name Second Agent: " << task_name_second_agent);
 
   for(auto it = agents_requests_.begin(); it!= agents_requests_.end();it++)
   {
