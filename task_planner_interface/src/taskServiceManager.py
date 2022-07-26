@@ -139,7 +139,7 @@ class TaskServiceManager:
                         # Call method for execute the task
                         self.execute_client(task,task_cmd_id)       # Il task name
 
-                    elif task_type_msg.type in ["Assembly", "Disassembly", "Sequence"]:
+                    elif task_type_msg.type in ["Assembly", "Disassembly", "Sequence", "unscrew", "screw"]:
                         rospy.loginfo(TASK_TYPE.format(task_type_msg.type))
                         # Call method for execute the sequence of sub-tasks
                         self.execute_sequence_client(task,task_cmd_id)       # Il task name

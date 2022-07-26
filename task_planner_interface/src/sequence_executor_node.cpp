@@ -25,6 +25,11 @@ protected:
   std::string action_name_;
   std::string group_name_;
 
+  ros::ServiceClient m_skill_type_client;
+  ros::ServiceClient m_skill_properties_client;
+
+
+
   std::shared_ptr<actionlib::SimpleActionClient<manipulation_msgs::PickObjectsAction>>  pick_ac;
   std::shared_ptr<actionlib::SimpleActionClient<manipulation_msgs::PlaceObjectsAction>> place_ac;
   std::shared_ptr<actionlib::SimpleActionClient<manipulation_msgs::GoToAction>> go_to_ac;
@@ -57,12 +62,44 @@ public:
 
     remove_object_from_slot_clnt = nh_.serviceClient<manipulation_msgs::RemoveObjectFromSlot>("/outbound_place_server/remove_obj_from_slot");
     remove_object_from_slot_clnt.waitForExistence();
+
+    /* Server clients for mongo*/
+    m_skill_type_client = nh_.serviceClient <task_planner_interface_msgs::TaskType>("mongo_handler/check_task_type");
+    m_skill_properties_client = nh_.serviceClient <task_planner_interface_msgs::BasicSkill>("mongo_handler/get_task_properties");
+
     as_.start();
   }
 
   ~SequenceExecuteAction(void)
   {
   }
+
+  bool checkSkillType(const std::string name, std::string& skill_type)
+  {
+    task_planner_interface_msgs::TaskType srv;
+    srv.request.name = name;
+
+    if(m_skill_type_client.call(srv))
+    {
+        if(srv.response.exist)
+        {
+            ROS_INFO("Task type: %s", srv.response.type.c_str());
+            skill_type=srv.response.type;
+            return true;
+        }
+        else
+        {
+            ROS_ERROR("Task type does not exist");
+        }
+
+    }
+    else
+    {
+        ROS_ERROR("Failed to call service check_type");
+    }
+    return false;   // Both for service fail or task doesn't exist
+  }
+
 
   void executeCB(const task_planner_interface_msgs::TaskExecuteGoalConstPtr &goal)
   {
@@ -78,8 +115,43 @@ public:
                 std::string>> // property_post_exec_id
                 recipe;
 
+    std::string skill_type;
+    try
+    {
+      if(checkSkillType(goal->name,skill_type))
+        ROS_INFO("Skill received");
+    }
+    catch (const std::exception &ex)
+    {
+      ROS_ERROR("Unable to find field 'goal' in mongoDB", ex.what());
+      return;
+    }
+
+    std::string skill_recipe;
+
+    task_planner_interface_msgs::BasicSkill srv;
+
+    if(m_skill_properties_client.call(srv))
+    {
+        if(!srv.response.error)   // If no error
+        {
+            ROS_INFO("Task properties retrieved correctly");
+            skill_recipe = srv.response.goal[0];
+        }
+        else
+        {
+            ROS_ERROR("Task does not exist");
+        }
+    }
+    else
+    {
+        ROS_ERROR("Rosservice call for retrive properties failed");
+    }
+
+
+
     XmlRpc::XmlRpcValue param;
-    if (!nh_.getParam(goal->name + "/recipe",param))
+    if (!nh_.getParam(skill_recipe + "/recipe",param))
     {
       ROS_ERROR("Recipe not found: %s",goal->name.c_str());
       return;
@@ -369,7 +441,6 @@ public:
     task_planner_interface_msgs::TaskExecuteResult result;
     result.outcome = 1;
     as_.setSucceeded(result);
-
 
   }
 
