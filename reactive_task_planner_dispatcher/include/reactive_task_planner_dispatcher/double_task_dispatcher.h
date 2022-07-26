@@ -12,7 +12,6 @@ class DoubleTaskDispatcher : public BT::SyncActionNode
 private:
   ros::NodeHandle nh_;
   ros::NodeHandle pnh_;
-  int condition_ = 0b00;
 
   std::string task_name_first_agent_, task_name_second_agent_;
   std::string first_agent_name_, second_agent_name_;
@@ -49,10 +48,13 @@ public:
           BT::InputPort<std::string>("second_agent_name"),
           BT::InputPort<bool>("wait_first_agent"),
           BT::InputPort<bool>("wait_second_agent"),
-          BT::InputPort<std::string>("piece_input"),
+          BT::InputPort<std::string>("piece_first_agent_input"),
+          BT::InputPort<std::string>("piece_second_agent_input"),
           BT::OutputPort<bool>("first_agent_state"),
           BT::OutputPort<bool>("second_agent_state"),
-          BT::OutputPort<std::string>("piece_ouput")};
+          BT::OutputPort<std::string>("piece_first_agent_output"),
+          BT::OutputPort<std::string>("piece_second_agent_output"),
+    };
   }
 
 };

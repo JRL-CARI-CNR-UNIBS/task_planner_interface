@@ -27,7 +27,8 @@ DoubleTaskDispatcher::DoubleTaskDispatcher(const std::string &name, const BT::No
 //  ROS_INFO_STREAM("Wait second agent: " << wait_agents_[second_agent_name_]);
 
   std::string task_feedback_topic_name,task_request_topic_name;
-
+  agents_requests_[first_agent_name_]=task_name_first_agent_;
+  agents_requests_[second_agent_name_]=task_name_second_agent_;
   for(auto it = agents_requests_.begin(); it!= agents_requests_.end();it++)
   {
     /* Get nedded parameters */

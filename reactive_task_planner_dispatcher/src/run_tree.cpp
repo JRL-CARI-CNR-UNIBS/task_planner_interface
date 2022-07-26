@@ -1,10 +1,13 @@
 #include <ros/ros.h>
 #include <behaviortree_cpp_v3/bt_factory.h>
+#include <behaviortree_cpp_v3/loggers/bt_zmq_publisher.h>
+
 #include <reactive_task_planner_dispatcher/single_task_dispatcher.h>
 #include <reactive_task_planner_dispatcher/double_task_dispatcher.h>
 #include <reactive_task_planner_dispatcher/wait_agent_feedback.h>
 #include <reactive_task_planner_dispatcher/trigger_new_piece.h>
 #include <reactive_task_planner_dispatcher/there_is_new_piece.h>
+#include <reactive_task_planner_dispatcher/switch_digital.h>
 
 class SayRuntimePort : public BT::SyncActionNode
 {
@@ -58,6 +61,8 @@ int main(int argc, char **argv)
     factory.registerNodeType<WaitAgentFeedback>("WaitAgentFeedback");
     factory.registerNodeType<TriggerNewPiece>("TriggerNewPiece");
     factory.registerNodeType<ThereIsNewPiece>("ThereIsNewPiece");
+    factory.registerNodeType<SwitchDigital>("SwitchDigital");
+
 
 ROS_INFO("Start running tree");
 //    SingleTaskDispatcher("task");
@@ -71,6 +76,7 @@ ROS_INFO("Start running tree");
     BT::Tree tree = factory.createTreeFromFile(tree_path);
 
     ROS_INFO("Tree created");
+    BT::PublisherZMQ publisher_zmq(tree);
 
     tree.tickRoot();
 
