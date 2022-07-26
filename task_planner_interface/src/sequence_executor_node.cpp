@@ -130,6 +130,7 @@ public:
     std::string skill_recipe;
 
     task_planner_interface_msgs::BasicSkill srv;
+    srv.request.name = goal->name;
 
     if(m_skill_properties_client.call(srv))
     {

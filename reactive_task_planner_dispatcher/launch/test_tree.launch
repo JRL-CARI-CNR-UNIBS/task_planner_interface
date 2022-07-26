@@ -2,7 +2,7 @@
 
 <launch>
 
-  <arg name="tree_path" default="$(find reactive_task_planner_dispatcher)/tree/test_tree_vero2.xml"/>
+  <arg name="tree_path" default="$(find reactive_task_planner_dispatcher)/tree/test_tree_vero2_test.xml"/>
 
   <arg name="prefix" default="/sharework/test/stiima"/>
 

@@ -71,9 +71,9 @@ BT::NodeStatus DoubleTaskDispatcher::tick()
     task_name_first_agent = task_name_first_agent_ + "-" + piece_first_agent_input + "-" + first_agent_name_;
     DoubleTaskDispatcher::setOutput("piece_first_agent_output",piece_first_agent_input);
   }
-  if(DoubleTaskDispatcher::getInput("piece_second_agent_input",piece_first_agent_input))
+  if(DoubleTaskDispatcher::getInput("piece_second_agent_input",piece_second_agent_input))
   {
-    task_name_second_agent = task_name_second_agent_ + "-" + piece_first_agent_input + "-" + second_agent_name_;
+    task_name_second_agent = task_name_second_agent_ + "-" + piece_second_agent_input + "-" + second_agent_name_;
     DoubleTaskDispatcher::setOutput("piece_second_agent_output",piece_second_agent_input);
   }
   agents_requests_[first_agent_name_]=task_name_first_agent;
