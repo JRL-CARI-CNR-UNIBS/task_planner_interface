@@ -8,6 +8,8 @@
 #include <reactive_task_planner_dispatcher/trigger_new_piece.h>
 #include <reactive_task_planner_dispatcher/there_is_new_piece.h>
 #include <reactive_task_planner_dispatcher/switch_digital.h>
+#include <reactive_task_planner_dispatcher/check_agent_state.h>
+#include <reactive_task_planner_dispatcher/reset_new_piece.h>
 
 class SayRuntimePort : public BT::SyncActionNode
 {
@@ -62,6 +64,9 @@ int main(int argc, char **argv)
     factory.registerNodeType<TriggerNewPiece>("TriggerNewPiece");
     factory.registerNodeType<ThereIsNewPiece>("ThereIsNewPiece");
     factory.registerNodeType<SwitchDigital>("SwitchDigital");
+    factory.registerNodeType<CheckAgentState>("CheckAgentState");
+    factory.registerNodeType<ResetNewPiece>("ResetNewPiece");
+
 
 
 ROS_INFO("Start running tree");

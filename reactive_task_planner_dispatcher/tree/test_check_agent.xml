@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+ <root main_tree_to_execute = "MainTree" >
+     <BehaviorTree ID="MainTree">
+
+        <Sequence name="root_sequence">
+            <!-- <LeggeFixture out="{pezzo}"> -->
+            <SingleTaskDispatcher task_name="task_1" agent_name="human" wait_feedback="false"/>
+
+            <Condition ID="CheckAgentState" agent_name="human"/>
+            <SingleTaskDispatcher task_name="task_1" agent_name="human" wait_feedback="false"/>
+
+              <!-- <RetryUntilSuccessful num_attempts="-1">
+                <Condition ID="CheckAgentState" agent_name="human"/>
+
+              </RetryUntilSuccessful> -->
+
+            <!-- <Inverter> -->
+
+          <!-- </Inverter> -->
+
+        </Sequence>
+     </BehaviorTree>
+ </root>

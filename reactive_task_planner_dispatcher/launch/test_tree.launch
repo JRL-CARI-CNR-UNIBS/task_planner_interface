@@ -2,7 +2,7 @@
 
 <launch>
 
-  <arg name="tree_path" default="$(find reactive_task_planner_dispatcher)/tree/test_tree_vero2_test.xml"/>
+  <arg name="tree_path" default="$(find reactive_task_planner_dispatcher)/tree/demo_tree_final.xml"/>
 
   <arg name="prefix" default="/sharework/test/stiima"/>
 
@@ -13,6 +13,9 @@
   <arg name="task_request_human" default="$(arg prefix)/human"/>
   <arg name="trigger_topic_name" default="/JFMX/L1/sharework/station/p0"/>
   <arg name="check_station_srv_name" default="check_new_piece"/>
+  <arg name="reset_piece_srv_name" default="reset_new_piece"/>
+  <arg name="check_agent_state_prefix_srv_name" default="check_agent_state"/>
+
 
 
   <param name="task_feedback_robot" value="$(arg task_feedback_robot)" />
@@ -21,6 +24,8 @@
   <param name="task_request_human" value="$(arg task_request_human)" />
   <param name="trigger_topic_name" value="$(arg trigger_topic_name)" />
   <param name="check_station_srv_name" value="$(arg check_station_srv_name)" />
+  <param name="reset_piece_srv_name" value="$(arg reset_piece_srv_name)" />
+  <param name="check_agent_state_prefix_srv_name" value="$(arg check_agent_state_prefix_srv_name)" />
 
 
   <node name="run_tree_node" pkg="reactive_task_planner_dispatcher" type="run_tree_node" output="screen" >
@@ -28,5 +33,8 @@
   </node>
 
   <node name="check_new_piece_node" pkg="sharework_demo" type="check_new_piece_srv.py" output="screen" />
+  <node name="check_agent_state_node" pkg="sharework_demo" type="check_agent_state_srv.py" output="screen">
+    <rosparam command="load" file="$(find sharework_task_planning)/config/multiple_agents.yaml" />
+  </node>
 
 </launch>

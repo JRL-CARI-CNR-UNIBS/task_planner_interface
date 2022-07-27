@@ -15,6 +15,12 @@ SingleTaskDispatcher::SingleTaskDispatcher(const std::string &name, const BT::No
     ROS_ERROR("Missing required input [task_name_]");
     throw BT::RuntimeError("Missing required input [task_name_]");
   }
+  wait_feedback_ = true;
+  if(SingleTaskDispatcher::getInput<bool>("wait_feedback",wait_feedback_))
+  {
+    ROS_INFO_STREAM("Wait feedback" << wait_feedback_);
+  }
+
 
 //  ROS_INFO_STREAM("Task Name: " << task_name_);
 //  ROS_INFO_STREAM("Agent Name: " << agent_name_);
@@ -36,7 +42,7 @@ SingleTaskDispatcher::SingleTaskDispatcher(const std::string &name, const BT::No
   /* Subscriber - Publisher */
   task_feedback_sub_.reset(new ros_helper::SubscriptionNotifier<task_planner_interface_msgs::MotionTaskExecutionFeedback> (nh_, task_feedback_topic_name,10));
   task_request_pub_ = nh_.advertise<task_planner_interface_msgs::MotionTaskExecutionRequestArray>(task_request_topic_name, 1000);
-
+  ros::Duration(1).sleep();
 }
 
 void SingleTaskDispatcher::publishTask(const ros::Publisher &pub,
@@ -57,8 +63,7 @@ BT::NodeStatus SingleTaskDispatcher::tick()
 {
   ROS_INFO_STREAM("---------------------------");
   ROS_INFO_STREAM("SingleTaskDispatcher ticked");
-
-  std::string piece_input, task_name;
+  std::string piece_input, task_name = task_name_;
   if(SingleTaskDispatcher::getInput("piece_input",piece_input))
   {
     task_name = task_name_ +"-" + piece_input + "-" + agent_name_;
@@ -79,9 +84,12 @@ BT::NodeStatus SingleTaskDispatcher::tick()
   /* Publish task request */
   publishTask(task_request_pub_,task_name);
 
+  if(!wait_feedback_)
+    return BT::NodeStatus::SUCCESS;
+
   /* Wait task response */
   ROS_INFO_STREAM("Waiting task feedback...");
-  while(!task_feedback_sub_->isANewDataAvailable() && ros::ok())
+  while(!task_feedback_sub_->isANewDataAvailable() && ros::ok() )
   {
     ros::Duration(0.1).sleep();
     ros::spinOnce();

@@ -66,6 +66,8 @@ BT::NodeStatus DoubleTaskDispatcher::tick()
   ROS_INFO_STREAM("---------------------------");
   ROS_INFO_STREAM("DoubleTaskDispatcher ticked");
   std::string piece_first_agent_input, piece_second_agent_input, task_name_first_agent, task_name_second_agent;
+  task_name_first_agent = task_name_first_agent_;
+  task_name_second_agent = task_name_second_agent_;
   if(DoubleTaskDispatcher::getInput("piece_first_agent_input",piece_first_agent_input))
   {
     task_name_first_agent = task_name_first_agent_ + "-" + piece_first_agent_input + "-" + first_agent_name_;

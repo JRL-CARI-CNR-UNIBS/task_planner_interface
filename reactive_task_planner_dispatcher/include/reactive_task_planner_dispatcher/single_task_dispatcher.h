@@ -14,6 +14,7 @@ private:
   ros::NodeHandle pnh_;
   std::string task_name_;
   std::string agent_name_;
+  bool wait_feedback_;
 
   std::shared_ptr<ros_helper::SubscriptionNotifier <task_planner_interface_msgs::MotionTaskExecutionFeedback>> task_feedback_sub_;
   ros::Publisher task_request_pub_;
@@ -33,6 +34,7 @@ public:
     return{BT::InputPort<std::string>("task_name"),
           BT::InputPort<std::string>("agent_name"),
           BT::InputPort<std::string>("piece_input"),
+          BT::InputPort<bool>("wait_feedback"),
           BT::OutputPort<std::string>("piece_output") };
   }
 
