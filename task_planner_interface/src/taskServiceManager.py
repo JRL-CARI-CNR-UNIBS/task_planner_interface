@@ -64,7 +64,7 @@ class TaskServiceManager:
             recipe_name (String): Recipe name
             prefix_topic_name (String): Prefix of topic name of action (executor) and feedback to upper layer
             is_human_real (bool): Flag for select if human agent is fake or real
-            start_recipe_index (int): Starting recipe index 
+            start_recipe_index (int): Starting recipe index
         """
 
         self.agent = agent                          # Agent
@@ -128,7 +128,7 @@ class TaskServiceManager:
         try:
 
             task_type_msg = self.task_type_service(task)            # Check type (rosservice call)
-            
+
             if task_type_msg.exist:
                 if self.is_human_real:
                     rospy.loginfo(TASK_TYPE.format(task_type_msg.type))
@@ -139,7 +139,7 @@ class TaskServiceManager:
                         # Call method for execute the task
                         self.execute_client(task,task_cmd_id)       # Il task name
 
-                    elif task_type_msg.type in ["Assembly", "Disassembly", "Sequence", "unscrew", "screw"]:
+                    elif task_type_msg.type in ["Assembly", "Disassembly", "Sequence", "unscrew", "Unscrew" ,"screw", "Screw"]:
                         rospy.loginfo(TASK_TYPE.format(task_type_msg.type))
                         # Call method for execute the sequence of sub-tasks
                         self.execute_sequence_client(task,task_cmd_id)       # Il task name
@@ -190,10 +190,10 @@ class TaskServiceManager:
             rospy.loginfo(RED+"Previous goal deleted"+END)
 
         goal = TaskExecuteGoal(task_name)
-        
+
         # tstart
         t_start_task = rospy.Time.now()
-        self.action_client.send_goal(goal)                          
+        self.action_client.send_goal(goal)
         rospy.loginfo(GREEN + "Goal Sent" + END)
 
         self.action_client.wait_for_result()
@@ -214,7 +214,7 @@ class TaskServiceManager:
             task_result.path_length = action_result.path_length
             task_result.t_start = t_start_task
             task_result.t_end = t_end_task
-     
+
             # Publish result to task planner
             self.pub_feedback_task_planner.publish(MotionTaskExecutionFeedback(task_cmd_id,action_result.outcome))
 
@@ -326,7 +326,7 @@ def main():
         start_recipe_index = 0
         rospy.logerr(RED + "Set to 0" + END)
 
-    
+
     agent_task_manager = []     # List of object TaskServiceManager (one for each agent)
     agent_types = agents.keys()
 
