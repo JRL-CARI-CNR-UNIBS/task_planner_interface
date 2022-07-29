@@ -129,11 +129,11 @@ namespace taskPlannerInterface
                    skill_feedback = m_sub_task_result->getData();
                    ros::Time t_msg;
                    m_sub_task_result->getMsgReceivedTime()->get(t_msg);
-                   //ROS_INFO("new msg. time = %f", t_msg.toSec() );
+                   ROS_INFO("new msg. time = %f", t_msg.toSec() );
+                   fdk_received = true;
 
-
-                   if ((t_msg - t_send).toSec()>0.0)
-                     fdk_received = true;
+                   //if ((t_msg - t_send).toSec()>0.0)
+                   //  fdk_received = true;
                 }
                 r.sleep();
               }

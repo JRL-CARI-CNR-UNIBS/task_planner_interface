@@ -1,0 +1,64 @@
+<?xml version="1.0"?>
+<root main_tree_to_execute="BehaviorTree">
+    <!-- ////////// -->
+    <BehaviorTree ID="BehaviorTree">
+        <Repeat num_cycles="-1">
+            <Sequence>
+                <RetryUntilSuccessful num_attempts="-1">
+                    <Condition ID="ThereIsNewPiece" piece_output="{pezzo}"/>
+                </RetryUntilSuccessful>
+                <Action ID="ResetNewPiece"/>
+                <Action ID="SingleTaskDispatcher" agent_name="human" piece_input="{pezzo}" piece_output="{pezzo}" task_name="pickplace-p0-p2" wait_feedback="true"/>
+                <Action ID="SingleTaskDispatcher" agent_name="human" piece_input="{pezzo}" piece_output="{pezzo}" task_name="unscrew-p2" wait_feedback=""/>
+                <Action ID="SingleTaskDispatcher" agent_name="human" piece_input="{pezzo}" piece_output="{pezzo}" task_name="unmount-p2" wait_feedback=""/>
+                <Action ID="SingleTaskDispatcher" agent_name="human" piece_input="{pezzo}" piece_output="{pezzo}" task_name="mount-p2" wait_feedback=""/>
+                <Action ID="SingleTaskDispatcher" agent_name="human" piece_input="{pezzo}" piece_output="{pezzo}" task_name="screw-p2" wait_feedback=""/>
+                <Action ID="SingleTaskDispatcher" agent_name="human" piece_input="{pezzo}" piece_output=" {pezzo}" task_name="pickplace-p2-p3" wait_feedback=""/>
+            </Sequence>
+        </Repeat>
+    </BehaviorTree>
+    <!-- ////////// -->
+    <TreeNodesModel>
+        <Condition ID="CheckAgentState">
+            <input_port name="agent_name"/>
+        </Condition>
+        <Action ID="DoubleTaskDispatcher">
+            <input_port name="first_agent_name"/>
+            <output_port name="first_agent_state"/>
+            <output_port name="piece_first_agent_input"/>
+            <input_port name="piece_first_agent_output"/>
+            <input_port name="piece_second_agent_input"/>
+            <input_port name="piece_second_agent_output"/>
+            <input_port name="second_agent_name"/>
+            <output_port name="second_agent_state"/>
+            <input_port name="task_name_first_agent"/>
+            <input_port name="task_name_second_agent"/>
+            <input_port name="wait_first_agent"/>
+            <input_port name="wait_second_agent"/>
+        </Action>
+        <Action ID="ResetNewPiece"/>
+        <Action ID="SingleTaskDispatcher">
+            <input_port name="agent_name"/>
+            <input_port name="piece_input"/>
+            <output_port name="piece_output"/>
+            <input_port name="task_name"/>
+            <input_port name="wait_feedback"/>
+        </Action>
+        <Control ID="SwitchDigital">
+            <input_port name="variable"/>
+        </Control>
+        <Condition ID="ThereIsNewPiece">
+            <output_port name="piece_output"/>
+        </Condition>
+        <Condition ID="TriggerNewPiece">
+            <output_port name="piece_output"/>
+        </Condition>
+        <Action ID="WaitAgentFeedback">
+            <input_port name="agent_name"/>
+            <input_port name="piece_input"/>
+            <output_port name="piece_output"/>
+        </Action>
+    </TreeNodesModel>
+    <!-- ////////// -->
+</root>
+

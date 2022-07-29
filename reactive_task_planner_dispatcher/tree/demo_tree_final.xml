@@ -7,23 +7,23 @@
                 <RetryUntilSuccessful num_attempts="-1">
                     <Condition ID="ThereIsNewPiece" piece_output="{pezzo}"/>
                 </RetryUntilSuccessful>
-                <Condition ID="ResetNewPiece"/>
-                <Action ID="SingleTaskDispatcher" agent_name="human" piece_input="{pezzo}" piece_output="{pezzo}" task_name="pickplace-p0-p1" wait_feedback=""/>
-                <Action ID="SingleTaskDispatcher" agent_name="robot" piece_input="{pezzo}" piece_output="{pezzo}" task_name="unscrew-p1" wait_feedback=""/>
-                <Action ID="SingleTaskDispatcher" agent_name="robot" piece_input="{pezzo}" piece_output="{pezzo}" task_name="unmount-p1" wait_feedback=""/>
+                <Action ID="ResetNewPiece"/>
+                <Action ID="SingleTaskDispatcher" agent_name="human" piece_input="{pezzo}" piece_output="{pezzo}" task_name="pickplace-p0-p1"/>
+                <Action ID="SingleTaskDispatcher" agent_name="robot" piece_input="{pezzo}" piece_output="{pezzo}" task_name="unscrew-p1"/>
+                <Action ID="SingleTaskDispatcher" agent_name="robot" piece_input="{pezzo}" piece_output="{pezzo}" task_name="unmount-p1"/>
                 <RetryUntilSuccessful num_attempts="-1">
                     <Sequence>
                         <Fallback>
                             <Sequence>
                                 <Condition ID="ThereIsNewPiece" piece_output="{pezzo2}"/>
-                                <Condition ID="ResetNewPiece"/>
-                                <Action ID="SingleTaskDispatcher" agent_name="human" piece_input="{pezzo}" piece_output="{pezzo}" task_name="pickplace-p1-p2" wait_feedback=""/>
-                                <Action ID="SingleTaskDispatcher" agent_name="human" piece_input="{pezzo2}" piece_output="{pezzo2}" task_name="pickplace-p0-p1" wait_feedback=""/>
+                                <Action ID="ResetNewPiece"/>
+                                <Action ID="SingleTaskDispatcher" agent_name="human" piece_input="{pezzo}" piece_output="{pezzo}" task_name="pickplace-p1-p2"/>
+                                <Action ID="SingleTaskDispatcher" agent_name="human" piece_input="{pezzo2}" piece_output="{pezzo2}" task_name="pickplace-p0-p1"/>
                                 <Action ID="DoubleTaskDispatcher" first_agent_name="robot" first_agent_state="{first_agent_state}" piece_first_agent_input="{pezzo}" piece_first_agent_output="{pezzo}" piece_second_agent_input="{pezzo2}" piece_second_agent_output="{pezzo2}" second_agent_name="human" second_agent_state="{second_agent_state}" task_name_first_agent="mount-p2" task_name_second_agent="unscrew-p1" wait_first_agent="true" wait_second_agent="true"/>
                                 <Fallback>
                                     <Sequence>
                                         <Action ID="DoubleTaskDispatcher" first_agent_name="robot" first_agent_state="{first_agent_state}" piece_first_agent_input="{pezzo2}" piece_first_agent_output="{pezzo2}" piece_second_agent_input="{pezzo}" piece_second_agent_output="{pezzo}" second_agent_name="human" second_agent_state="{second_agent_state}" task_name_first_agent="unmount-p1" task_name_second_agent="screw-p2" wait_first_agent="false" wait_second_agent="true"/>
-                                        <Action ID="SingleTaskDispatcher" agent_name="human" piece_input="{pezzo}" piece_output="{pezzo}" task_name="pickplace-p2-p3" wait_feedback=""/>
+                                        <Action ID="SingleTaskDispatcher" agent_name="human" piece_input="{pezzo}" piece_output="{pezzo}" task_name="pickplace-p2-p3"/>
                                         <RetryUntilSuccessful num_attempts="-1">
                                             <Condition ID="CheckAgentState" agent_name="robot"/>
                                         </RetryUntilSuccessful>
@@ -31,16 +31,16 @@
                                         <SetBlackboard output_key="{pezzo}" value="{pezzo2}"/>
                                     </Sequence>
                                     <Sequence>
-                                        <Action ID="SingleTaskDispatcher" agent_name="robot" piece_input="{pezzo2}" piece_output="{pezzo}" task_name="mount-p1" wait_feedback=""/>
-                                        <Action ID="SingleTaskDispatcher" agent_name="robot" piece_input="{pezzo2}" piece_output="{pezzo" task_name="screw-p1" wait_feedback=""/>
-                                        <Action ID="SingleTaskDispatcher" agent_name="human" piece_input="{pezzo2}" piece_output="{pezzo2}" task_name="pickplace-p1-p3" wait_feedback=""/>
+                                        <Action ID="SingleTaskDispatcher" agent_name="robot" piece_input="{pezzo2}" piece_output="{pezzo}" task_name="mount-p1"/>
+                                        <Action ID="SingleTaskDispatcher" agent_name="robot" piece_input="{pezzo2}" piece_output="{pezzo}" task_name="screw-p1"/>
+                                        <Action ID="SingleTaskDispatcher" agent_name="human" piece_input="{pezzo2}" piece_output="{pezzo2}" task_name="pickplace-p1-p3"/>
                                     </Sequence>
                                 </Fallback>
                             </Sequence>
                             <Sequence>
-                                <Action ID="SingleTaskDispatcher" agent_name="robot" piece_input="{pezzo}" piece_output="{pezzo}" task_name="mount-p1" wait_feedback=""/>
-                                <Action ID="SingleTaskDispatcher" agent_name="robot" piece_input="{pezzo}" piece_output="{pezzo}" task_name="screw-p1" wait_feedback=""/>
-                                <Action ID="SingleTaskDispatcher" agent_name="human" piece_input="{pezzo}" piece_output="{pezzo}" task_name="pickplace-p1-p3" wait_feedback=""/>
+                                <Action ID="SingleTaskDispatcher" agent_name="robot" piece_input="{pezzo}" piece_output="{pezzo}" task_name="mount-p1"/>
+                                <Action ID="SingleTaskDispatcher" agent_name="human" piece_input="{pezzo}" piece_output="{pezzo}" task_name="screw-p1"/>
+                                <Action ID="SingleTaskDispatcher" agent_name="human" piece_input="{pezzo}" piece_output="{pezzo}" task_name="pickplace-p1-p3"/>
                             </Sequence>
                         </Fallback>
                         <Inverter>
