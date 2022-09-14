@@ -38,6 +38,7 @@ DATE_FORMAT = "%Y_%m_%d_%H:%M:%S"
 START_PAUSE_MESSAGE = "Starting pause of: {} s"
 FINISH_PAUSE_MESSAGE = GREEN + "Pause finished, for agent: {}" + END
 END_MESSAGE = GREEN + "Recipe number: {} succesfully performed, cycletime: {}" + END
+DATABASE_DISCONNECTED = RED + "Disconnected from database" + END
 
 RECIPE_NAME_FORMAT = "{}_{}_{}"
 
@@ -46,7 +47,6 @@ UPLOAD_RESULT_SERVICE = "mongo_handler/task_result"
 CHECK_TASK_TYPE_SERVICE = 'mongo_handler/check_task_type'
 PAUSE_PROPERTIES = "mongo_handler/get_pause_properties"
 
-#BASE_TOPIC_NAME = "/sharework/test/stiima/"
 ACTION_NAME = "/task_execute"
 ACTION_NAME_SEQ = "/sequence_execute"
 
@@ -145,7 +145,7 @@ class TaskServiceManager:
                         self.execute_sequence_client(task,task_cmd_id)       # Il task name
 
                     elif task == "end": #task e' name
-                        #Call goto with home_position (si arrangia recuperando dal db..pero attenzione alla necessita diversi per agenti per home pos da gestire)
+                        #Note that in db task properties the end task has to be associated to all agents goal: it has to be ok for all agents. Home pose of all agent
                         self.execute_end(task,task_cmd_id)       # Il task name
                         # Publish cycle time and reset cycle_initialized
                         t_cycle = rospy.Time.now() - self.t_start
@@ -169,7 +169,7 @@ class TaskServiceManager:
             elif task == "wait_for_input":
                 input(INPUT_MESSAGE)
             else:       #Task doesn't exits
-                rospy.loginfo(RED + "Goal non inviato" + END)
+                rospy.loginfo(RED + "Goal not sent" + END)
                 pass        #Da capire cosa fare nel caso non sia presente (Es. end, wait..oppure qualcosa che effettivamente non c'è)
         except rospy.ServiceException as e:
             rospy.logerr(SERVICE_FAILED.format(e))
@@ -244,12 +244,16 @@ class TaskServiceManager:
             rospy.loginfo(RED+"Previous goal deleted"+END)
 
         goal = TaskExecuteGoal(task_name)
+        # tstart
+        t_start_task = rospy.Time.now()
         self.action_client_seq.send_goal(goal)
         rospy.loginfo(GREEN + "Goal Sent" + END)
 
         self.action_client_seq.wait_for_result()
 
         action_result = self.action_client_seq.get_result()
+        # tend
+        t_end_task = rospy.Time.now()
 
         rospy.loginfo(YELLOW + "Received result" + END)
 
@@ -263,6 +267,8 @@ class TaskServiceManager:
             task_result.duration_real = action_result.duration_real
             task_result.planning_time = action_result.planning_time
             task_result.path_length = action_result.path_length
+            task_result.t_start = t_start_task
+            task_result.t_end = t_end_task
 
             # Publish result to task planner
             self.pub_feedback_task_planner.publish(MotionTaskExecutionFeedback(task_cmd_id,action_result.outcome))

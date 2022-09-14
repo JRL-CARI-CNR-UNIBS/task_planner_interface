@@ -3,6 +3,7 @@
 import rospy
 
 from std_srvs.srv import SetBool,SetBoolResponse
+from Pipeline import Pipeline
 
 from pymongo import MongoClient
 import pymongo.errors
@@ -18,6 +19,9 @@ import copy
 
 import pandas as pd
 import seaborn as sns
+# import statsmodels.api as sm
+import statsmodels.formula.api as smf
+from sklearn.ensemble import IsolationForest
 
 GREEN = '\033[92m'
 YELLOW = '\033[93m'
@@ -38,9 +42,18 @@ DURATION_OK = "Duration computed correctly"
 
 COMPUTE_DURATION_SERVICE = "mongo_statistics/compute_durations"
 COMPUTE_DYNAMIC_RISK_SERVICE = "mongo_statistics/compute_dynamic_risk"
-COMPUTE_DYNAMIC_RISK_SERVICE_V2 = "mongo_statistics/compute_dynamic_risk_v2"
-MAKE_CHART_SERVICE = "/mongo_statistics/make_timeline_chart"
-MAKE_DR_CHART_SERVICE = "/mongo_statistics/make_dr_chart"
+COMPUTE_DYNAMIC_RISK_WITH_UNC_SERVICE = "mongo_statistics/compute_dynamic_risk_unc"
+
+
+TASK_DURATION_CHART_SERVICE = "mongo_statistics/task_duration_chart"
+TASK_DURATION_BY_GROUPING_CHART_SERVICE = "mongo_statistics/task_duration_by_grouping_chart"
+SYNERGY_MATRIX_CHART_SERVICE = "mongo_statistics/synergy_matrix_chart"
+SYNERGY_UNCERTAINTY_CHART_SERVICE = "mongo_statistics/synergy_uncertainty_chart"
+TIMELINE_CHART_SERVICE = "mongo_statistics/timeline_chart"
+
+
+
+paper = True
 
 class MongoStatistics:
     
@@ -75,7 +88,7 @@ class MongoStatistics:
         self.coll_durations_name = coll_duration_name 
         self.coll_results_name =  coll_results_name
 
-        self.utils_results_name = "utils_results"
+        self.utils_results_name = "utils_results_2"
 
     
         self.coll_utils_results = self.db[self.utils_results_name]       
@@ -85,7 +98,7 @@ class MongoStatistics:
         
 
     def computeDurations(self,request):
-        """_summary_
+        """Method to compute the expected duration of each task with standard deviation, min and max information.
 
         Args:
             request (_type_): _description_
@@ -97,177 +110,8 @@ class MongoStatistics:
         rospy.loginfo(SERVICE_CALLBACK.format(COMPUTE_DURATION_SERVICE))
         
         
-        pipeline = [
-        {
-            '$project': {
-                'duration': {
-                    '$cond': {
-                        'if': {
-                            '$eq': [
-                                '$outcome', 0
-                            ]
-                        }, 
-                        'then': None, 
-                        'else': '$duration_real'
-                    }
-                }, 
-                'name': 1, 
-                'type': 1, 
-                'agent': 1, 
-                'outcome': 1
-            }
-        }, {
-            '$group': {
-                '_id': {
-                    'agent': '$agent', 
-                    'name': '$name'
-                }, 
-                'expected_duration': {
-                    '$avg': '$duration'
-                }, 
-                'duration_stddev': {
-                    '$stdDevSamp': '$duration'
-                }, 
-                'counter_success': {
-                    '$sum': '$outcome'
-                }, 
-                'counter': {
-                    '$sum': 1
-                }, 
-                'success_rate': {
-                    '$avg': '$outcome'
-                }
-            }
-        }, {
-            '$project': {
-                '_id': 0, 
-                'name': '$_id.name', 
-                'agent': '$_id.agent', 
-                'expected_duration': {
-                    '$cond': {
-                        'if': {
-                            '$eq': [
-                                '$expected_duration', None
-                            ]
-                        }, 
-                        'then': 0, 
-                        'else': '$expected_duration'
-                    }
-                }, 
-                'duration_stddev': {
-                    '$cond': {
-                        'if': {
-                            '$eq': [
-                                '$duration_stddev', None
-                            ]
-                        }, 
-                        'then': 0, 
-                        'else': '$duration_stddev'
-                    }
-                }, 
-                'success_rate': 1, 
-                'counter': 1
-            }
-        }, {
-            '$sort': {
-                'name': 1
-            }
-        },  {
-        '$out': self.coll_durations_name
-        }
-        ]
+        pipeline = Pipeline.durationComputationPipeline(self.coll_durations_name)
         
-        pipeline=[
-        {
-            '$project': {
-                'duration': {
-                    '$cond': {
-                        'if': {
-                            '$eq': [
-                                '$outcome', 0
-                            ]
-                        }, 
-                        'then': None, 
-                        'else': {
-                            '$subtract': [
-                                '$t_end', '$t_start'
-                            ]
-                        }
-                    }
-                }, 
-                'name': 1, 
-                'type': 1, 
-                'agent': 1, 
-                'outcome': 1
-            }
-        }, {
-            '$group': {
-                '_id': {
-                    'agent': '$agent', 
-                    'name': '$name'
-                }, 
-                'expected_duration': {
-                    '$avg': '$duration'
-                }, 
-                'duration_stddev': {
-                    '$stdDevSamp': '$duration'
-                }, 
-                'counter_success': {
-                    '$sum': '$outcome'
-                }, 
-                'counter': {
-                    '$sum': 1
-                }, 
-                'success_rate': {
-                    '$avg': '$outcome'
-                }, 
-                'min': {
-                    '$min': '$duration'
-                }, 
-                'max': {
-                    '$max': '$duration'
-                }
-            }
-        }, {
-            '$project': {
-                'name': '$_id.name', 
-                'agent': '$_id.agent', 
-                'expected_duration': {
-                    '$cond': {
-                        'if': {
-                            '$eq': [
-                                '$expected_duration', None
-                            ]
-                        }, 
-                        'then': 0, 
-                        'else': '$expected_duration'
-                    }
-                }, 
-                'duration_stddev': {
-                    '$cond': {
-                        'if': {
-                            '$eq': [
-                                '$duration_stddev', None
-                            ]
-                        }, 
-                        'then': 0, 
-                        'else': '$duration_stddev'
-                    }
-                }, 
-
-                'counter': 1, 
-                'success_rate': 1, 
-                'min': 1, 
-                'max': 1
-            }
-        }, {
-            '$sort': {
-                'name': 1
-            }
-        },{
-        '$out': self.coll_durations_name
-        }
-        ]
         try:
             self.coll_durations.delete_many({})
             results = self.coll_results.aggregate(pipeline)
@@ -277,86 +121,46 @@ class MongoStatistics:
             rospy.logerr(CONNECTION_LOST)
             return SetBoolResponse(False,NOT_SUCCESSFUL)
         
-
-
     def createUtilsResults(self):  
         """Method for creating a collection of results with added task_mean_information and delta_time based on t_end-t_start
 
         Returns:
             bool: True if no exception occure, False viceversa
         """
-        rospy.loginfo(RED + "CHIAMATO UTILS RESULTS" + END)
+        rospy.loginfo(RED + "Create Utils Results called" + END)
         # Delete existing collection if it exists
         self.coll_utils_results.delete_many({})
         
-        # TODO FIRST CHECK THAT IN DURATION COLLECTION THERE IS SOMETHINF
+        # TODO FIRST CHECK THAT IN DURATION COLLECTION THERE IS SOMETHING
         #self.coll_durations.count_documents({})
         # self.coll_interaction.delete_many({})
         t_start = rospy.Time.now()
         
         # Pipeline = add Field delta_time and search task mean information from duration document
-        pipeline=[                          
-        {
-            '$addFields': {
-                'delta_time': {
-                    '$subtract': [
-                        '$t_end', '$t_start'
-                    ]
-                }
-            }
-        }, {
-            '$lookup': {
-                'from': self.coll_durations_name, 
-                'let': {
-                    'local_name': '$name', 
-                    'local_agent': '$agent', 
-                    'local_recipe': '$recipe'
-                }, 
-                'pipeline': [
-                    {
-                        '$match': {
-                            '$expr': {
-                                '$and': [
-                                    {
-                                        '$eq': [
-                                            '$agent', '$$local_agent'
-                                        ]
-                                    }, {
-                                        '$eq': [
-                                            '$name', '$$local_name'
-                                        ]
-                                    }
-                                ]
-                            }
-                        }
-                    }, {
-                        '$project': {
-                            'stock_item': 0, 
-                            '_id': 0
-                        }
-                    }
-                ], 
-                'as': 'task_mean_informations'
-            }
-        }, {
-            '$out': self.utils_results_name
-        }
-        ]
+        pipeline = Pipeline.createUtilsResultsPipeline(self.coll_durations_name,
+                                                       self.utils_results_name)
         
         try:
             results = self.coll_results.aggregate(pipeline)
             t_end = rospy.Time.now()
                         
-            rospy.loginfo(RED + "Tempo impiegato: " + str((t_end-t_start).to_sec())+ END)
+            rospy.loginfo(RED + "Computation time: " + str((t_end-t_start).to_sec())+ END)
 
-            rospy.loginfo("Concurrent Results ok")
+            rospy.loginfo("Created utils results")
             return True
         except pymongo.errors.AutoReconnect:
             rospy.logerr(CONNECTION_LOST)
             return False 
     
-    def getConcurrentTaskStatistics(self, task_name):
+    def getConcurrentTaskStatistics(self, task_name: str):
+        """ Method returning concurrent task informations
 
+        Args:
+            task_name (str): task name
+
+        Returns:
+            _type_: _description_
+        """        
         return self.concurrent_task_counters[task_name]["counter"] , self.concurrent_task_counters[task_name]["success_counter"]/self.concurrent_task_counters[task_name]["counter"]
 
     def getCounter(self, task_name):
@@ -376,10 +180,10 @@ class MongoStatistics:
         """Method for creating a collection of results with added the concurrent tasks
 
         Args:
-            request (SetBoolRequest): _description_
+            request (SetBoolRequest): Service request
 
         Returns:
-            SetBoolResponse: _description_
+            SetBoolResponse: Service response
         """
         
         t_start = rospy.Time.now()
@@ -430,7 +234,6 @@ class MongoStatistics:
         rospy.loginfo("Dizionario: agente->task list: ")
         rospy.loginfo(task_index)
         rospy.loginfo(RED + "OK FINO TASK RETRIEVE INFO" + END)
-        # input("wait...")
         
         agents = list(task_index.keys())
         
@@ -440,202 +243,7 @@ class MongoStatistics:
         
         ############
         #Retrive results with their concurrent tasks information
-        pipeline = [
-        {
-            '$lookup': {
-                'from': self.utils_results_name, 
-                'let': {
-                    'local_name': '$name', 
-                    'local_agent': '$agent', 
-                    'local_recipe': '$recipe', 
-                    'local_t_start': '$t_start', 
-                    'local_t_end': '$t_end'
-                }, 
-                'pipeline': [
-                    {
-                        '$match': {
-                            '$expr': {
-                                '$and': [
-                                    {
-                                        '$ne': [
-                                            '$agent', '$$local_agent'
-                                        ]
-                                    }, {
-                                        '$eq': [
-                                            '$recipe', '$$local_recipe'
-                                        ]
-                                    }, {
-                                        '$lte': [
-                                            '$$local_t_start', '$t_start'
-                                        ]
-                                    }, {
-                                        '$gte': [
-                                            '$$local_t_end', '$t_end'
-                                        ]
-                                    }
-                                ]
-                            }
-                        }
-                    }, {
-                        '$project': {
-                            'stock_item': 0, 
-                            '_id': 0
-                        }
-                    }
-                ], 
-                'as': 'inner_task'
-            }
-        }, {
-            '$lookup': {
-                'from': self.utils_results_name, 
-                'let': {
-                    'local_name': '$name', 
-                    'local_agent': '$agent', 
-                    'local_recipe': '$recipe', 
-                    'local_t_start': '$t_start', 
-                    'local_t_end': '$t_end'
-                }, 
-                'pipeline': [
-                    {
-                        '$match': {
-                            '$expr': {
-                                '$and': [
-                                    {
-                                        '$ne': [
-                                            '$agent', '$$local_agent'
-                                        ]
-                                    }, {
-                                        '$eq': [
-                                            '$recipe', '$$local_recipe'
-                                        ]
-                                    }, {
-                                        '$lt': [
-                                            '$$local_t_start', '$t_end'
-                                        ]
-                                    }, {
-                                        '$gt': [
-                                            '$$local_t_start', '$t_start'
-                                        ]
-                                    }, {
-                                        '$lt': [
-                                            '$t_end', '$$local_t_end'
-                                        ]
-                                    }
-                                ]
-                            }
-                        }
-                    }, {
-                        '$project': {
-                            'stock_item': 0, 
-                            '_id': 0
-                        }
-                    }
-                ], 
-                'as': 'partial_task_initial'
-            }
-        }, {
-            '$lookup': {
-                'from': self.utils_results_name, 
-                'let': {
-                    'local_name': '$name', 
-                    'local_agent': '$agent', 
-                    'local_recipe': '$recipe', 
-                    'local_t_start': '$t_start', 
-                    'local_t_end': '$t_end'
-                }, 
-                'pipeline': [
-                    {
-                        '$match': {
-                            '$expr': {
-                                '$and': [
-                                    {
-                                        '$ne': [
-                                            '$agent', '$$local_agent'
-                                        ]
-                                    }, {
-                                        '$eq': [
-                                            '$recipe', '$$local_recipe'
-                                        ]
-                                    }, {
-                                        '$gt': [
-                                            '$$local_t_end', '$t_start'
-                                        ]
-                                    }, {
-                                        '$lt': [
-                                            '$$local_t_end', '$t_end'
-                                        ]
-                                    }, {
-                                        '$lt': [
-                                            '$$local_t_start', '$t_start'
-                                        ]
-                                    }
-                                ]
-                            }
-                        }
-                    }, {
-                        '$project': {
-                            'stock_item': 0, 
-                            '_id': 0
-                        }
-                    }
-                ], 
-                'as': 'partial_task_final'
-            }
-        }, {
-            '$lookup': {
-                'from': self.utils_results_name, 
-                'let': {
-                    'local_name': '$name', 
-                    'local_agent': '$agent', 
-                    'local_recipe': '$recipe', 
-                    'local_t_start': '$t_start', 
-                    'local_t_end': '$t_end'
-                }, 
-                'pipeline': [
-                    {
-                        '$match': {
-                            '$expr': {
-                                '$and': [
-                                    {
-                                        '$ne': [
-                                            '$agent', '$$local_agent'
-                                        ]
-                                    }, {
-                                        '$eq': [
-                                            '$recipe', '$$local_recipe'
-                                        ]
-                                    }, {
-                                        '$lt': [
-                                            '$$local_t_end', '$t_end'
-                                        ]
-                                    }, {
-                                        '$gt': [
-                                            '$$local_t_start', '$t_start'
-                                        ]
-                                    }
-                                ]
-                            }
-                        }
-                    }, {
-                        '$project': {
-                            'stock_item': 0, 
-                            '_id': 0
-                        }
-                    }
-                ], 
-                'as': 'outer_task'
-            }
-        }, {
-            '$group': {                     # Il group molto lento 0.1 -> 0.7
-                '_id': [
-                    '$name', '$agent'
-                ], 
-                'grouped_task_agent': {
-                    '$push': '$$ROOT'
-                }
-            }
-        }
-        ]
+        pipeline = Pipeline.dynamicRiskPipeline(self.utils_results_name)
 
         try:
             t_start = rospy.Time.now()
@@ -648,7 +256,9 @@ class MongoStatistics:
         
         rospy.loginfo(YELLOW + "Iterating results" + END)
         
-
+        available_stats = {"average_task_duration":"expected_duration","min_task_duration":"min"}
+        used_stat_index = available_stats["average_task_duration"]
+        
         rospy.loginfo(GREEN + "Agents: {}".format(agents) + END)
         for task_group in results:          #A task_group contains vector of all (task_j, agent_i) same task computed by same agent
             input("New task group...")
@@ -735,7 +345,7 @@ class MongoStatistics:
                             # print(p_initial_task[0]["task_mean_informations"])
                             # print(p_initial_task[0]["task_mean_informations"][0])
                             # print(p_initial_task[0]["task_mean_informations"][0]["expected_duration"])
-                            t_initial_mean = p_initial_task[0]["task_mean_informations"][0]["expected_duration"] #"task_mean_informations":[{"exp_dur":**}]
+                            t_initial_mean = p_initial_task[0]["task_mean_informations"][0][used_stat_index] #"task_mean_informations":[{"exp_dur":**}]
                             # print(task_index[concurrent_agent])
                             col_index_reg_mat = task_index[concurrent_agent].index(p_initial_task[0]["name"])
                             
@@ -771,7 +381,7 @@ class MongoStatistics:
                             # print(p_final_task[0]["task_mean_informations"])
                             # print(p_final_task[0]["task_mean_informations"][0])
                             # print(p_final_task[0]["task_mean_informations"][0]["expected_duration"])
-                            t_final_mean = p_final_task[0]["task_mean_informations"][0]["expected_duration"] #"task_mean_informations":[{"exp_dur":**}]
+                            t_final_mean = p_final_task[0]["task_mean_informations"][0][used_stat_index] #"task_mean_informations":[{"exp_dur":**}]
                             # print(concurrent_agent)
                             col_index_reg_mat = task_index[concurrent_agent].index(p_final_task[0]["name"])
                             
@@ -810,7 +420,7 @@ class MongoStatistics:
                             # print(inner_task["task_mean_informations"][0])
                             #regression_mat[row, col_index_reg_mat] = inner_task["task_mean_informations"][0]["expected_duration"]
                             
-                            row_vect[0,col_index_reg_mat] += inner_task["task_mean_informations"][0]["expected_duration"]
+                            row_vect[0,col_index_reg_mat] += inner_task["task_mean_informations"][0][used_stat_index]
                             
                             overlapping_inner_tasks += inner_task["delta_time"]
                             add_task_to_regmat = True
@@ -828,7 +438,7 @@ class MongoStatistics:
 
                             delta_global_outside = single_task["delta_time"] / global_outer_task[0]["delta_time"]
                             
-                            t_global_outside_task_mean = global_outer_task[0]["task_mean_informations"][0]["expected_duration"] #"task_mean_informations":[{"exp_dur":**}]
+                            t_global_outside_task_mean = global_outer_task[0]["task_mean_informations"][0][used_stat_index] #"task_mean_informations":[{"exp_dur":**}]
                             
                             col_index_reg_mat = task_index[concurrent_agent].index(global_outer_task[0]["name"])
                             #regression_mat[row, col_index_reg_mat] = delta_global_outside * t_global_outside_task_mean     # delta_time is the real duration of "inner task"
@@ -900,536 +510,6 @@ class MongoStatistics:
             print((rospy.Time.now()-t_start).to_sec())
             
         return SetBoolResponse(True,SUCCESSFUL)
-
-
-    def computeDynamicRiskMin(self,request):   #Compute dynamic risk with concurrent and mean information
-            """Method for creating a collection of results with added the concurrent tasks
-
-            Args:
-                request (SetBoolRequest): _description_
-
-            Returns:
-                SetBoolResponse: _description_
-            """
-            
-            t_start = rospy.Time.now()
-            
-            # Delete older dynamic risk collection
-            try:
-                self.coll_interaction.delete_many({})
-            except pymongo.errors.AutoReconnect:
-                rospy.logerr(CONNECTION_LOST)
-                return SetBoolResponse(False,NOT_SUCCESSFUL)
-            
-            # Create collection with results task + task mean information
-            if not self.createUtilsResults():
-                return SetBoolResponse(False,NOT_SUCCESSFUL)
-            
-            # Pipeline for: retriving task name, unwinded for agents, each task only 1 agents
-            pipeline_agents_task_name =[
-            {
-                '$unwind': {
-                    'path': '$agent', 
-                    'preserveNullAndEmptyArrays': False
-                }
-            }, {
-                '$project': {
-                    '_id': 0, 
-                    'name': 1, 
-                    'agent': 1
-                }
-            }
-            ]
-
-            try:
-                cursor_task_properties = self.coll_skills.aggregate(pipeline_agents_task_name)
-            except pymongo.errors.AutoReconnect:
-                rospy.logerr(CONNECTION_LOST)
-                return SetBoolResponse(False,NOT_SUCCESSFUL)
-                    
-            task_index = dict()                                                         # It will be as: {"agent_name":[list with all tasks that it can perform],..}
-            for single_task in cursor_task_properties:
-                if "name" in single_task.keys() and "agent" in single_task.keys() :     # Ensure it has nedded attributes
-                    if not single_task["name"] == "end":                                # Excule task end (not interesting)
-                        if single_task["agent"] not in task_index:                      # If not exist already that agents
-                            task_index[single_task["agent"]] = set()                    # A SET for each agent to ensure unique task
-                        task_index[single_task["agent"]].add(single_task["name"])
-                                        
-            task_index = {key: list(values) for key, values in task_index.items()}       # Convert agents tasks from set to list (for have index)
-            
-            rospy.loginfo("Dizionario: agente->task list: ")
-            rospy.loginfo(task_index)
-            rospy.loginfo(RED + "OK FINO TASK RETRIEVE INFO" + END)
-            # input("wait...")
-            
-            agents = list(task_index.keys())
-            
-            if len(agents)>2:
-                rospy.loginfo(RED + "There are more than 2 agents in task properties" + END)
-                return SetBoolResponse(False,NOT_SUCCESSFUL)
-            
-            ############
-            #Retrive results with their concurrent tasks information
-            pipeline = [
-            {
-                '$lookup': {
-                    'from': self.utils_results_name, 
-                    'let': {
-                        'local_name': '$name', 
-                        'local_agent': '$agent', 
-                        'local_recipe': '$recipe', 
-                        'local_t_start': '$t_start', 
-                        'local_t_end': '$t_end'
-                    }, 
-                    'pipeline': [
-                        {
-                            '$match': {
-                                '$expr': {
-                                    '$and': [
-                                        {
-                                            '$ne': [
-                                                '$agent', '$$local_agent'
-                                            ]
-                                        }, {
-                                            '$eq': [
-                                                '$recipe', '$$local_recipe'
-                                            ]
-                                        }, {
-                                            '$lte': [
-                                                '$$local_t_start', '$t_start'
-                                            ]
-                                        }, {
-                                            '$gte': [
-                                                '$$local_t_end', '$t_end'
-                                            ]
-                                        }
-                                    ]
-                                }
-                            }
-                        }, {
-                            '$project': {
-                                'stock_item': 0, 
-                                '_id': 0
-                            }
-                        }
-                    ], 
-                    'as': 'inner_task'
-                }
-            }, {
-                '$lookup': {
-                    'from': self.utils_results_name, 
-                    'let': {
-                        'local_name': '$name', 
-                        'local_agent': '$agent', 
-                        'local_recipe': '$recipe', 
-                        'local_t_start': '$t_start', 
-                        'local_t_end': '$t_end'
-                    }, 
-                    'pipeline': [
-                        {
-                            '$match': {
-                                '$expr': {
-                                    '$and': [
-                                        {
-                                            '$ne': [
-                                                '$agent', '$$local_agent'
-                                            ]
-                                        }, {
-                                            '$eq': [
-                                                '$recipe', '$$local_recipe'
-                                            ]
-                                        }, {
-                                            '$lt': [
-                                                '$$local_t_start', '$t_end'
-                                            ]
-                                        }, {
-                                            '$gt': [
-                                                '$$local_t_start', '$t_start'
-                                            ]
-                                        }, {
-                                            '$lt': [
-                                                '$t_end', '$$local_t_end'
-                                            ]
-                                        }
-                                    ]
-                                }
-                            }
-                        }, {
-                            '$project': {
-                                'stock_item': 0, 
-                                '_id': 0
-                            }
-                        }
-                    ], 
-                    'as': 'partial_task_initial'
-                }
-            }, {
-                '$lookup': {
-                    'from': self.utils_results_name, 
-                    'let': {
-                        'local_name': '$name', 
-                        'local_agent': '$agent', 
-                        'local_recipe': '$recipe', 
-                        'local_t_start': '$t_start', 
-                        'local_t_end': '$t_end'
-                    }, 
-                    'pipeline': [
-                        {
-                            '$match': {
-                                '$expr': {
-                                    '$and': [
-                                        {
-                                            '$ne': [
-                                                '$agent', '$$local_agent'
-                                            ]
-                                        }, {
-                                            '$eq': [
-                                                '$recipe', '$$local_recipe'
-                                            ]
-                                        }, {
-                                            '$gt': [
-                                                '$$local_t_end', '$t_start'
-                                            ]
-                                        }, {
-                                            '$lt': [
-                                                '$$local_t_end', '$t_end'
-                                            ]
-                                        }, {
-                                            '$lt': [
-                                                '$$local_t_start', '$t_start'
-                                            ]
-                                        }
-                                    ]
-                                }
-                            }
-                        }, {
-                            '$project': {
-                                'stock_item': 0, 
-                                '_id': 0
-                            }
-                        }
-                    ], 
-                    'as': 'partial_task_final'
-                }
-            }, {
-                '$lookup': {
-                    'from': self.utils_results_name, 
-                    'let': {
-                        'local_name': '$name', 
-                        'local_agent': '$agent', 
-                        'local_recipe': '$recipe', 
-                        'local_t_start': '$t_start', 
-                        'local_t_end': '$t_end'
-                    }, 
-                    'pipeline': [
-                        {
-                            '$match': {
-                                '$expr': {
-                                    '$and': [
-                                        {
-                                            '$ne': [
-                                                '$agent', '$$local_agent'
-                                            ]
-                                        }, {
-                                            '$eq': [
-                                                '$recipe', '$$local_recipe'
-                                            ]
-                                        }, {
-                                            '$lt': [
-                                                '$$local_t_end', '$t_end'
-                                            ]
-                                        }, {
-                                            '$gt': [
-                                                '$$local_t_start', '$t_start'
-                                            ]
-                                        }
-                                    ]
-                                }
-                            }
-                        }, {
-                            '$project': {
-                                'stock_item': 0, 
-                                '_id': 0
-                            }
-                        }
-                    ], 
-                    'as': 'outer_task'
-                }
-            }, {
-                '$group': {                     # Il group molto lento 0.1 -> 0.7
-                    '_id': [
-                        '$name', '$agent'
-                    ], 
-                    'grouped_task_agent': {
-                        '$push': '$$ROOT'
-                    }
-                }
-            }
-            ]
-
-            try:
-                t_start = rospy.Time.now()
-                results = self.coll_utils_results.aggregate(pipeline)
-                t_end = (rospy.Time.now() - t_start).to_sec()
-                rospy.loginfo("Computational time for dynamic risk" + str(t_end))
-            except pymongo.errors.AutoReconnect:
-                rospy.logerr(CONNECTION_LOST)
-                return SetBoolResponse(False,NOT_SUCCESSFUL)
-            
-            rospy.loginfo(YELLOW + "Iterating results" + END)
-            
-
-            rospy.loginfo(GREEN + "Agents: {}".format(agents) + END)
-            for task_group in results:          #A task_group contains vector of all (task_j, agent_i) same task computed by same agent
-                input("New task group...")
-                
-                #Number of rows of regression matrix
-                n_rows = len(task_group['grouped_task_agent'])
-                
-                # print(agents)
-                
-                #Compute other agents different from current task agent
-                agent = task_group["_id"][1]                                    #First element of _id is name
-                concurrent_agent = list(set(agents).difference(set([agent])))[0]         # If only one agent ok, otherwise there is also others agents in the set.
-                
-                rospy.loginfo("Principal agent: {}".format(agent))
-                rospy.loginfo("Concurrent agent: {}".format(concurrent_agent))
-                            
-                        
-                #for concurrent_agent in other_agents:                   #If more than one agents
-                
-                #Number of column of regression matrix = concurrent_agent task
-                n_col = len(task_index[concurrent_agent])
-                
-                #Initialize regression matrix
-                
-                #regression_mat = np.zeros((n_rows,n_col))                       # To change: non è detto che per un task ce ne sia uno parallelo
-                #row_vect = np.zeros((1,n_col))
-                
-                regression_mat = np.empty((0,n_col)) 
-                known_vect = np.empty((0,1))
-                
-                # print("////////////////////////")
-                # # print(regression_mat)
-                # print("////////////////////////")
-                # print(n_col)
-                # print(n_rows)
-                # print("-----------------------")
-
-                rospy.loginfo(GREEN + "Fondamental task: {}".format(task_group["_id"][0]) + END)
-                
-                self.resetConcurrentTaskCounters()
-                # if not(agent == "ur5_on_guide" and concurrent_agent == "human_right_arm" and task_group["_id"][0]=="pick_blue_box"):
-                #     continue
-                for row, single_task in enumerate(task_group['grouped_task_agent']):
-                    add_task_to_regmat = False
-                    row_vect = np.zeros((1,n_col))
-                    # print(single_task)
-                    # print("task")
-                    # print(single_task["name"])
-                    # print("t start")
-                    # print(single_task["t_start"])
-                    
-                    # print("t end")
-                    # print(single_task["t_end"])
-                    # print("mean")
-                    # print(single_task["task_mean_informations"][0]["expected_duration"])
-                    
-
-                    p_initial_task = single_task['partial_task_initial']
-                    p_final_task = single_task['partial_task_final']
-                    # inner_tasks = single_task['inner_task']
-                    global_outer_task = single_task['outer_task']
-
-                    overlapping_initial_time = 0.0
-                    overlapping_final_time = 0.0
-                    overlapping_inner_tasks = 0.0
-                    overlapping_global_outer_task = 0.0
-                    
-                    # print(p_initial_task)
-                    # print(p_final_task)
-                    print("**************************************************")
-                    rospy.loginfo(RED + "DURATION: {}".format(single_task["delta_time"]) + END)
-                    #Insert partial initial task
-                    if p_initial_task:          # Not empty
-                        if len(p_initial_task)>1:                                               #Future note: It can be more than one agents in parallel, in that case filter to consider only concurrent task of concurrent agent
-                            rospy.loginfo(RED + "More than one partial initial task" + END)
-                        else:
-                            if p_initial_task[0]["outcome"] == 1:
-                                # print("initial")
-                                rospy.loginfo(RED + "Initial task: {}".format(p_initial_task[0]["name"]) + END)
-                                
-                                overlapping_initial_time = p_initial_task[0]["t_end"] - single_task["t_start"] 
-                                delta_initial = overlapping_initial_time / p_initial_task[0]["delta_time"]
-                                # print(p_initial_task[0])
-                                # print(p_initial_task[0]["task_mean_informations"])
-                                # print(p_initial_task[0]["task_mean_informations"][0])
-                                # print(p_initial_task[0]["task_mean_informations"][0]["expected_duration"])
-                                t_initial_mean = p_initial_task[0]["task_mean_informations"][0]["min"] #"task_mean_informations":[{"exp_dur":**}]
-                                # print(task_index[concurrent_agent])
-                                col_index_reg_mat = task_index[concurrent_agent].index(p_initial_task[0]["name"])
-                                
-                                #regression_mat[row, col_index_reg_mat] = delta_initial*t_initial_mean
-                                
-                                row_vect[0,col_index_reg_mat] += delta_initial*t_initial_mean
-                                add_task_to_regmat = True
-                                
-                            self.updateConcurrentTaskCounters(p_initial_task[0]["name"], p_initial_task[0]["outcome"])
-                            
-                            #print(single_task)
-                            #print(p_initial_task)
-                            # print(p_initial_task[0]["name"])
-                            # print(p_initial_task[0]["agent"])
-                            # print(p_initial_task[0]["t_start"])
-                            # print(p_initial_task[0]["t_end"])       
-                            
-                            # print(overlapping_initial_time)
-                            # print(delta_initial)
-                            # print(t_initial_mean)
-                            # print(col_index_reg_mat)
-                            
-                    #Insert partial final task
-                    if p_final_task:          # Not empty
-                        if len(p_final_task)>1:
-                            rospy.loginfo(RED + "More than one partial final task" + END)        #Future note: It can be more than one agents in parallel, in that case filter to consider only concurrent task of concurrent agent
-                        else:
-                            if p_final_task[0]["outcome"] == 1:          
-                                rospy.loginfo(RED + "Final task: {}".format(p_final_task[0]["name"]) + END)
-
-                                overlapping_final_time = single_task["t_end"] - p_final_task[0]["t_start"]
-                                delta_final = overlapping_final_time / p_final_task[0]["delta_time"]
-                                # print(p_final_task[0]["task_mean_informations"])
-                                # print(p_final_task[0]["task_mean_informations"][0])
-                                # print(p_final_task[0]["task_mean_informations"][0]["expected_duration"])
-                                t_final_mean = p_final_task[0]["task_mean_informations"][0]["min"] #"task_mean_informations":[{"exp_dur":**}]
-                                # print(concurrent_agent)
-                                col_index_reg_mat = task_index[concurrent_agent].index(p_final_task[0]["name"])
-                                
-                                #regression_mat[row, col_index_reg_mat] = delta_final*t_final_mean
-                                row_vect[0,col_index_reg_mat] += delta_final*t_final_mean
-                                add_task_to_regmat = True
-
-                            self.updateConcurrentTaskCounters(p_final_task[0]["name"], p_final_task[0]["outcome"])
-                            #print(single_task)
-                            
-                            # print(p_final_task[0]["name"])
-                            # print(p_final_task[0]["agent"])
-                            # print(p_final_task[0]["t_start"])
-                            # print(p_final_task[0]["t_end"])       
-                            
-                            # print(overlapping_final_time)
-                            # print(delta_final)
-                            # print(t_final_mean)
-                            # print(col_index_reg_mat)
-                    
-                                    
-                    if single_task['inner_task']:
-                        rospy.loginfo(RED + "Inner tasks: " + END)
-                        # print(single_task['inner_task'])
-                        # print("...............................................")
-                        # print(single_task['inner_task'])
-                        # print(type(single_task['inner_task']))
-                        for inner_task in single_task['inner_task']:
-                            # print(inner_task)
-                            if inner_task["outcome"] == 1:               #QUesto [0] non sono sicuro
-                                col_index_reg_mat = task_index[concurrent_agent].index(inner_task["name"])
-                                # print("another inner tasks")
-                                print(inner_task["name"])
-                                # print(inner_task["task_mean_informations"])
-                                # print(inner_task["task_mean_informations"][0]["expected_duration"])                        
-                                # print(inner_task["task_mean_informations"][0])
-                                #regression_mat[row, col_index_reg_mat] = inner_task["task_mean_informations"][0]["expected_duration"]
-                                
-                                row_vect[0,col_index_reg_mat] += inner_task["task_mean_informations"][0]["min"]
-                                
-                                overlapping_inner_tasks += inner_task["delta_time"]
-                                add_task_to_regmat = True
-                            
-                            self.updateConcurrentTaskCounters(inner_task["name"], inner_task["outcome"])
-                            # input("guarda inner task")
-                            # print(inner_task["name"])
-                    
-                    if global_outer_task:
-                        if len(global_outer_task)>1:
-                            rospy.loginfo(RED + "More than one global outside final task" + END)        #Future note: It can be more than one agents in parallel, in that case filter to consider only concurrent task of concurrent agent
-                        else:
-                            if global_outer_task[0]["outcome"] == 1:          
-                                rospy.loginfo(RED + "Global outside task: {}".format(global_outer_task[0]["name"]) + END)
-
-                                delta_global_outside = single_task["delta_time"] / global_outer_task[0]["delta_time"]
-                                
-                                t_global_outside_task_mean = global_outer_task[0]["task_mean_informations"][0]["min"] #"task_mean_informations":[{"exp_dur":**}]
-                                
-                                col_index_reg_mat = task_index[concurrent_agent].index(global_outer_task[0]["name"])
-                                #regression_mat[row, col_index_reg_mat] = delta_global_outside * t_global_outside_task_mean     # delta_time is the real duration of "inner task"
-
-                                row_vect[0,col_index_reg_mat] += delta_global_outside * t_global_outside_task_mean
-
-                                overlapping_global_outer_task = single_task["delta_time"]                                      # All the little task   |---|
-                                add_task_to_regmat = True                                                                                                   # |--------|
-                            self.updateConcurrentTaskCounters(global_outer_task[0]["name"], global_outer_task[0]["outcome"])
-                    print(row_vect)
-                    print(overlapping_initial_time)
-                    print(overlapping_inner_tasks)
-                    print(overlapping_final_time)
-                    print(overlapping_global_outer_task)
-                    if add_task_to_regmat:
-                        #Nota TODO solo se almeno uno di quelli sopra
-                        regression_mat = np.append(regression_mat, row_vect,axis=0)
-                        # print("------------------")
-                        # print(regression_mat)
-                        # print("------------------")
-                        
-                        known_vect = np.append(known_vect, overlapping_initial_time + overlapping_final_time + overlapping_inner_tasks + overlapping_global_outer_task)
-                        # print(known_vect)
-                        # print("------------------")
-                        # known_vect[row] = overlapping_initial_time + overlapping_final_time + overlapping_inner_tasks + overlapping_global_outer_task  # = single_task["delta_time"]-t_idle : t_idle = single_task["delta_time"] - overlapping_inner -overl_initial-over_final 
-                    # print(known_vect)
-                    print(known_vect)
-                    input("COntrolla")
-                input("Regression...")
-                print(regression_mat)
-                print(known_vect)
-                # print(regression_mat.shape)
-                # print(known_vect.shape)
-                
-                t_start=rospy.Time.now()
-                try:
-                    lstsq_results=np.linalg.lstsq(regression_mat, known_vect, rcond=None)
-                    print(lstsq_results)
-                    dynamic_risk = lstsq_results[0]
-                except np.linalg.LinAlgError:
-                    rospy.loginfo(RED + "Least square does not converge" + END)
-                    return SetBoolResponse(False,NOT_SUCCESSFUL)        
-                
-                # Here agent and concurrent_agent change role for dynamic risk 
-                for index, task in enumerate(task_index[concurrent_agent]):
-                    counter, success_rate = self.getConcurrentTaskStatistics(task)
-                    try:
-                        results = self.coll_utils_results.aggregate(pipeline)
-                        self.coll_interaction.insert_one({"agent": concurrent_agent, 
-                                                        "concurrent_agent": agent,
-                                                        "agent_skill": task, 
-                                                        "concurrent_skill": task_group["_id"][0],
-                                                        "success_rate": success_rate,
-                                                        "dynamic_risk": dynamic_risk[index],
-                                                        "counter": counter})
-                    except pymongo.errors.AutoReconnect:
-                        rospy.logerr(CONNECTION_LOST)
-                        return SetBoolResponse(False,NOT_SUCCESSFUL)
-                    
-                rospy.loginfo(GREEN + "Fondamental task:" + END)
-                print(single_task["name"])
-                print(task_index[concurrent_agent])
-                print(dynamic_risk)
-                input("Leggi i risultati...")
-                # for k in coefficient:
-                #     input("Prossimo k")
-                #     print(k)
-                    
-                print((rospy.Time.now()-t_start).to_sec())
-                
-            return SetBoolResponse(True,SUCCESSFUL)
         
     def dynamicRiskChart(self,request):
         """Method that is a callback of a service usefull for do dynamic risk heat map
@@ -1440,39 +520,20 @@ class MongoStatistics:
         Returns:
             SetBoolResponse: _description_
         """
-        print("ciao")
+
         # Check if the results folder path not exist create it
         if not os.path.exists(self.results_folder_path):
             os.makedirs(self.results_folder_path)
             rospy.loginfo(RED + "The new direcory {} is created!".format(self.results_folder_path) + END)
         
-        
-        import pandas as pd
-        import seaborn as sns
+        pipeline_dr_grouped_by_agent = Pipeline.groupedDynamicRiskPipeline()        # Pipeline to group/separate dynamic risk elements by agent  
 
-        pipeline_dr_grouped_by_agent = [        # Pipeline to group/separate dynamic risk elements by agent  
-        {
-            '$sort': {
-                'agent_skill': 1, 
-                'concurrent_skill': 1
-            }
-        }, {
-            '$group': {
-                '_id': '$agent', 
-                'grouped_task_agent': {
-                    '$push': '$$ROOT'
-                }
-            }
-        }
-        ]
         try:
             dynamic_risk_grouped = self.coll_interaction.aggregate(pipeline_dr_grouped_by_agent)
         except pymongo.errors.AutoReconnect:
             rospy.logerr(CONNECTION_LOST)
-        print("dopo")
-        #### --------------- 
+            
         dynamic_risk_list = []      # It will be a list of dictionaries each made like: {"main_agent":"name", "concurrent_agent":"name", "name_main_agent":[],  "name_concurrent_agent":[], "dynamic_risk":[]}
-        print("dopo")
 
         for index, dynamic_risk_single_agent in enumerate(dynamic_risk_grouped):        # Iterate a group of dynamic_risk element (a group for main agent)
             dynamic_risk_list.append({})
@@ -1506,7 +567,7 @@ class MongoStatistics:
             print("Main agent: {}".format(dynamic_risk_single_agent["_id"]))
             print("Concurrent agent: {}".format(dynamic_risk_single_element["concurrent_agent"]))
             print(dynamic_risk_list[index])   
-        ##### -------------------
+
         
         # fig, axs = plt.subplots(1, 2)
         # fig.suptitle('Dynamic Matrix')
@@ -1548,24 +609,7 @@ class MongoStatistics:
                 plot_title = "Sinergy Matrix for agent: {} ($S^{}$)".format(main_agent_label["name"],main_agent_label["abbreviation"])
                 for agent in [main_agent,concurrent_agent]:
                     for k in data.index:
-                        if data.at[k,agent] == "pick_blue_box_human_right_arm":
-                            data.at[k,agent] = "Pick Blue Box (H)"
-                        elif data.at[k,agent] == "place_blue_box_human_right_arm":
-                            data.at[k,agent] = "Place Blue Box (H)"
-                        elif data.at[k,agent] == "pick_blue_box_ur5_on_guide":
-                            data.at[k,agent] = "Pick Blue Box (R)"
-                        elif data.at[k,agent] == "place_blue_box_ur5_on_guide":
-                            data.at[k,agent] = "Place Blue Box (R)"
-                        elif data.at[k,agent] == "place_blue_box_ur5_on_guide":
-                            data.at[k,agent] = "Place Blue Box"                       
-                        elif data.at[k,agent] == "pick_white_box":
-                            data.at[k,agent] = "Pick White Box"
-                        elif data.at[k,agent] == "place_white_box":
-                            data.at[k,agent] = "Place White Box"
-                        elif data.at[k,agent] == "pick_orange_box":
-                            data.at[k,agent] = "Pick Orange Box"
-                        elif data.at[k,agent] == "place_orange_box":
-                            data.at[k,agent] = "Place Orange Box"
+                        data.at[k,agent] = self.getPaperTaskName(data.at[k,agent])
                 data = data.rename(columns={main_agent: main_agent_label["name"]+" Tasks", concurrent_agent: concurrent_agent_label["name"]+" Tasks"})
                 print(data)
                 data_matrix = data.pivot(main_agent_label["name"]+" Tasks",concurrent_agent_label["name"]+" Tasks","dynamic_risk")    
@@ -1592,196 +636,12 @@ class MongoStatistics:
         
         return SetBoolResponse(True,SUCCESSFUL)
                                                        
-    def computeDynamicRiskNoAddInfo(self,request):     #senza medie nei concurrent
         t_start = rospy.Time.now()
         
         rospy.loginfo(SERVICE_CALLBACK.format(COMPUTE_DURATION_SERVICE))
         #Aggiunge delta_time, aggiunge la duration media del task "principale", + concurrent che sono senza info medie
-        pipeline=[
-        {
-            '$addFields': {
-                'delta_time': {
-                    '$subtract': [
-                        '$t_end', '$t_start'
-                    ]
-                }
-            }
-        }, {
-            '$lookup': {
-                'from': self.coll_durations_name, 
-                'let': {
-                    'local_name': '$name', 
-                    'local_agent': '$agent', 
-                    'local_recipe': '$recipe'
-                }, 
-                'pipeline': [
-                    {
-                        '$match': {
-                            '$expr': {
-                                '$and': [
-                                    {
-                                        '$eq': [
-                                            '$agent', '$$local_agent'
-                                        ]
-                                    }, {
-                                        '$eq': [
-                                            '$name', '$$local_name'
-                                        ]
-                                    }
-                                ]
-                            }
-                        }
-                    }, {
-                        '$project': {
-                            'stock_item': 0, 
-                            '_id': 0
-                        }
-                    }
-                ], 
-                'as': 'task_mean_informations'
-            }
-        }, {
-            '$lookup': {
-                'from': self.coll_results_name, 
-                'let': {
-                    'local_name': '$name', 
-                    'local_agent': '$agent', 
-                    'local_recipe': '$recipe', 
-                    'local_t_start': '$t_start', 
-                    'local_t_end': '$t_end'
-                }, 
-                'pipeline': [
-                    {
-                        '$match': {
-                            '$expr': {
-                                '$and': [
-                                    {
-                                        '$ne': [
-                                            '$agent', '$$local_agent'
-                                        ]
-                                    }, {
-                                        '$eq': [
-                                            '$recipe', '$$local_recipe'
-                                        ]
-                                    }, {
-                                        '$lte': [
-                                            '$$local_t_start', '$t_start'
-                                        ]
-                                    }, {
-                                        '$gte': [
-                                            '$$local_t_end', '$t_end'
-                                        ]
-                                    }
-                                ]
-                            }
-                        }
-                    }, {
-                        '$project': {
-                            'stock_item': 0, 
-                            '_id': 0
-                        }
-                    }
-                ], 
-                'as': 'inner_task'
-            }
-        }, {
-            '$lookup': {
-                'from': self.coll_results_name, 
-                'let': {
-                    'local_name': '$name', 
-                    'local_agent': '$agent', 
-                    'local_recipe': '$recipe', 
-                    'local_t_start': '$t_start', 
-                    'local_t_end': '$t_end'
-                }, 
-                'pipeline': [
-                    {
-                        '$match': {
-                            '$expr': {
-                                '$and': [
-                                    {
-                                        '$ne': [
-                                            '$agent', '$$local_agent'
-                                        ]
-                                    }, {
-                                        '$eq': [
-                                            '$recipe', '$$local_recipe'
-                                        ]
-                                    }, {
-                                        '$lt': [
-                                            '$$local_t_start', '$t_end'
-                                        ]
-                                    }, {
-                                        '$gt': [
-                                            '$$local_t_start', '$t_start'
-                                        ]
-                                    }, {
-                                        '$lt': [
-                                             '$t_end','$$local_t_end'
-                                        ]
-                                    }
-                                ]
-                            }
-                        }
-                    }, {
-                        '$project': {
-                            'stock_item': 0, 
-                            '_id': 0
-                        }
-                    }
-                ], 
-                'as': 'partial_task_initial'
-            }
-        }, {
-            '$lookup': {
-                'from': self.coll_results_name, 
-                'let': {
-                    'local_name': '$name', 
-                    'local_agent': '$agent', 
-                    'local_recipe': '$recipe', 
-                    'local_t_start': '$t_start', 
-                    'local_t_end': '$t_end'
-                }, 
-                'pipeline': [
-                    {
-                        '$match': {
-                            '$expr': {
-                                '$and': [
-                                    {
-                                        '$ne': [
-                                            '$agent', '$$local_agent'
-                                        ]
-                                    }, {
-                                        '$eq': [
-                                            '$recipe', '$$local_recipe'
-                                        ]
-                                    }, {
-                                        '$gt': [
-                                            '$$local_t_end', '$t_start'
-                                        ]
-                                    }, {
-                                        '$lt': [
-                                            '$$local_t_end', '$t_end'
-                                        ]
-                                    }, {
-                                        '$lt': [
-                                            '$$local_t_start', '$t_start'
-                                        ]
-                                    }
-                                ]
-                            }
-                        }
-                    }, {
-                        '$project': {
-                            'stock_item': 0, 
-                            '_id': 0
-                        }
-                    }
-                ], 
-                'as': 'partial_task_final'
-            }
-        }
-        ]
+        pipeline=Pipeline.dynamicRiskNoAddInfo(self.coll_durations_name,
+                                                self.coll_results_name)
         
         try:
             results = self.coll_results.aggregate(pipeline)
@@ -1970,7 +830,7 @@ class MongoStatistics:
 
                     ax.grid(True)
                     ax.set_title("Recipe: {}".format(n_recipe))
-                    self.results_folder_path="/home/samuele/projects/planning_ws/src/task-planner-interface/task_planner_statistics/file/recipe/"
+                    # self.results_folder_path="/home/samuele/projects/planning_ws/src/task-planner-interface/task_planner_statistics/file/recipe/"
 
                     if not os.path.exists(self.results_folder_path):
                         os.makedirs(self.results_folder_path)
@@ -1995,7 +855,7 @@ class MongoStatistics:
         pass
 
     def groupedDurationChart(self,request):   #Compute dynamic risk with concurrent and mean information
-        """Method 
+        """Method for making chart of task duration (grouped task for each parallel task)
 
         Args:
             request (SetBoolRequest): 
@@ -2003,8 +863,6 @@ class MongoStatistics:
         Returns:
             SetBoolResponse: 
         """
-        import pandas as pd
-        import seaborn as sns
         
         if not self.createUtilsResults():
             return SetBoolResponse(False,NOT_SUCCESSFUL)
@@ -2016,225 +874,8 @@ class MongoStatistics:
         for agent in agents:
             task_results[agent] =[]
         
-        # try:
-        #     cursor_task_results= self.coll_durations.find({})
-        # except pymongo.errors.AutoReconnect:
-        #     rospy.logerr(CONNECTION_LOST)
-        #     return SetBoolResponse(False,NOT_SUCCESSFUL)
-        
-        # for cursor_result in cursor_task_results:
 
-        pipeline = [
-        {
-            '$lookup': {
-                'from': self.utils_results_name, 
-                'let': {
-                    'local_name': '$name', 
-                    'local_agent': '$agent', 
-                    'local_recipe': '$recipe', 
-                    'local_t_start': '$t_start', 
-                    'local_t_end': '$t_end'
-                }, 
-                'pipeline': [
-                    {
-                        '$match': {
-                            '$expr': {
-                                '$and': [
-                                    {
-                                        '$ne': [
-                                            '$agent', '$$local_agent'
-                                        ]
-                                    }, {
-                                        '$eq': [
-                                            '$recipe', '$$local_recipe'
-                                        ]
-                                    }, {
-                                        '$lte': [
-                                            '$$local_t_start', '$t_start'
-                                        ]
-                                    }, {
-                                        '$gte': [
-                                            '$$local_t_end', '$t_end'
-                                        ]
-                                    }
-                                ]
-                            }
-                        }
-                    }, {
-                        '$project': {
-                            'stock_item': 0, 
-                            '_id': 0
-                        }
-                    }
-                ], 
-                'as': 'inner_task'
-            }
-        }, {
-            '$lookup': {
-                'from': self.utils_results_name, 
-                'let': {
-                    'local_name': '$name', 
-                    'local_agent': '$agent', 
-                    'local_recipe': '$recipe', 
-                    'local_t_start': '$t_start', 
-                    'local_t_end': '$t_end'
-                }, 
-                'pipeline': [
-                    {
-                        '$match': {
-                            '$expr': {
-                                '$and': [
-                                    {
-                                        '$ne': [
-                                            '$agent', '$$local_agent'
-                                        ]
-                                    }, {
-                                        '$eq': [
-                                            '$recipe', '$$local_recipe'
-                                        ]
-                                    }, {
-                                        '$lt': [
-                                            '$$local_t_start', '$t_end'
-                                        ]
-                                    }, {
-                                        '$gt': [
-                                            '$$local_t_start', '$t_start'
-                                        ]
-                                    }, {
-                                        '$lt': [
-                                            '$t_end', '$$local_t_end'
-                                        ]
-                                    }
-                                ]
-                            }
-                        }
-                    }, {
-                        '$project': {
-                            'stock_item': 0, 
-                            '_id': 0
-                        }
-                    }
-                ], 
-                'as': 'partial_task_initial'
-            }
-        }, {
-            '$lookup': {
-                'from': self.utils_results_name, 
-                'let': {
-                    'local_name': '$name', 
-                    'local_agent': '$agent', 
-                    'local_recipe': '$recipe', 
-                    'local_t_start': '$t_start', 
-                    'local_t_end': '$t_end'
-                }, 
-                'pipeline': [
-                    {
-                        '$match': {
-                            '$expr': {
-                                '$and': [
-                                    {
-                                        '$ne': [
-                                            '$agent', '$$local_agent'
-                                        ]
-                                    }, {
-                                        '$eq': [
-                                            '$recipe', '$$local_recipe'
-                                        ]
-                                    }, {
-                                        '$gt': [
-                                            '$$local_t_end', '$t_start'
-                                        ]
-                                    }, {
-                                        '$lt': [
-                                            '$$local_t_end', '$t_end'
-                                        ]
-                                    }, {
-                                        '$lt': [
-                                            '$$local_t_start', '$t_start'
-                                        ]
-                                    }
-                                ]
-                            }
-                        }
-                    }, {
-                        '$project': {
-                            'stock_item': 0, 
-                            '_id': 0
-                        }
-                    }
-                ], 
-                'as': 'partial_task_final'
-            }
-        }, {
-            '$lookup': {
-                'from': self.utils_results_name, 
-                'let': {
-                    'local_name': '$name', 
-                    'local_agent': '$agent', 
-                    'local_recipe': '$recipe', 
-                    'local_t_start': '$t_start', 
-                    'local_t_end': '$t_end'
-                }, 
-                'pipeline': [
-                    {
-                        '$match': {
-                            '$expr': {
-                                '$and': [
-                                    {
-                                        '$ne': [
-                                            '$agent', '$$local_agent'
-                                        ]
-                                    }, {
-                                        '$eq': [
-                                            '$recipe', '$$local_recipe'
-                                        ]
-                                    }, {
-                                        '$lt': [
-                                            '$$local_t_end', '$t_end'
-                                        ]
-                                    }, {
-                                        '$gt': [
-                                            '$$local_t_start', '$t_start'
-                                        ]
-                                    }
-                                ]
-                            }
-                        }
-                    }, {
-                        '$project': {
-                            'stock_item': 0, 
-                            '_id': 0
-                        }
-                    }
-                ], 
-                'as': 'outer_task'
-            }
-        }, {
-            '$group': {                     # Il group molto lento 0.1 -> 0.7
-                '_id': [
-                    '$name', '$agent'
-                ], 
-                'grouped_task_agent': {
-                    '$push': '$$ROOT'
-                }
-            }
-        }, {
-            '$addFields': {
-                'main_agent': {
-                    '$arrayElemAt': [
-                        '$_id', 1
-                    ]
-                }
-            }
-        }, {
-            '$group': {
-                '_id': '$main_agent', 
-                'grouped_main_agent': {
-                    '$push': '$$ROOT'
-                }
-            }
-        }
-        ]
+        pipeline = Pipeline.dynamicRiskForChart(self.utils_results_name)
 
         try:
             results = self.coll_utils_results.aggregate(pipeline)
@@ -2326,10 +967,8 @@ class MongoStatistics:
             # sns.catplot(data=dati, x=main_agent, y="duration", hue=concurrent_agent)
             sns.catplot(data=dati, kind="bar", x=main_agent, y="duration", hue=concurrent_agent)
 
-            plt.figure()
-            # sns.boxplot(data=dati, x=main_agent, y="duration", hue=concurrent_agent)
+            #plt.figure()
             
-
         plt.show()
         return SetBoolResponse(True,SUCCESSFUL)
 
@@ -2362,6 +1001,11 @@ class MongoStatistics:
         
         return [agent["_id"] for agent in list(agents_cursor)]
 
+    def computeOverlappingRatio(self,*,*):
+        #TODO: Receive in input task if initial, ..., and time start-end of main task and concurrent task and parallel task
+
+        
+    
     def computeDynamicRiskWithUncertainty(self,request):   #Compute dynamic risk with concurrent and mean information
         """Method for creating a collection of results with added the concurrent tasks
 
@@ -2371,9 +1015,7 @@ class MongoStatistics:
         Returns:
             SetBoolResponse: _description_
         """
-        import pandas as pd
-        import statsmodels.api as sm
-        import statsmodels.formula.api as smf
+
 
         t_start = rospy.Time.now()
         
@@ -2384,6 +1026,16 @@ class MongoStatistics:
             rospy.logerr(CONNECTION_LOST)
             return SetBoolResponse(False,NOT_SUCCESSFUL)
         
+        available_stats = {"average_task_duration":"expected_duration","min_task_duration":"min","median_task_duration":"median"}
+        
+        used_stat_index = available_stats["average_task_duration"]
+        if used_stat_index=="median":   
+            try:
+                self.addMedianToTaskStats()  
+            except pymongo.errors.AutoReconnect:
+                rospy.logerr(CONNECTION_LOST)
+                return SetBoolResponse(False,NOT_SUCCESSFUL)
+
         # Create collection with results task + task mean information
         if not self.createUtilsResults():
             return SetBoolResponse(False,NOT_SUCCESSFUL)
@@ -2422,7 +1074,7 @@ class MongoStatistics:
         
         rospy.loginfo("Dizionario: agente->task list: ")
         rospy.loginfo(task_index)
-        rospy.loginfo(RED + "OK FINO TASK RETRIEVE INFO" + END)
+
         # input("wait...")
         
         agents = list(task_index.keys())
@@ -2431,205 +1083,11 @@ class MongoStatistics:
             rospy.loginfo(RED + "There are more than 2 agents in task properties" + END)
             return SetBoolResponse(False,NOT_SUCCESSFUL)
         
-        ############
         #Retrive results with their concurrent tasks information
-        pipeline = [
-        {
-            '$lookup': {
-                'from': self.utils_results_name, 
-                'let': {
-                    'local_name': '$name', 
-                    'local_agent': '$agent', 
-                    'local_recipe': '$recipe', 
-                    'local_t_start': '$t_start', 
-                    'local_t_end': '$t_end'
-                }, 
-                'pipeline': [
-                    {
-                        '$match': {
-                            '$expr': {
-                                '$and': [
-                                    {
-                                        '$ne': [
-                                            '$agent', '$$local_agent'
-                                        ]
-                                    }, {
-                                        '$eq': [
-                                            '$recipe', '$$local_recipe'
-                                        ]
-                                    }, {
-                                        '$lte': [
-                                            '$$local_t_start', '$t_start'
-                                        ]
-                                    }, {
-                                        '$gte': [
-                                            '$$local_t_end', '$t_end'
-                                        ]
-                                    }
-                                ]
-                            }
-                        }
-                    }, {
-                        '$project': {
-                            'stock_item': 0, 
-                            '_id': 0
-                        }
-                    }
-                ], 
-                'as': 'inner_task'
-            }
-        }, {
-            '$lookup': {
-                'from': self.utils_results_name, 
-                'let': {
-                    'local_name': '$name', 
-                    'local_agent': '$agent', 
-                    'local_recipe': '$recipe', 
-                    'local_t_start': '$t_start', 
-                    'local_t_end': '$t_end'
-                }, 
-                'pipeline': [
-                    {
-                        '$match': {
-                            '$expr': {
-                                '$and': [
-                                    {
-                                        '$ne': [
-                                            '$agent', '$$local_agent'
-                                        ]
-                                    }, {
-                                        '$eq': [
-                                            '$recipe', '$$local_recipe'
-                                        ]
-                                    }, {
-                                        '$lt': [
-                                            '$$local_t_start', '$t_end'
-                                        ]
-                                    }, {
-                                        '$gt': [
-                                            '$$local_t_start', '$t_start'
-                                        ]
-                                    }, {
-                                        '$lt': [
-                                            '$t_end', '$$local_t_end'
-                                        ]
-                                    }
-                                ]
-                            }
-                        }
-                    }, {
-                        '$project': {
-                            'stock_item': 0, 
-                            '_id': 0
-                        }
-                    }
-                ], 
-                'as': 'partial_task_initial'
-            }
-        }, {
-            '$lookup': {
-                'from': self.utils_results_name, 
-                'let': {
-                    'local_name': '$name', 
-                    'local_agent': '$agent', 
-                    'local_recipe': '$recipe', 
-                    'local_t_start': '$t_start', 
-                    'local_t_end': '$t_end'
-                }, 
-                'pipeline': [
-                    {
-                        '$match': {
-                            '$expr': {
-                                '$and': [
-                                    {
-                                        '$ne': [
-                                            '$agent', '$$local_agent'
-                                        ]
-                                    }, {
-                                        '$eq': [
-                                            '$recipe', '$$local_recipe'
-                                        ]
-                                    }, {
-                                        '$gt': [
-                                            '$$local_t_end', '$t_start'
-                                        ]
-                                    }, {
-                                        '$lt': [
-                                            '$$local_t_end', '$t_end'
-                                        ]
-                                    }, {
-                                        '$lt': [
-                                            '$$local_t_start', '$t_start'
-                                        ]
-                                    }
-                                ]
-                            }
-                        }
-                    }, {
-                        '$project': {
-                            'stock_item': 0, 
-                            '_id': 0
-                        }
-                    }
-                ], 
-                'as': 'partial_task_final'
-            }
-        }, {
-            '$lookup': {
-                'from': self.utils_results_name, 
-                'let': {
-                    'local_name': '$name', 
-                    'local_agent': '$agent', 
-                    'local_recipe': '$recipe', 
-                    'local_t_start': '$t_start', 
-                    'local_t_end': '$t_end'
-                }, 
-                'pipeline': [
-                    {
-                        '$match': {
-                            '$expr': {
-                                '$and': [
-                                    {
-                                        '$ne': [
-                                            '$agent', '$$local_agent'
-                                        ]
-                                    }, {
-                                        '$eq': [
-                                            '$recipe', '$$local_recipe'
-                                        ]
-                                    }, {
-                                        '$lt': [
-                                            '$$local_t_end', '$t_end'
-                                        ]
-                                    }, {
-                                        '$gt': [
-                                            '$$local_t_start', '$t_start'
-                                        ]
-                                    }
-                                ]
-                            }
-                        }
-                    }, {
-                        '$project': {
-                            'stock_item': 0, 
-                            '_id': 0
-                        }
-                    }
-                ], 
-                'as': 'outer_task'
-            }
-        }, {
-            '$group': {                     # Il group molto lento 0.1 -> 0.7
-                '_id': [
-                    '$name', '$agent'
-                ], 
-                'grouped_task_agent': {
-                    '$push': '$$ROOT'
-                }
-            }
-        }
-        ]
-
+        pipeline = Pipeline.dynamicRiskPipeline(self.utils_results_name)
+        
+        parallelism_type = ["partial_task_initial", "partial_task_final","inner_task","outer_task"]
+        
         try:
             t_start = rospy.Time.now()
             results = self.coll_utils_results.aggregate(pipeline)
@@ -2639,13 +1097,10 @@ class MongoStatistics:
             rospy.logerr(CONNECTION_LOST)
             return SetBoolResponse(False,NOT_SUCCESSFUL)
         
-        rospy.loginfo(YELLOW + "Iterating results" + END)
-        
-
         rospy.loginfo(GREEN + "Agents: {}".format(agents) + END)
         
         for task_group in results:          #A task_group contains vector of all (task_j, agent_i) same task computed by same agent
-            input("New task group...")
+            # input("New task group...")    #usefull for debug
             
             #Number of rows of regression matrix
             n_rows = len(task_group['grouped_task_agent'])
@@ -2654,7 +1109,7 @@ class MongoStatistics:
             
             #Compute other agents different from current task agent
             agent = task_group["_id"][1]                                    #First element of _id is name
-            concurrent_agent = list(set(agents).difference(set([agent])))[0]         # If only one agent ok, otherwise there is also others agents in the set.
+            concurrent_agent = set(agents).difference(set([agent])).pop()         # If only one agent ok, otherwise there is also others agents in the set.
             
             rospy.loginfo("Principal agent: {}".format(agent))
             rospy.loginfo("Concurrent agent: {}".format(concurrent_agent))
@@ -2666,40 +1121,18 @@ class MongoStatistics:
             n_col = len(task_index[concurrent_agent])
             
             #Initialize regression matrix
-            
-            #regression_mat = np.zeros((n_rows,n_col))                       # To change: non è detto che per un task ce ne sia uno parallelo
-            #row_vect = np.zeros((1,n_col))
-            
+                       
             regression_mat = np.empty((0,n_col)) 
             known_vect = np.empty((0,1))
             
-            # print("////////////////////////")
-            # # print(regression_mat)
-            # print("////////////////////////")
-            # print(n_col)
-            # print(n_rows)
-            # print("-----------------------")
-
             rospy.loginfo(GREEN + "Fondamental task: {}".format(task_group["_id"][0]) + END)
             
             self.resetConcurrentTaskCounters()
-            # if not(agent == "ur5_on_guide" and concurrent_agent == "human_right_arm" and task_group["_id"][0]=="pick_blue_box"):
-            #     continue
+            
             for row, single_task in enumerate(task_group['grouped_task_agent']):
                 add_task_to_regmat = False
                 row_vect = np.zeros((1,n_col))
-                # print(single_task)
-                # print("task")
-                # print(single_task["name"])
-                # print("t start")
-                # print(single_task["t_start"])
                 
-                # print("t end")
-                # print(single_task["t_end"])
-                # print("mean")
-                # print(single_task["task_mean_informations"][0]["expected_duration"])
-                
-
                 p_initial_task = single_task['partial_task_initial']
                 p_final_task = single_task['partial_task_final']
                 # inner_tasks = single_task['inner_task']
@@ -2710,8 +1143,6 @@ class MongoStatistics:
                 overlapping_inner_tasks = 0.0
                 overlapping_global_outer_task = 0.0
                 
-                # print(p_initial_task)
-                # print(p_final_task)
                 print("**************************************************")
                 rospy.loginfo(RED + "DURATION: {}".format(single_task["delta_time"]) + END)
                 #Insert partial initial task
@@ -2720,17 +1151,14 @@ class MongoStatistics:
                         rospy.loginfo(RED + "More than one partial initial task" + END)
                     else:
                         if p_initial_task[0]["outcome"] == 1:
-                            # print("initial")
+
                             rospy.loginfo(RED + "Initial task: {}".format(p_initial_task[0]["name"]) + END)
                             
                             overlapping_initial_time = p_initial_task[0]["t_end"] - single_task["t_start"] 
                             delta_initial = overlapping_initial_time / p_initial_task[0]["delta_time"]
-                            # print(p_initial_task[0])
-                            # print(p_initial_task[0]["task_mean_informations"])
-                            # print(p_initial_task[0]["task_mean_informations"][0])
-                            # print(p_initial_task[0]["task_mean_informations"][0]["expected_duration"])
-                            t_initial_mean = p_initial_task[0]["task_mean_informations"][0]["expected_duration"] #"task_mean_informations":[{"exp_dur":**}]
-                            # print(task_index[concurrent_agent])
+
+                            t_initial_mean = p_initial_task[0]["task_mean_informations"][0][used_stat_index] #"task_mean_informations":[{"exp_dur":**}]
+
                             col_index_reg_mat = task_index[concurrent_agent].index(p_initial_task[0]["name"])
                             
                             #regression_mat[row, col_index_reg_mat] = delta_initial*t_initial_mean
@@ -2740,17 +1168,6 @@ class MongoStatistics:
                             
                         self.updateConcurrentTaskCounters(p_initial_task[0]["name"], p_initial_task[0]["outcome"])
                         
-                        #print(single_task)
-                        #print(p_initial_task)
-                        # print(p_initial_task[0]["name"])
-                        # print(p_initial_task[0]["agent"])
-                        # print(p_initial_task[0]["t_start"])
-                        # print(p_initial_task[0]["t_end"])       
-                        
-                        # print(overlapping_initial_time)
-                        # print(delta_initial)
-                        # print(t_initial_mean)
-                        # print(col_index_reg_mat)
                         
                 #Insert partial final task
                 if p_final_task:          # Not empty
@@ -2762,11 +1179,9 @@ class MongoStatistics:
 
                             overlapping_final_time = single_task["t_end"] - p_final_task[0]["t_start"]
                             delta_final = overlapping_final_time / p_final_task[0]["delta_time"]
-                            # print(p_final_task[0]["task_mean_informations"])
-                            # print(p_final_task[0]["task_mean_informations"][0])
-                            # print(p_final_task[0]["task_mean_informations"][0]["expected_duration"])
-                            t_final_mean = p_final_task[0]["task_mean_informations"][0]["expected_duration"] #"task_mean_informations":[{"exp_dur":**}]
-                            # print(concurrent_agent)
+
+                            t_final_mean = p_final_task[0]["task_mean_informations"][0][used_stat_index] #"task_mean_informations":[{"exp_dur":**}]
+
                             col_index_reg_mat = task_index[concurrent_agent].index(p_final_task[0]["name"])
                             
                             #regression_mat[row, col_index_reg_mat] = delta_final*t_final_mean
@@ -2774,18 +1189,8 @@ class MongoStatistics:
                             add_task_to_regmat = True
 
                         self.updateConcurrentTaskCounters(p_final_task[0]["name"], p_final_task[0]["outcome"])
-                        #print(single_task)
                         
-                        # print(p_final_task[0]["name"])
-                        # print(p_final_task[0]["agent"])
-                        # print(p_final_task[0]["t_start"])
-                        # print(p_final_task[0]["t_end"])       
                         
-                        # print(overlapping_final_time)
-                        # print(delta_final)
-                        # print(t_final_mean)
-                        # print(col_index_reg_mat)
-                
                                   
                 if single_task['inner_task']:
                     rospy.loginfo(RED + "Inner tasks: " + END)
@@ -2794,24 +1199,18 @@ class MongoStatistics:
                     # print(single_task['inner_task'])
                     # print(type(single_task['inner_task']))
                     for inner_task in single_task['inner_task']:
-                        # print(inner_task)
                         if inner_task["outcome"] == 1:               #QUesto [0] non sono sicuro
                             col_index_reg_mat = task_index[concurrent_agent].index(inner_task["name"])
-                            # print("another inner tasks")
-                            print(inner_task["name"])
-                            # print(inner_task["task_mean_informations"])
-                            # print(inner_task["task_mean_informations"][0]["expected_duration"])                        
-                            # print(inner_task["task_mean_informations"][0])
-                            #regression_mat[row, col_index_reg_mat] = inner_task["task_mean_informations"][0]["expected_duration"]
+
+
                             
-                            row_vect[0,col_index_reg_mat] += inner_task["task_mean_informations"][0]["expected_duration"]
+                            row_vect[0,col_index_reg_mat] += inner_task["task_mean_informations"][0][used_stat_index]
                             
                             overlapping_inner_tasks += inner_task["delta_time"]
                             add_task_to_regmat = True
                         
                         self.updateConcurrentTaskCounters(inner_task["name"], inner_task["outcome"])
-                        # input("guarda inner task")
-                        # print(inner_task["name"])
+
                 
                 if global_outer_task:
                     if len(global_outer_task)>1:
@@ -2822,7 +1221,7 @@ class MongoStatistics:
 
                             delta_global_outside = single_task["delta_time"] / global_outer_task[0]["delta_time"]
                             
-                            t_global_outside_task_mean = global_outer_task[0]["task_mean_informations"][0]["expected_duration"] #"task_mean_informations":[{"exp_dur":**}]
+                            t_global_outside_task_mean = global_outer_task[0]["task_mean_informations"][0][used_stat_index] #"task_mean_informations":[{"exp_dur":**}]
                             
                             col_index_reg_mat = task_index[concurrent_agent].index(global_outer_task[0]["name"])
                             #regression_mat[row, col_index_reg_mat] = delta_global_outside * t_global_outside_task_mean     # delta_time is the real duration of "inner task"
@@ -2832,39 +1231,22 @@ class MongoStatistics:
                             overlapping_global_outer_task = single_task["delta_time"]                                      # All the little task   |---|
                             add_task_to_regmat = True                                                                                                   # |--------|
                         self.updateConcurrentTaskCounters(global_outer_task[0]["name"], global_outer_task[0]["outcome"])
-                # print(row_vect)
-                # print(overlapping_initial_time)
-                # print(overlapping_inner_tasks)
-                # print(overlapping_final_time)
-                # print(overlapping_global_outer_task)
+
                 if add_task_to_regmat:
                     # Nota TODO solo se almeno uno di quelli sopra
                     regression_mat = np.append(regression_mat, row_vect,axis=0)
-                    # print("------------------")
-                    # print(regression_mat)
-                    # print("------------------")
+
                     
                     known_vect = np.append(known_vect, overlapping_initial_time + overlapping_final_time + overlapping_inner_tasks + overlapping_global_outer_task)
-                    # print(known_vect)
-                    # print("------------------")
-                    # known_vect[row] = overlapping_initial_time + overlapping_final_time + overlapping_inner_tasks + overlapping_global_outer_task  # = single_task["delta_time"]-t_idle : t_idle = single_task["delta_time"] - overlapping_inner -overl_initial-over_final 
-                # print(known_vect)
-                # print(known_vect)
-                # input("COntrolla")
-            #input("Regression...")
+
             print(regression_mat)
             print(known_vect)
             rospy.loginfo(YELLOW + "****************"+ END)
             # if agent == "human_right_arm":
-            from sklearn.ensemble import IsolationForest
             clf = IsolationForest(n_estimators=20, warm_start=True)
             estimator=clf.fit(known_vect.reshape(-1,1))  # fit 10 trees  
             check = estimator.decision_function(known_vect.reshape(-1,1))
             outliers = check > 0
-            # print(regression_mat.shape)
-            # print(known_vect.shape)
-            # print(regression_mat[np.array([True]),:])
-            # print(outliers.shape)
             
             # outliers=np.abs(known_vect-np.mean(known_vect))<np.std(known_vect)*1.8
             # outliers = known_vect<15
@@ -2898,7 +1280,7 @@ class MongoStatistics:
                 if index < col - 1:
                     formula_string += " + "
             rospy.loginfo(formula_string)     
-            input("Guarda  formula")   
+            # input("Look at formula")  #usefull for debug   
             dizionario["duration"] = known_vect
             print(dizionario)    
             dataF = pd.DataFrame(dizionario)
@@ -2907,7 +1289,6 @@ class MongoStatistics:
             reg_result = reg_model.fit()
             print(reg_result.summary())
             
-            input("stronzo")
             print("**************")
             
             #Here agent and concurrent_agent change role for dynamic risk 
@@ -2916,7 +1297,6 @@ class MongoStatistics:
                 print(task)
                 print(reg_result.bse[task])
                 try:
-                    pass
                     # results = self.coll_utils_results.aggregate(pipeline)
                     self.coll_interaction.insert_one({"agent": concurrent_agent, 
                                                     "concurrent_agent": agent,
@@ -2934,632 +1314,18 @@ class MongoStatistics:
             print(single_task["name"])
             print(task_index[concurrent_agent])
             print(dynamic_risk)
-            input("Leggi i risultati...")
-            # for k in coefficient:
-            #     input("Prossimo k")
-            #     print(k)
+            input("Look at results")
                 
             print((rospy.Time.now()-t_start).to_sec())
             
         return SetBoolResponse(True,SUCCESSFUL)
-    def computeDynamicRiskWithUncertaintyMin(self,request):   #Compute dynamic risk with concurrent and mean information
-        """Method for creating a collection of results with added the concurrent tasks
+    
+    def addMedianToTaskStats(self):
+        """_summary_
 
-        Args:
-            request (SetBoolRequest): _description_
-
-        Returns:
-            SetBoolResponse: _description_
-        """
-        import pandas as pd
-        import statsmodels.api as sm
-        import statsmodels.formula.api as smf
-
-        t_start = rospy.Time.now()
-        
-        # Delete older dynamic risk collection
-        try:
-            self.coll_interaction.delete_many({})
-        except pymongo.errors.AutoReconnect:
-            rospy.logerr(CONNECTION_LOST)
-            return SetBoolResponse(False,NOT_SUCCESSFUL)
-        
-        # Create collection with results task + task mean information
-        if not self.createUtilsResults():
-            return SetBoolResponse(False,NOT_SUCCESSFUL)
-        
-        # Pipeline for: retriving task name, unwinded for agents, each task only 1 agents
-        pipeline_agents_task_name =[
-        {
-            '$unwind': {
-                'path': '$agent', 
-                'preserveNullAndEmptyArrays': False
-            }
-        }, {
-            '$project': {
-                '_id': 0, 
-                'name': 1, 
-                'agent': 1
-            }
-        }
-        ]
-
-        try:
-            cursor_task_properties = self.coll_skills.aggregate(pipeline_agents_task_name)
-        except pymongo.errors.AutoReconnect:
-            rospy.logerr(CONNECTION_LOST)
-            return SetBoolResponse(False,NOT_SUCCESSFUL)
-                
-        task_index = dict()                                                         # It will be as: {"agent_name":[list with all tasks that it can perform],..}
-        for single_task in cursor_task_properties:
-            if "name" in single_task.keys() and "agent" in single_task.keys() :     # Ensure it has nedded attributes
-                if not single_task["name"] == "end":                                # Excule task end (not interesting)
-                    if single_task["agent"] not in task_index:                      # If not exist already that agents
-                        task_index[single_task["agent"]] = set()                    # A SET for each agent to ensure unique task
-                    task_index[single_task["agent"]].add(single_task["name"])
-                                    
-        task_index = {key: list(values) for key, values in task_index.items()}       # Convert agents tasks from set to list (for have index)
-        
-        rospy.loginfo("Dizionario: agente->task list: ")
-        rospy.loginfo(task_index)
-        rospy.loginfo(RED + "OK FINO TASK RETRIEVE INFO" + END)
-        # input("wait...")
-        
-        agents = list(task_index.keys())
-        
-        if len(agents)>2:
-            rospy.loginfo(RED + "There are more than 2 agents in task properties" + END)
-            return SetBoolResponse(False,NOT_SUCCESSFUL)
-        
-        ############
-        #Retrive results with their concurrent tasks information
-        pipeline = [
-        {
-            '$lookup': {
-                'from': self.utils_results_name, 
-                'let': {
-                    'local_name': '$name', 
-                    'local_agent': '$agent', 
-                    'local_recipe': '$recipe', 
-                    'local_t_start': '$t_start', 
-                    'local_t_end': '$t_end'
-                }, 
-                'pipeline': [
-                    {
-                        '$match': {
-                            '$expr': {
-                                '$and': [
-                                    {
-                                        '$ne': [
-                                            '$agent', '$$local_agent'
-                                        ]
-                                    }, {
-                                        '$eq': [
-                                            '$recipe', '$$local_recipe'
-                                        ]
-                                    }, {
-                                        '$lte': [
-                                            '$$local_t_start', '$t_start'
-                                        ]
-                                    }, {
-                                        '$gte': [
-                                            '$$local_t_end', '$t_end'
-                                        ]
-                                    }
-                                ]
-                            }
-                        }
-                    }, {
-                        '$project': {
-                            'stock_item': 0, 
-                            '_id': 0
-                        }
-                    }
-                ], 
-                'as': 'inner_task'
-            }
-        }, {
-            '$lookup': {
-                'from': self.utils_results_name, 
-                'let': {
-                    'local_name': '$name', 
-                    'local_agent': '$agent', 
-                    'local_recipe': '$recipe', 
-                    'local_t_start': '$t_start', 
-                    'local_t_end': '$t_end'
-                }, 
-                'pipeline': [
-                    {
-                        '$match': {
-                            '$expr': {
-                                '$and': [
-                                    {
-                                        '$ne': [
-                                            '$agent', '$$local_agent'
-                                        ]
-                                    }, {
-                                        '$eq': [
-                                            '$recipe', '$$local_recipe'
-                                        ]
-                                    }, {
-                                        '$lt': [
-                                            '$$local_t_start', '$t_end'
-                                        ]
-                                    }, {
-                                        '$gt': [
-                                            '$$local_t_start', '$t_start'
-                                        ]
-                                    }, {
-                                        '$lt': [
-                                            '$t_end', '$$local_t_end'
-                                        ]
-                                    }
-                                ]
-                            }
-                        }
-                    }, {
-                        '$project': {
-                            'stock_item': 0, 
-                            '_id': 0
-                        }
-                    }
-                ], 
-                'as': 'partial_task_initial'
-            }
-        }, {
-            '$lookup': {
-                'from': self.utils_results_name, 
-                'let': {
-                    'local_name': '$name', 
-                    'local_agent': '$agent', 
-                    'local_recipe': '$recipe', 
-                    'local_t_start': '$t_start', 
-                    'local_t_end': '$t_end'
-                }, 
-                'pipeline': [
-                    {
-                        '$match': {
-                            '$expr': {
-                                '$and': [
-                                    {
-                                        '$ne': [
-                                            '$agent', '$$local_agent'
-                                        ]
-                                    }, {
-                                        '$eq': [
-                                            '$recipe', '$$local_recipe'
-                                        ]
-                                    }, {
-                                        '$gt': [
-                                            '$$local_t_end', '$t_start'
-                                        ]
-                                    }, {
-                                        '$lt': [
-                                            '$$local_t_end', '$t_end'
-                                        ]
-                                    }, {
-                                        '$lt': [
-                                            '$$local_t_start', '$t_start'
-                                        ]
-                                    }
-                                ]
-                            }
-                        }
-                    }, {
-                        '$project': {
-                            'stock_item': 0, 
-                            '_id': 0
-                        }
-                    }
-                ], 
-                'as': 'partial_task_final'
-            }
-        }, {
-            '$lookup': {
-                'from': self.utils_results_name, 
-                'let': {
-                    'local_name': '$name', 
-                    'local_agent': '$agent', 
-                    'local_recipe': '$recipe', 
-                    'local_t_start': '$t_start', 
-                    'local_t_end': '$t_end'
-                }, 
-                'pipeline': [
-                    {
-                        '$match': {
-                            '$expr': {
-                                '$and': [
-                                    {
-                                        '$ne': [
-                                            '$agent', '$$local_agent'
-                                        ]
-                                    }, {
-                                        '$eq': [
-                                            '$recipe', '$$local_recipe'
-                                        ]
-                                    }, {
-                                        '$lt': [
-                                            '$$local_t_end', '$t_end'
-                                        ]
-                                    }, {
-                                        '$gt': [
-                                            '$$local_t_start', '$t_start'
-                                        ]
-                                    }
-                                ]
-                            }
-                        }
-                    }, {
-                        '$project': {
-                            'stock_item': 0, 
-                            '_id': 0
-                        }
-                    }
-                ], 
-                'as': 'outer_task'
-            }
-        }, {
-            '$group': {                     # Il group molto lento 0.1 -> 0.7
-                '_id': [
-                    '$name', '$agent'
-                ], 
-                'grouped_task_agent': {
-                    '$push': '$$ROOT'
-                }
-            }
-        }
-        ]
-
-        try:
-            t_start = rospy.Time.now()
-            results = self.coll_utils_results.aggregate(pipeline)
-            t_end = (rospy.Time.now() - t_start).to_sec()
-            rospy.loginfo("Computational time for dynamic risk" + str(t_end))
-        except pymongo.errors.AutoReconnect:
-            rospy.logerr(CONNECTION_LOST)
-            return SetBoolResponse(False,NOT_SUCCESSFUL)
-        
-        rospy.loginfo(YELLOW + "Iterating results" + END)
-        
-
-        rospy.loginfo(GREEN + "Agents: {}".format(agents) + END)
-        for task_group in results:          #A task_group contains vector of all (task_j, agent_i) same task computed by same agent
-            input("New task group...")
-            
-            #Number of rows of regression matrix
-            n_rows = len(task_group['grouped_task_agent'])
-            
-            # print(agents)
-            
-            #Compute other agents different from current task agent
-            agent = task_group["_id"][1]                                    #First element of _id is name
-            concurrent_agent = list(set(agents).difference(set([agent])))[0]         # If only one agent ok, otherwise there is also others agents in the set.
-            
-            rospy.loginfo("Principal agent: {}".format(agent))
-            rospy.loginfo("Concurrent agent: {}".format(concurrent_agent))
-                        
-                       
-            #for concurrent_agent in other_agents:                   #If more than one agents
-            
-            #Number of column of regression matrix = concurrent_agent task
-            n_col = len(task_index[concurrent_agent])
-            
-            #Initialize regression matrix
-            
-            #regression_mat = np.zeros((n_rows,n_col))                       # To change: non è detto che per un task ce ne sia uno parallelo
-            #row_vect = np.zeros((1,n_col))
-            
-            regression_mat = np.empty((0,n_col)) 
-            known_vect = np.empty((0,1))
-            
-            # print("////////////////////////")
-            # # print(regression_mat)
-            # print("////////////////////////")
-            # print(n_col)
-            # print(n_rows)
-            # print("-----------------------")
-
-            rospy.loginfo(GREEN + "Fondamental task: {}".format(task_group["_id"][0]) + END)
-            
-            self.resetConcurrentTaskCounters()
-            # if not(agent == "ur5_on_guide" and concurrent_agent == "human_right_arm" and task_group["_id"][0]=="pick_blue_box"):
-            #     continue
-            for row, single_task in enumerate(task_group['grouped_task_agent']):
-                add_task_to_regmat = False
-                row_vect = np.zeros((1,n_col))
-                # print(single_task)
-                # print("task")
-                # print(single_task["name"])
-                # print("t start")
-                # print(single_task["t_start"])
-                
-                # print("t end")
-                # print(single_task["t_end"])
-                # print("mean")
-                # print(single_task["task_mean_informations"][0]["expected_duration"])
-                
-
-                p_initial_task = single_task['partial_task_initial']
-                p_final_task = single_task['partial_task_final']
-                # inner_tasks = single_task['inner_task']
-                global_outer_task = single_task['outer_task']
-
-                overlapping_initial_time = 0.0
-                overlapping_final_time = 0.0
-                overlapping_inner_tasks = 0.0
-                overlapping_global_outer_task = 0.0
-                
-                # print(p_initial_task)
-                # print(p_final_task)
-                print("**************************************************")
-                rospy.loginfo(RED + "DURATION: {}".format(single_task["delta_time"]) + END)
-                #Insert partial initial task
-                if p_initial_task:          # Not empty
-                    if len(p_initial_task)>1:                                               #Future note: It can be more than one agents in parallel, in that case filter to consider only concurrent task of concurrent agent
-                        rospy.loginfo(RED + "More than one partial initial task" + END)
-                    else:
-                        if p_initial_task[0]["outcome"] == 1:
-                            # print("initial")
-                            rospy.loginfo(RED + "Initial task: {}".format(p_initial_task[0]["name"]) + END)
-                            
-                            overlapping_initial_time = p_initial_task[0]["t_end"] - single_task["t_start"] 
-                            delta_initial = overlapping_initial_time / p_initial_task[0]["delta_time"]
-                            # print(p_initial_task[0])
-                            # print(p_initial_task[0]["task_mean_informations"])
-                            # print(p_initial_task[0]["task_mean_informations"][0])
-                            # print(p_initial_task[0]["task_mean_informations"][0]["expected_duration"])
-                            t_initial_mean = p_initial_task[0]["task_mean_informations"][0]["min"] #"task_mean_informations":[{"exp_dur":**}]
-                            # print(task_index[concurrent_agent])
-                            col_index_reg_mat = task_index[concurrent_agent].index(p_initial_task[0]["name"])
-                            
-                            #regression_mat[row, col_index_reg_mat] = delta_initial*t_initial_mean
-                            
-                            row_vect[0,col_index_reg_mat] += delta_initial*t_initial_mean
-                            add_task_to_regmat = True
-                            
-                        self.updateConcurrentTaskCounters(p_initial_task[0]["name"], p_initial_task[0]["outcome"])
-                        
-                        #print(single_task)
-                        #print(p_initial_task)
-                        # print(p_initial_task[0]["name"])
-                        # print(p_initial_task[0]["agent"])
-                        # print(p_initial_task[0]["t_start"])
-                        # print(p_initial_task[0]["t_end"])       
-                        
-                        # print(overlapping_initial_time)
-                        # print(delta_initial)
-                        # print(t_initial_mean)
-                        # print(col_index_reg_mat)
-                        
-                #Insert partial final task
-                if p_final_task:          # Not empty
-                    if len(p_final_task)>1:
-                        rospy.loginfo(RED + "More than one partial final task" + END)        #Future note: It can be more than one agents in parallel, in that case filter to consider only concurrent task of concurrent agent
-                    else:
-                        if p_final_task[0]["outcome"] == 1:          
-                            rospy.loginfo(RED + "Final task: {}".format(p_final_task[0]["name"]) + END)
-
-                            overlapping_final_time = single_task["t_end"] - p_final_task[0]["t_start"]
-                            delta_final = overlapping_final_time / p_final_task[0]["delta_time"]
-                            # print(p_final_task[0]["task_mean_informations"])
-                            # print(p_final_task[0]["task_mean_informations"][0])
-                            # print(p_final_task[0]["task_mean_informations"][0]["expected_duration"])
-                            t_final_mean = p_final_task[0]["task_mean_informations"][0]["min"] #"task_mean_informations":[{"exp_dur":**}]
-                            # print(concurrent_agent)
-                            col_index_reg_mat = task_index[concurrent_agent].index(p_final_task[0]["name"])
-                            
-                            #regression_mat[row, col_index_reg_mat] = delta_final*t_final_mean
-                            row_vect[0,col_index_reg_mat] += delta_final*t_final_mean
-                            add_task_to_regmat = True
-
-                        self.updateConcurrentTaskCounters(p_final_task[0]["name"], p_final_task[0]["outcome"])
-                        #print(single_task)
-                        
-                        # print(p_final_task[0]["name"])
-                        # print(p_final_task[0]["agent"])
-                        # print(p_final_task[0]["t_start"])
-                        # print(p_final_task[0]["t_end"])       
-                        
-                        # print(overlapping_final_time)
-                        # print(delta_final)
-                        # print(t_final_mean)
-                        # print(col_index_reg_mat)
-                
-                                  
-                if single_task['inner_task']:
-                    rospy.loginfo(RED + "Inner tasks: " + END)
-                    # print(single_task['inner_task'])
-                    # print("...............................................")
-                    # print(single_task['inner_task'])
-                    # print(type(single_task['inner_task']))
-                    for inner_task in single_task['inner_task']:
-                        # print(inner_task)
-                        if inner_task["outcome"] == 1:               #QUesto [0] non sono sicuro
-                            col_index_reg_mat = task_index[concurrent_agent].index(inner_task["name"])
-                            # print("another inner tasks")
-                            print(inner_task["name"])
-                            # print(inner_task["task_mean_informations"])
-                            # print(inner_task["task_mean_informations"][0]["expected_duration"])                        
-                            # print(inner_task["task_mean_informations"][0])
-                            #regression_mat[row, col_index_reg_mat] = inner_task["task_mean_informations"][0]["expected_duration"]
-                            
-                            row_vect[0,col_index_reg_mat] += inner_task["task_mean_informations"][0]["min"]
-                            
-                            overlapping_inner_tasks += inner_task["delta_time"]
-                            add_task_to_regmat = True
-                        
-                        self.updateConcurrentTaskCounters(inner_task["name"], inner_task["outcome"])
-                        # input("guarda inner task")
-                        # print(inner_task["name"])
-                
-                if global_outer_task:
-                    if len(global_outer_task)>1:
-                        rospy.loginfo(RED + "More than one global outside final task" + END)        #Future note: It can be more than one agents in parallel, in that case filter to consider only concurrent task of concurrent agent
-                    else:
-                        if global_outer_task[0]["outcome"] == 1:          
-                            rospy.loginfo(RED + "Global outside task: {}".format(global_outer_task[0]["name"]) + END)
-
-                            delta_global_outside = single_task["delta_time"] / global_outer_task[0]["delta_time"]
-                            
-                            t_global_outside_task_mean = global_outer_task[0]["task_mean_informations"][0]["min"] #"task_mean_informations":[{"exp_dur":**}]
-                            
-                            col_index_reg_mat = task_index[concurrent_agent].index(global_outer_task[0]["name"])
-                            #regression_mat[row, col_index_reg_mat] = delta_global_outside * t_global_outside_task_mean     # delta_time is the real duration of "inner task"
-
-                            row_vect[0,col_index_reg_mat] += delta_global_outside * t_global_outside_task_mean
-
-                            overlapping_global_outer_task = single_task["delta_time"]                                      # All the little task   |---|
-                            add_task_to_regmat = True                                                                                                   # |--------|
-                        self.updateConcurrentTaskCounters(global_outer_task[0]["name"], global_outer_task[0]["outcome"])
-                print(row_vect)
-                print(overlapping_initial_time)
-                print(overlapping_inner_tasks)
-                print(overlapping_final_time)
-                print(overlapping_global_outer_task)
-                if add_task_to_regmat:
-                    #Nota TODO solo se almeno uno di quelli sopra
-                    regression_mat = np.append(regression_mat, row_vect,axis=0)
-                    # print("------------------")
-                    # print(regression_mat)
-                    # print("------------------")
-                    
-                    known_vect = np.append(known_vect, overlapping_initial_time + overlapping_final_time + overlapping_inner_tasks + overlapping_global_outer_task)
-                    # print(known_vect)
-                    # print("------------------")
-                    # known_vect[row] = overlapping_initial_time + overlapping_final_time + overlapping_inner_tasks + overlapping_global_outer_task  # = single_task["delta_time"]-t_idle : t_idle = single_task["delta_time"] - overlapping_inner -overl_initial-over_final 
-                # print(known_vect)
-                print(known_vect)
-                # input("COntrolla")
-            #input("Regression...")
-            print(regression_mat)
-            print(known_vect)
-            # print(regression_mat.shape)
-            # print(known_vect.shape)
-            
-            t_start=rospy.Time.now()
-            try:
-                lstsq_results=np.linalg.lstsq(regression_mat, known_vect, rcond=None)
-                print(lstsq_results)
-                dynamic_risk = lstsq_results[0]
-            except np.linalg.LinAlgError:
-                rospy.loginfo(RED + "Least square does not converge" + END)
-                return SetBoolResponse(False,NOT_SUCCESSFUL)        
-            
-            print("**************")
-            (row,col) = regression_mat.shape
-            dizionario = dict()
-            formula_string = ""
-            for index in range(0,col):
-                dizionario[task_index[concurrent_agent][index]] = regression_mat[:,index]
-                formula_string +=task_index[concurrent_agent][index]
-                if index < col - 1:
-                    formula_string += " + "
-            rospy.loginfo(formula_string)     
-            input("Guarda  formula")   
-            dizionario["duration"] = known_vect
-            print(dizionario)    
-            dataF = pd.DataFrame(dizionario)
-            
-            reg_model = smf.ols(formula="duration ~ " + formula_string + " -1 ", data=dataF)
-            reg_result = reg_model.fit()
-            
-            print(reg_result.summary())
-            
-            input("stronzo")
-            print("**************")
-            
-            #Here agent and concurrent_agent change role for dynamic risk 
-            for index, task in enumerate(task_index[concurrent_agent]):
-                counter, success_rate = self.getConcurrentTaskStatistics(task)
-                print(task)
-                print(reg_result.bse[task])
-                try:
-                    results = self.coll_utils_results.aggregate(pipeline)
-                    self.coll_interaction.insert_one({"agent": concurrent_agent, 
-                                                    "concurrent_agent": agent,
-                                                    "agent_skill": task, 
-                                                    "concurrent_skill": task_group["_id"][0],
-                                                    "success_rate": success_rate,
-                                                    "dynamic_risk": dynamic_risk[index],
-                                                    "std_err": reg_result.bse[task],
-                                                    "counter": counter})
-                except pymongo.errors.AutoReconnect:
-                    rospy.logerr(CONNECTION_LOST)
-                    return SetBoolResponse(False,NOT_SUCCESSFUL)
-                
-            rospy.loginfo(GREEN + "Fondamental task:" + END)
-            print(single_task["name"])
-            print(task_index[concurrent_agent])
-            print(dynamic_risk)
-            input("Leggi i risultati...")
-            # for k in coefficient:
-            #     input("Prossimo k")
-            #     print(k)
-                
-            print((rospy.Time.now()-t_start).to_sec())
-            
-        return SetBoolResponse(True,SUCCESSFUL)
-
-    def computeDynamicRiskWithUncertaintyMedian(self,request):   #Compute dynamic risk with concurrent and mean information
-        """Method for creating a collection of results with added the concurrent tasks
-
-        Args:
-            request (SetBoolRequest): _description_
-
-        Returns:
-            SetBoolResponse: _description_
-        """
-        import pandas as pd
-        import statsmodels.api as sm
-        import statsmodels.formula.api as smf
-
-        t_start = rospy.Time.now()
-        
-        # Delete older dynamic risk collection
-        try:
-            self.coll_interaction.delete_many({})
-        except pymongo.errors.AutoReconnect:
-            rospy.logerr(CONNECTION_LOST)
-            return SetBoolResponse(False,NOT_SUCCESSFUL)
-        
-        # Create collection with results task + task mean information
-        
-        # Pipeline for: retriving task name, unwinded for agents, each task only 1 agents
-        pipeline_agents_task_name =[
-        {
-            '$unwind': {
-                'path': '$agent', 
-                'preserveNullAndEmptyArrays': False
-            }
-        }, {
-            '$project': {
-                '_id': 0, 
-                'name': 1, 
-                'agent': 1
-            }
-        }
-        ]
-
-        try:
-            cursor_task_properties = self.coll_skills.aggregate(pipeline_agents_task_name)
-        except pymongo.errors.AutoReconnect:
-            rospy.logerr(CONNECTION_LOST)
-            return SetBoolResponse(False,NOT_SUCCESSFUL)
-                
-        task_index = dict()                                                         # It will be as: {"agent_name":[list with all tasks that it can perform],..}
-        for single_task in cursor_task_properties:
-            if "name" in single_task.keys() and "agent" in single_task.keys() :     # Ensure it has nedded attributes
-                if not single_task["name"] == "end":                                # Excule task end (not interesting)
-                    if single_task["agent"] not in task_index:                      # If not exist already that agents
-                        task_index[single_task["agent"]] = set()                    # A SET for each agent to ensure unique task
-                    task_index[single_task["agent"]].add(single_task["name"])
-                                    
-        task_index = {key: list(values) for key, values in task_index.items()}       # Convert agents tasks from set to list (for have index)
-        
-        rospy.loginfo("Dizionario: agente->task list: ")
-        rospy.loginfo(task_index)
-        rospy.loginfo(RED + "OK FINO TASK RETRIEVE INFO" + END)
-        
+        Raises:
+            pymongo.errors.AutoReconnect: In case of connection lost with db
+        """        
         pipeline_for_median=[
         {
             '$group': {
@@ -3577,8 +1343,8 @@ class MongoStatistics:
             cursor_task_median = self.coll_results.aggregate(pipeline_for_median)
         except pymongo.errors.AutoReconnect:
             rospy.logerr(CONNECTION_LOST)
-            return SetBoolResponse(False,NOT_SUCCESSFUL)
-        
+            raise pymongo.errors.AutoReconnect
+                    
         for task_group in cursor_task_median:
             agent = task_group["_id"]["agent"]
             task_name = task_group["_id"]["name"]
@@ -3586,620 +1352,17 @@ class MongoStatistics:
             task_duration_vector = np.empty((len(task_group["all"])))
 
             for id,task in enumerate(task_group["all"]): 
-                print(task)
                 task_duration_vector[id]=task["t_end"]-task["t_start"]
             median=np.median(task_duration_vector)
+            
             try:
                 self.coll_durations.update_one({"_id.agent":agent,"_id.name":task_name},{"$set": {"median": median}})
-
             except pymongo.errors.AutoReconnect:
                 rospy.logerr(CONNECTION_LOST)
-                return SetBoolResponse(False,NOT_SUCCESSFUL)
-
-        if not self.createUtilsResults():
-            return SetBoolResponse(False,NOT_SUCCESSFUL)
-            
-        # input("wait...")
-        
-        agents = list(task_index.keys())
-        
-        if len(agents)>2:
-            rospy.loginfo(RED + "There are more than 2 agents in task properties" + END)
-            return SetBoolResponse(False,NOT_SUCCESSFUL)
-        
-        ############
-        #Retrive results with their concurrent tasks information
-        pipeline = [
-        {
-            '$lookup': {
-                'from': self.utils_results_name, 
-                'let': {
-                    'local_name': '$name', 
-                    'local_agent': '$agent', 
-                    'local_recipe': '$recipe', 
-                    'local_t_start': '$t_start', 
-                    'local_t_end': '$t_end'
-                }, 
-                'pipeline': [
-                    {
-                        '$match': {
-                            '$expr': {
-                                '$and': [
-                                    {
-                                        '$ne': [
-                                            '$agent', '$$local_agent'
-                                        ]
-                                    }, {
-                                        '$eq': [
-                                            '$recipe', '$$local_recipe'
-                                        ]
-                                    }, {
-                                        '$lte': [
-                                            '$$local_t_start', '$t_start'
-                                        ]
-                                    }, {
-                                        '$gte': [
-                                            '$$local_t_end', '$t_end'
-                                        ]
-                                    }
-                                ]
-                            }
-                        }
-                    }, {
-                        '$project': {
-                            'stock_item': 0, 
-                            '_id': 0
-                        }
-                    }
-                ], 
-                'as': 'inner_task'
-            }
-        }, {
-            '$lookup': {
-                'from': self.utils_results_name, 
-                'let': {
-                    'local_name': '$name', 
-                    'local_agent': '$agent', 
-                    'local_recipe': '$recipe', 
-                    'local_t_start': '$t_start', 
-                    'local_t_end': '$t_end'
-                }, 
-                'pipeline': [
-                    {
-                        '$match': {
-                            '$expr': {
-                                '$and': [
-                                    {
-                                        '$ne': [
-                                            '$agent', '$$local_agent'
-                                        ]
-                                    }, {
-                                        '$eq': [
-                                            '$recipe', '$$local_recipe'
-                                        ]
-                                    }, {
-                                        '$lt': [
-                                            '$$local_t_start', '$t_end'
-                                        ]
-                                    }, {
-                                        '$gt': [
-                                            '$$local_t_start', '$t_start'
-                                        ]
-                                    }, {
-                                        '$lt': [
-                                            '$t_end', '$$local_t_end'
-                                        ]
-                                    }
-                                ]
-                            }
-                        }
-                    }, {
-                        '$project': {
-                            'stock_item': 0, 
-                            '_id': 0
-                        }
-                    }
-                ], 
-                'as': 'partial_task_initial'
-            }
-        }, {
-            '$lookup': {
-                'from': self.utils_results_name, 
-                'let': {
-                    'local_name': '$name', 
-                    'local_agent': '$agent', 
-                    'local_recipe': '$recipe', 
-                    'local_t_start': '$t_start', 
-                    'local_t_end': '$t_end'
-                }, 
-                'pipeline': [
-                    {
-                        '$match': {
-                            '$expr': {
-                                '$and': [
-                                    {
-                                        '$ne': [
-                                            '$agent', '$$local_agent'
-                                        ]
-                                    }, {
-                                        '$eq': [
-                                            '$recipe', '$$local_recipe'
-                                        ]
-                                    }, {
-                                        '$gt': [
-                                            '$$local_t_end', '$t_start'
-                                        ]
-                                    }, {
-                                        '$lt': [
-                                            '$$local_t_end', '$t_end'
-                                        ]
-                                    }, {
-                                        '$lt': [
-                                            '$$local_t_start', '$t_start'
-                                        ]
-                                    }
-                                ]
-                            }
-                        }
-                    }, {
-                        '$project': {
-                            'stock_item': 0, 
-                            '_id': 0
-                        }
-                    }
-                ], 
-                'as': 'partial_task_final'
-            }
-        }, {
-            '$lookup': {
-                'from': self.utils_results_name, 
-                'let': {
-                    'local_name': '$name', 
-                    'local_agent': '$agent', 
-                    'local_recipe': '$recipe', 
-                    'local_t_start': '$t_start', 
-                    'local_t_end': '$t_end'
-                }, 
-                'pipeline': [
-                    {
-                        '$match': {
-                            '$expr': {
-                                '$and': [
-                                    {
-                                        '$ne': [
-                                            '$agent', '$$local_agent'
-                                        ]
-                                    }, {
-                                        '$eq': [
-                                            '$recipe', '$$local_recipe'
-                                        ]
-                                    }, {
-                                        '$lt': [
-                                            '$$local_t_end', '$t_end'
-                                        ]
-                                    }, {
-                                        '$gt': [
-                                            '$$local_t_start', '$t_start'
-                                        ]
-                                    }
-                                ]
-                            }
-                        }
-                    }, {
-                        '$project': {
-                            'stock_item': 0, 
-                            '_id': 0
-                        }
-                    }
-                ], 
-                'as': 'outer_task'
-            }
-        }, {
-            '$group': {                     # Il group molto lento 0.1 -> 0.7
-                '_id': [
-                    '$name', '$agent'
-                ], 
-                'grouped_task_agent': {
-                    '$push': '$$ROOT'
-                }
-            }
-        }
-        ]
-
-        try:
-            t_start = rospy.Time.now()
-            results = self.coll_utils_results.aggregate(pipeline)
-            t_end = (rospy.Time.now() - t_start).to_sec()
-            rospy.loginfo("Computational time for dynamic risk" + str(t_end))
-        except pymongo.errors.AutoReconnect:
-            rospy.logerr(CONNECTION_LOST)
-            return SetBoolResponse(False,NOT_SUCCESSFUL)
-        
-        rospy.loginfo(YELLOW + "Iterating results" + END)
-        
-
-        rospy.loginfo(GREEN + "Agents: {}".format(agents) + END)
-        for task_group in results:          #A task_group contains vector of all (task_j, agent_i) same task computed by same agent
-            input("New task group...")
-            
-            #Number of rows of regression matrix
-            n_rows = len(task_group['grouped_task_agent'])
-            
-            # print(agents)
-            
-            #Compute other agents different from current task agent
-            agent = task_group["_id"][1]                                    #First element of _id is name
-            concurrent_agent = list(set(agents).difference(set([agent])))[0]         # If only one agent ok, otherwise there is also others agents in the set.
-            
-            rospy.loginfo("Principal agent: {}".format(agent))
-            rospy.loginfo("Concurrent agent: {}".format(concurrent_agent))
-                        
-                       
-            #for concurrent_agent in other_agents:                   #If more than one agents
-            
-            #Number of column of regression matrix = concurrent_agent task
-            n_col = len(task_index[concurrent_agent])
-            
-            #Initialize regression matrix
-            
-            #regression_mat = np.zeros((n_rows,n_col))                       # To change: non è detto che per un task ce ne sia uno parallelo
-            #row_vect = np.zeros((1,n_col))
-            
-            regression_mat = np.empty((0,n_col)) 
-            known_vect = np.empty((0,1))
-            
-            # print("////////////////////////")
-            # # print(regression_mat)
-            # print("////////////////////////")
-            # print(n_col)
-            # print(n_rows)
-            # print("-----------------------")
-
-            rospy.loginfo(GREEN + "Fondamental task: {}".format(task_group["_id"][0]) + END)
-            
-            self.resetConcurrentTaskCounters()
-            # if not(agent == "ur5_on_guide" and concurrent_agent == "human_right_arm" and task_group["_id"][0]=="pick_blue_box"):
-            #     continue
-            for row, single_task in enumerate(task_group['grouped_task_agent']):
-                add_task_to_regmat = False
-                row_vect = np.zeros((1,n_col))
-                # print(single_task)
-                # print("task")
-                # print(single_task["name"])
-                # print("t start")
-                # print(single_task["t_start"])
-                
-                # print("t end")
-                # print(single_task["t_end"])
-                # print("mean")
-                # print(single_task["task_mean_informations"][0]["expected_duration"])
-                
-
-                p_initial_task = single_task['partial_task_initial']
-                p_final_task = single_task['partial_task_final']
-                # inner_tasks = single_task['inner_task']
-                global_outer_task = single_task['outer_task']
-
-                overlapping_initial_time = 0.0
-                overlapping_final_time = 0.0
-                overlapping_inner_tasks = 0.0
-                overlapping_global_outer_task = 0.0
-                
-                # print(p_initial_task)
-                # print(p_final_task)
-                print("**************************************************")
-                rospy.loginfo(RED + "DURATION: {}".format(single_task["delta_time"]) + END)
-                #Insert partial initial task
-                if p_initial_task:          # Not empty
-                    if len(p_initial_task)>1:                                               #Future note: It can be more than one agents in parallel, in that case filter to consider only concurrent task of concurrent agent
-                        rospy.loginfo(RED + "More than one partial initial task" + END)
-                    else:
-                        if p_initial_task[0]["outcome"] == 1:
-                            # print("initial")
-                            rospy.loginfo(RED + "Initial task: {}".format(p_initial_task[0]["name"]) + END)
-                            
-                            overlapping_initial_time = p_initial_task[0]["t_end"] - single_task["t_start"] 
-                            delta_initial = overlapping_initial_time / p_initial_task[0]["delta_time"]
-                            # print(p_initial_task[0])
-                            # print(p_initial_task[0]["task_mean_informations"])
-                            # print(p_initial_task[0]["task_mean_informations"][0])
-                            # print(p_initial_task[0]["task_mean_informations"][0]["expected_duration"])
-                            t_initial_mean = p_initial_task[0]["task_mean_informations"][0]["median"] #"task_mean_informations":[{"exp_dur":**}]
-                            # print(task_index[concurrent_agent])
-                            col_index_reg_mat = task_index[concurrent_agent].index(p_initial_task[0]["name"])
-                            
-                            #regression_mat[row, col_index_reg_mat] = delta_initial*t_initial_mean
-                            
-                            row_vect[0,col_index_reg_mat] += delta_initial*t_initial_mean
-                            add_task_to_regmat = True
-                            
-                        self.updateConcurrentTaskCounters(p_initial_task[0]["name"], p_initial_task[0]["outcome"])
-                        
-                        #print(single_task)
-                        #print(p_initial_task)
-                        # print(p_initial_task[0]["name"])
-                        # print(p_initial_task[0]["agent"])
-                        # print(p_initial_task[0]["t_start"])
-                        # print(p_initial_task[0]["t_end"])       
-                        
-                        # print(overlapping_initial_time)
-                        # print(delta_initial)
-                        # print(t_initial_mean)
-                        # print(col_index_reg_mat)
-                        
-                #Insert partial final task
-                if p_final_task:          # Not empty
-                    if len(p_final_task)>1:
-                        rospy.loginfo(RED + "More than one partial final task" + END)        #Future note: It can be more than one agents in parallel, in that case filter to consider only concurrent task of concurrent agent
-                    else:
-                        if p_final_task[0]["outcome"] == 1:          
-                            rospy.loginfo(RED + "Final task: {}".format(p_final_task[0]["name"]) + END)
-
-                            overlapping_final_time = single_task["t_end"] - p_final_task[0]["t_start"]
-                            delta_final = overlapping_final_time / p_final_task[0]["delta_time"]
-                            # print(p_final_task[0]["task_mean_informations"])
-                            # print(p_final_task[0]["task_mean_informations"][0])
-                            # print(p_final_task[0]["task_mean_informations"][0]["expected_duration"])
-                            t_final_mean = p_final_task[0]["task_mean_informations"][0]["median"] #"task_mean_informations":[{"exp_dur":**}]
-                            # print(concurrent_agent)
-                            col_index_reg_mat = task_index[concurrent_agent].index(p_final_task[0]["name"])
-                            
-                            #regression_mat[row, col_index_reg_mat] = delta_final*t_final_mean
-                            row_vect[0,col_index_reg_mat] += delta_final*t_final_mean
-                            add_task_to_regmat = True
-
-                        self.updateConcurrentTaskCounters(p_final_task[0]["name"], p_final_task[0]["outcome"])
-                        #print(single_task)
-                        
-                        # print(p_final_task[0]["name"])
-                        # print(p_final_task[0]["agent"])
-                        # print(p_final_task[0]["t_start"])
-                        # print(p_final_task[0]["t_end"])       
-                        
-                        # print(overlapping_final_time)
-                        # print(delta_final)
-                        # print(t_final_mean)
-                        # print(col_index_reg_mat)
-                
-                                  
-                if single_task['inner_task']:
-                    rospy.loginfo(RED + "Inner tasks: " + END)
-                    # print(single_task['inner_task'])
-                    # print("...............................................")
-                    # print(single_task['inner_task'])
-                    # print(type(single_task['inner_task']))
-                    for inner_task in single_task['inner_task']:
-                        # print(inner_task)
-                        if inner_task["outcome"] == 1:               #QUesto [0] non sono sicuro
-                            col_index_reg_mat = task_index[concurrent_agent].index(inner_task["name"])
-                            # print("another inner tasks")
-                            print(inner_task["name"])
-                            # print(inner_task["task_mean_informations"])
-                            # print(inner_task["task_mean_informations"][0]["expected_duration"])                        
-                            # print(inner_task["task_mean_informations"][0])
-                            #regression_mat[row, col_index_reg_mat] = inner_task["task_mean_informations"][0]["expected_duration"]
-                            
-                            row_vect[0,col_index_reg_mat] += inner_task["task_mean_informations"][0]["median"]
-                            
-                            overlapping_inner_tasks += inner_task["delta_time"]
-                            add_task_to_regmat = True
-                        
-                        self.updateConcurrentTaskCounters(inner_task["name"], inner_task["outcome"])
-                        # input("guarda inner task")
-                        # print(inner_task["name"])
-                
-                if global_outer_task:
-                    if len(global_outer_task)>1:
-                        rospy.loginfo(RED + "More than one global outside final task" + END)        #Future note: It can be more than one agents in parallel, in that case filter to consider only concurrent task of concurrent agent
-                    else:
-                        if global_outer_task[0]["outcome"] == 1:          
-                            rospy.loginfo(RED + "Global outside task: {}".format(global_outer_task[0]["name"]) + END)
-
-                            delta_global_outside = single_task["delta_time"] / global_outer_task[0]["delta_time"]
-                            
-                            t_global_outside_task_mean = global_outer_task[0]["task_mean_informations"][0]["median"] #"task_mean_informations":[{"exp_dur":**}]
-                            
-                            col_index_reg_mat = task_index[concurrent_agent].index(global_outer_task[0]["name"])
-                            #regression_mat[row, col_index_reg_mat] = delta_global_outside * t_global_outside_task_mean     # delta_time is the real duration of "inner task"
-
-                            row_vect[0,col_index_reg_mat] += delta_global_outside * t_global_outside_task_mean
-
-                            overlapping_global_outer_task = single_task["delta_time"]                                      # All the little task   |---|
-                            add_task_to_regmat = True                                                                                                   # |--------|
-                        self.updateConcurrentTaskCounters(global_outer_task[0]["name"], global_outer_task[0]["outcome"])
-                print(row_vect)
-                print(overlapping_initial_time)
-                print(overlapping_inner_tasks)
-                print(overlapping_final_time)
-                print(overlapping_global_outer_task)
-                if add_task_to_regmat:
-                    #Nota TODO solo se almeno uno di quelli sopra
-                    regression_mat = np.append(regression_mat, row_vect,axis=0)
-                    # print("------------------")
-                    # print(regression_mat)
-                    # print("------------------")
+                raise pymongo.errors.AutoReconnect 
                     
-                    known_vect = np.append(known_vect, overlapping_initial_time + overlapping_final_time + overlapping_inner_tasks + overlapping_global_outer_task)
-                    # print(known_vect)
-                    # print("------------------")
-                    # known_vect[row] = overlapping_initial_time + overlapping_final_time + overlapping_inner_tasks + overlapping_global_outer_task  # = single_task["delta_time"]-t_idle : t_idle = single_task["delta_time"] - overlapping_inner -overl_initial-over_final 
-                # print(known_vect)
-                print(known_vect)
-                # input("COntrolla")
-            #input("Regression...")
-            print(regression_mat)
-            print(known_vect)
-            # print(regression_mat.shape)
-            # print(known_vect.shape)
-            
-            t_start=rospy.Time.now()
-            try:
-                lstsq_results=np.linalg.lstsq(regression_mat, known_vect, rcond=None)
-                print(lstsq_results)
-                dynamic_risk = lstsq_results[0]
-            except np.linalg.LinAlgError:
-                rospy.loginfo(RED + "Least square does not converge" + END)
-                return SetBoolResponse(False,NOT_SUCCESSFUL)        
-            
-            print("**************")
-            (row,col) = regression_mat.shape
-            dizionario = dict()
-            formula_string = ""
-            for index in range(0,col):
-                dizionario[task_index[concurrent_agent][index]] = regression_mat[:,index]
-                formula_string +=task_index[concurrent_agent][index]
-                if index < col - 1:
-                    formula_string += " + "
-            rospy.loginfo(formula_string)     
-            input("Guarda  formula")   
-            dizionario["duration"] = known_vect
-            print(dizionario)    
-            dataF = pd.DataFrame(dizionario)
-            
-            reg_model = smf.ols(formula="duration ~ " + formula_string + " -1 ", data=dataF)
-            reg_result = reg_model.fit()
-            
-            print(reg_result.summary())
-            
-            input("stronzo")
-            print("**************")
-            
-            #Here agent and concurrent_agent change role for dynamic risk 
-            for index, task in enumerate(task_index[concurrent_agent]):
-                counter, success_rate = self.getConcurrentTaskStatistics(task)
-                print(task)
-                print(reg_result.bse[task])
-                try:
-                    self.coll_interaction.insert_one({"agent": concurrent_agent, 
-                                                    "concurrent_agent": agent,
-                                                    "agent_skill": task, 
-                                                    "concurrent_skill": task_group["_id"][0],
-                                                    "success_rate": success_rate,
-                                                    "dynamic_risk": dynamic_risk[index],
-                                                    "std_err": reg_result.bse[task],
-                                                    "counter": counter})
-                except pymongo.errors.AutoReconnect:
-                    rospy.logerr(CONNECTION_LOST)
-                    return SetBoolResponse(False,NOT_SUCCESSFUL)
-                
-            rospy.loginfo(GREEN + "Fondamental task:" + END)
-            print(single_task["name"])
-            print(task_index[concurrent_agent])
-            print(dynamic_risk)
-            input("Leggi i risultati...")
-            # for k in coefficient:
-            #     input("Prossimo k")
-            #     print(k)
-                
-            print((rospy.Time.now()-t_start).to_sec())
-            
-        return SetBoolResponse(True,SUCCESSFUL)
-
-    def dynamicRiskUncertaintyChart(self,request):
-        import pandas as pd
-        import seaborn as sns
-
-        pipeline_dr_grouped_by_agent = [        # Pipeline to group/separate dynamic risk elements by agent  
-        {
-            '$sort': {
-                'agent_skill': 1, 
-                'concurrent_skill': 1
-            }
-        }, {
-            '$group': {
-                '_id': '$agent', 
-                'grouped_task_agent': {
-                    '$push': '$$ROOT'
-                }
-            }
-        }
-        ]
-        try:
-            dynamic_risk_grouped = self.coll_interaction.aggregate(pipeline_dr_grouped_by_agent)
-        except pymongo.errors.AutoReconnect:
-            rospy.logerr("Connectrion lost")
-            return SetBoolResponse(False,NOT_SUCCESSFUL)
-        
-        dynamic_risk_list = []
-        for index, dynamic_risk_single_agent in enumerate(dynamic_risk_grouped):        # Iterate a group of dynamic_risk element (a group for main agent)
-            dynamic_risk_list.append({})
-            dynamic_risk_list[index][dynamic_risk_single_agent["_id"]] = []             # Main agent
-            dynamic_risk_list[index]["dynamic_risk"] = []  
-            dynamic_risk_list[index]["std_err"] = []                             
-            dynamic_risk_list[index]["main_agent"] = dynamic_risk_single_agent["_id"]   # In order to store who is main agent
-            for dynamic_risk_single_element in dynamic_risk_single_agent["grouped_task_agent"]: 
-                
-                # Add concurrent agent  
-                if dynamic_risk_single_element["concurrent_agent"] not in dynamic_risk_list[index]:
-                    dynamic_risk_list[index][dynamic_risk_single_element["concurrent_agent"]] = []                  
-                    dynamic_risk_list[index]["concurrent_agent"] = dynamic_risk_single_element["concurrent_agent"]  # In order to store who is concurrent agent
-                    #here dynamic_risk_list[index] = {"main_agent":"name", "concurrent_agent":"name", "name_main_agent":[],  "name_concurrent_agent":[], "dynamic_risk":[]}
-                
-                # Retrieve agent and concurrent agent skills 
-                agent_skill = dynamic_risk_single_element["agent_skill"]
-                concurrent_agent_skill = dynamic_risk_single_element["concurrent_skill"]
-             
-                #If pick_blue_box -> pick_blue_box_ + agent
-                if "pick_blue_box" in dynamic_risk_single_element["agent_skill"]:
-                    agent_skill += "_" + dynamic_risk_single_element["agent"]
-                if "pick_blue_box" in dynamic_risk_single_element["concurrent_skill"]:
-                    concurrent_agent_skill += "_" + dynamic_risk_single_element["concurrent_agent"]
-                
-                # Append dynamic_risk element 
-                dynamic_risk_list[index][dynamic_risk_single_agent["_id"]].append(agent_skill) 
-                dynamic_risk_list[index][dynamic_risk_single_element["concurrent_agent"]].append(concurrent_agent_skill) 
-                dynamic_risk_list[index]["dynamic_risk"].append(dynamic_risk_single_element["dynamic_risk"])
-                if "std_err" in dynamic_risk_single_element:
-                    dynamic_risk_list[index]["std_err"].append(dynamic_risk_single_element["std_err"])
-                else:
-                    return SetBoolResponse(False,NOT_SUCCESSFUL) 
-            print("-------------")
-            print("Main agent: {}".format(dynamic_risk_single_agent["_id"]))
-            print("Concurrent agent: {}".format(dynamic_risk_single_element["concurrent_agent"]))
-            print(dynamic_risk_list[index])   
-        ##### -------------------
-        
-        # fig, axs = plt.subplots(1, 2)
-        # fig.suptitle('Dynamic Matrix')
-        
-        for index, single_agent_dynamic_risk in enumerate(dynamic_risk_list):
-            # Retrieve agent name
-            main_agent = single_agent_dynamic_risk["main_agent"]
-            concurrent_agent = single_agent_dynamic_risk["concurrent_agent"]
-            
-            # Remove it for chart data
-            single_agent_dynamic_risk.pop("main_agent",None)
-            single_agent_dynamic_risk.pop("concurrent_agent",None)
-            
-            # Create a dataframe
-            data = pd.DataFrame(single_agent_dynamic_risk)
-            print(data)
-            #sns.catplot(data=dati, x=main_agent, y="duration", hue=concurrent_agent)
-
-            # ax = sns.catplot(data = data, kind="bar", x=main_agent, y="dynamic_risk", hue=concurrent_agent)
-            # # plot time series with seaborn
-            #ax = sns.barplot(data=data.dynamic_risk) #, err_style="unit_traces")
-
-            # # Add std deviation bars to the previous plot
-            mean = data.dynamic_risk
-            std  = data.std_err
-            # ax.errorbar(data.index, mean, yerr=std, fmt='-o')
-            
-            df = pd.DataFrame.from_dict({
-                "mean": mean,
-                "std": std
-            }).reset_index()
-
-            g = sns.FacetGrid(df, size=6)
-            ax = g.map(plt.errorbar, "index", "mean", "std")
-            ax.set(xlabel="", ylabel="")
-            plt.show()
-            # plt.figure(index)
-            # ax = sns.barplot(data)
-            # plt.title("Dynamic Risk Matrix for agent: {}".format(main_agent))
-            # plt.savefig(self.results_folder_path + "dynamic_risk_agent_" + main_agent +".png")
-    
-    def singleDRCoefficientChart(self,request):   #Compute dynamic risk with concurrent and mean information
+   
+    def singleDRCoefficientChart(self,request):   
         """Method 
 
         Args:
@@ -4236,16 +1399,13 @@ class MongoStatistics:
                 main_task = agent_synergy_element["agent_skill"]
                 concurrent_task = agent_synergy_element["concurrent_skill"]
                 main_agent_label = main_agent
-                paper = True
+
                 if paper:
                     main_task = self.getPaperTaskName(self.checkPickPlaceWithAgent(agent_synergy_element["agent_skill"], main_agent))
                     concurrent_agent = self.getPaperAgentName(agent_synergy_element["concurrent_agent"])
                     concurrent_task = self.getPaperTaskName(self.checkPickPlaceWithAgent(agent_synergy_element["concurrent_skill"],agent_synergy_element["concurrent_agent"]))
                     main_agent_label = self.getPaperAgentName(main_agent)
-                    # print(main_task)
-                    # print(concurrent_task)
-                    # print(main_task)
-                    # print(concurrent_task)
+
                 synergy_mean_value = agent_synergy_element["dynamic_risk"]
                 synergy_std = agent_synergy_element["std_err"]
                 dati = np.random.normal(synergy_mean_value,synergy_std,n_samples)
@@ -4253,7 +1413,7 @@ class MongoStatistics:
                 extended_synergy = pd.DataFrame({'main_agent':main_agent,"main_task":main_task,"concurrent_agent":concurrent_agent,"concurrent_task":concurrent_task,"synergy":dati},dtype=object)
                 
                 synergy_agent_values = synergy_agent_values.append(extended_synergy,ignore_index=True)
-            print("qui")
+            
             sns.set_theme()
             sns.set(rc={'figure.figsize':(11,7)})
             # sns.catplot(data=dati, x=main_agent, y="duration", hue=concurrent_agent)
@@ -4265,15 +1425,11 @@ class MongoStatistics:
             plt.xticks(fontsize=16)
             plt.yticks(fontsize=16)
             
-            #     ax._legend.set_title("Concurrent task ({})".format(concurrent_agent))
-            #             ax.set_ylabel("Duration (s)",fontsize=15,labelpad=15)
-            # ax.set_xlabel("Task name",fontsize=15,labelpad=15)
-            # ax.set_title("Task Durations",fontsize=15)
             legend = plt.legend(title="Concurrent task ({})".format(concurrent_agent), loc='upper left',fontsize='18')
             legend.get_title().set_fontsize('20')
             
             # plt.xticks(rotation=, ha="right")
-            self.results_folder_path="/home/samuele/projects/planning_ws/src/task-planner-interface/task_planner_statistics/file/"
+            # self.results_folder_path="/home/samuele/projects/planning_ws/src/task-planner-interface/task_planner_statistics/file/"
             ax.figure.set_size_inches(11, 8)
             
             plt.savefig(self.results_folder_path + "dynamic_risk_coefficient_agent_" + main_agent +".png")
@@ -4281,32 +1437,23 @@ class MongoStatistics:
             
         # plt.figure()
         plt.show()
-            # print(synergy_agent_values)      
-              
+        
         return SetBoolResponse(True,"ok")
         
-        # task_results = dict()           
-        # task_results["duration"] = []
-        # for agent in agents:
-        #     task_results[agent] =[]
-        
     def taskDurationChart(self,request):
-        """Method 
+        """Method for making task duration grouped by type
 
         Args:
-            request (SetBoolRequest): 
+            request (SetBoolRequest): Request
 
         Returns:
-            SetBoolResponse: 
+            SetBoolResponse: Response
         """
 
-        
-        
         agents = self.getAgents()
 
         task_results={"task_name":[],"agent_name":[],"duration":[]}
         for main_agent in agents:
-            # synergy_agent_values = pd.DataFrame(columns=['main_agent','main_task','concurrent_agent','concurrent_task','synergy'],dtype=object)
             pipeline_get_only_speciefied_agent_elements = [
             {
                 '$match': {
@@ -4324,7 +1471,7 @@ class MongoStatistics:
                 agent_name = result_element["agent"]
                 duration = result_element["t_end"] - result_element["t_start"]
                 
-                paper = True
+                
                 if paper:
                     task_name = self.getPaperTaskName(self.checkPickPlaceWithAgent(task_name, agent_name))
                     agent_name = self.getPaperAgentName(agent_name)
@@ -4334,12 +1481,8 @@ class MongoStatistics:
                 task_results["duration"].append(duration)
             
         task_results_data = pd.DataFrame(task_results,dtype=object)
-        print(task_results_data)
-        sns.set_theme()
-        # sns.set_style("whitegrid")
 
-            # sns.set(rc={'figure.figsize':(11,7)})
-            # sns.catplot(data=dati, x=main_agent, y="duration", hue=concurrent_agent)
+        sns.set_theme()
         sns.set(rc={'figure.figsize':(17,7)})
         ax = sns.boxplot(data=task_results_data, x="task_name", y="duration", hue="agent_name",
                         showmeans=True, 
@@ -4350,55 +1493,48 @@ class MongoStatistics:
                         linewidth=1,
                         showfliers = False) #,
                         # palette="tab10")
-        # mybox = ax.artists[2]
-
-        # # Change the appearance of that box
-        # mybox.set_facecolor('red')
-        # mybox.set_edgecolor('black')
-        # mybox.set_linewidth(3)
-        # plt.legend([],[], frameon=False)
 
         ax.set_ylabel("Duration (s)",fontsize=24,labelpad=15)
         ax.set_xlabel("Task name",fontsize=24,labelpad=15)
         plt.xticks(fontsize=20, rotation=20)
         plt.yticks(fontsize=21, rotation=0)
 
-        
         ax.set_title("Task Durations",fontsize=20)
         legend = plt.legend(title='Agent Name', loc='upper left',fontsize=20)
         legend.get_title().set_fontsize('22')
         
-        
         ax.figure.set_size_inches(17, 8)
-        # plt.figure()
+        
         plt.savefig(self.results_folder_path + "task_durations.png",bbox_inches='tight')
-            # ax = sns.catplot(data=synergy_agent_values, kind="bar", x="main_task", y="synergy", hue="concurrent_task",ci="sd")   
-            # ax.set_xlabels('Main Agent: ' + main_agent_label, fontsize=15,labelpad=15) # not set_label
-            # ax.fig.suptitle("Synergy Matrix Coefficients",y=1)
-            # ax.set_ylabels("Synergy coefficient value")
-            # ax._legend.set_title("Concurrent task ({})".format(concurrent_agent))
-            # # plt.xticks(rotation=, ha="right")
-            # self.results_folder_path="/home/samuele/projects/planning_ws/src/task-planner-interface/task_planner_statistics/file/"
-            # ax.figure.set_size_inches(11, 8)
-            
-            # plt.savefig(self.results_folder_path + "dynamic_risk_coefficient_agent_" + main_agent +".png",)
-            # plt.savefig(self.results_folder_path+"test"+"dynamic_coefficient_risk_agent_"+".pdf",)
-            # sns.catplot(data=dati, x=main_agent, y="duration", hue=concurrent_agent)
 
         # plt.figure()
         plt.show()
-            # print(synergy_agent_values)      
               
         return SetBoolResponse(True,"ok")
         
-
     def checkPickPlaceWithAgent(self,task_name,agent):
+        """Method for replacing task name for task performable by both agents
+        Args:
+            agent (str): task name in db
+            agent (str): agent name in db
+
+        Returns:
+            str: task name with agent
+        """
         if task_name == "pick_blue_box":
             return task_name + "_" + agent
         else:
             return task_name
 
     def getPaperTaskName(self,task):
+        """Method for replacing task names (for charts inherent in the paper)
+
+        Args:
+            agent (str): task name in db
+
+        Returns:
+            str: Paper task name
+        """
         if task == "pick_blue_box_human_right_arm":
             task_name = "Pick Blue Box (H)"
         elif task == "place_blue_box_human_right_arm":
@@ -4420,6 +1556,14 @@ class MongoStatistics:
         return task_name
     
     def getPaperAgentName(self,agent):
+        """Method for replacing agent names (for charts inherent in the paper)
+
+        Args:
+            agent (str): agent name in db
+
+        Returns:
+            str: Paper agent name
+        """
         if agent=="ur5_on_guide":
             agent_label = "Robot"
         elif agent=="human_right_arm":
@@ -4460,7 +1604,7 @@ def main():
     coll_properties_name = "tasks_properties_test"
     coll_results_name = "sinergy_results_test_long"  #"results_test"
     coll_duration_name = "durations_long_min"
-    coll_risk_name = "dynamics_long_test_outliers"
+    coll_risk_name = "dynamics_long_test_outliers_3"
     
     fig_folder="/home/samuele/projects/planning_ws/src/task-planner-interface/task_planner_statistics/file/"
 
@@ -4468,31 +1612,22 @@ def main():
         mongo_statistics = MongoStatistics(db_name,coll_properties_name,coll_results_name,coll_duration_name,coll_risk_name,fig_folder)
     except:
         return 0     #Connection to db failed 
-    
        
     # Rosservice
+    
     rospy.Service(COMPUTE_DURATION_SERVICE,SetBool,mongo_statistics.computeDurations)
     rospy.Service(COMPUTE_DYNAMIC_RISK_SERVICE,SetBool,mongo_statistics.computeDynamicRisk)
-    COMPUTE_DYNAMIC_RISK_SERVICE_MIN = "mongo_statistics/compute_dynamic_risk_min"
-    rospy.Service(COMPUTE_DYNAMIC_RISK_SERVICE_MIN,SetBool,mongo_statistics.computeDynamicRiskMin)
+    # COMPUTE_DYNAMIC_RISK_SERVICE_MIN = "mongo_statistics/compute_dynamic_risk_min"
+    # rospy.Service(COMPUTE_DYNAMIC_RISK_SERVICE_MIN,SetBool,mongo_statistics.computeDynamicRiskMin)
 
-    rospy.Service(COMPUTE_DYNAMIC_RISK_SERVICE_V2,SetBool,mongo_statistics.computeDynamicRiskNoAddInfo) 
-    rospy.Service(MAKE_CHART_SERVICE,SetBool,mongo_statistics.drawTimeline) 
-    rospy.Service(MAKE_DR_CHART_SERVICE,SetBool,mongo_statistics.dynamicRiskChart) 
-    rospy.Service("prova",SetBool,mongo_statistics.groupedDurationChart) 
-    rospy.Service("prova_regressione",SetBool,mongo_statistics.computeDynamicRiskWithUncertainty) 
-    rospy.Service("prova_regressione_min",SetBool,mongo_statistics.computeDynamicRiskWithUncertaintyMin) 
-    rospy.Service("prova_regressione_median",SetBool,mongo_statistics.computeDynamicRiskWithUncertaintyMedian) 
+    rospy.Service(COMPUTE_DYNAMIC_RISK_WITH_UNC_SERVICE,SetBool,mongo_statistics.computeDynamicRiskWithUncertainty) 
+    # rospy.Service("prova_regressione_median",SetBool,mongo_statistics.computeDynamicRiskWithUncertaintyMedian) 
 
-
-    rospy.Service("mongo_statistics/make_uncertainty_chart",SetBool,mongo_statistics.dynamicRiskUncertaintyChart) 
-    
-    rospy.Service("mongo_statistics/make_single_dr_coeff_chart",SetBool,mongo_statistics.singleDRCoefficientChart) 
-    rospy.Service("mongo_statistics/make_task_duration_chart",SetBool,mongo_statistics.taskDurationChart) 
-
-
-
-    
+    rospy.Service(TASK_DURATION_CHART_SERVICE,SetBool,mongo_statistics.taskDurationChart)    
+    rospy.Service(TASK_DURATION_BY_GROUPING_CHART_SERVICE,SetBool,mongo_statistics.groupedDurationChart) 
+    rospy.Service(SYNERGY_MATRIX_CHART_SERVICE,SetBool,mongo_statistics.dynamicRiskChart) 
+    rospy.Service(SYNERGY_UNCERTAINTY_CHART_SERVICE,SetBool,mongo_statistics.singleDRCoefficientChart)
+    rospy.Service(TIMELINE_CHART_SERVICE,SetBool,mongo_statistics.drawTimeline) 
     
     rospy.loginfo(READY)
     rospy.spin()
