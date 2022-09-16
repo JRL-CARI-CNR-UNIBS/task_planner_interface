@@ -1,8 +1,0 @@
-prefix=/home/samuele/projects/planning_ws/src/task-planner-interface/task_planner_interface_msgs/build/devel
-
-Name: task_planner_interface_msgs
-Description: Description of task_planner_interface_msgs
-Version: 0.0.0
-Cflags: -I/home/samuele/projects/planning_ws/src/task-planner-interface/task_planner_interface_msgs/build/devel/include
-Libs: -L${prefix}/lib 
-Requires: std_msgs actionlib_msgs

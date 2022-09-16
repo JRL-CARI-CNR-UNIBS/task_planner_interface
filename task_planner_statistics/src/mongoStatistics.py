@@ -23,6 +23,12 @@ import seaborn as sns
 import statsmodels.formula.api as smf
 from sklearn.ensemble import IsolationForest
 
+import pyro
+import pyro.distributions as dist
+import pyro.optim as optim
+from pyro.infer import MCMC, NUTS
+import torch
+
 GREEN = '\033[92m'
 YELLOW = '\033[93m'
 RED = '\033[91m'
@@ -43,7 +49,7 @@ DURATION_OK = "Duration computed correctly"
 COMPUTE_DURATION_SERVICE = "mongo_statistics/compute_durations"
 COMPUTE_DYNAMIC_RISK_SERVICE = "mongo_statistics/compute_dynamic_risk"
 COMPUTE_DYNAMIC_RISK_WITH_UNC_SERVICE = "mongo_statistics/compute_dynamic_risk_unc"
-
+COMPUTE_BAYESIAN_DYNAMIC_RISK_SERVICE = "mongo_statistics/compute_bayesian_dynamic_risk"
 
 TASK_DURATION_CHART_SERVICE = "mongo_statistics/task_duration_chart"
 TASK_DURATION_BY_GROUPING_CHART_SERVICE = "mongo_statistics/task_duration_by_grouping_chart"
@@ -51,7 +57,10 @@ SYNERGY_MATRIX_CHART_SERVICE = "mongo_statistics/synergy_matrix_chart"
 SYNERGY_UNCERTAINTY_CHART_SERVICE = "mongo_statistics/synergy_uncertainty_chart"
 TIMELINE_CHART_SERVICE = "mongo_statistics/timeline_chart"
 
-
+PARTIAL_INITIAL = "partial_task_initial"
+PARTIAL_FINAL = "partial_task_final"
+INNER = "inner_task"
+OUTER = "outer_task"
 
 paper = True
 
@@ -1001,7 +1010,23 @@ class MongoStatistics:
         
         return [agent["_id"] for agent in list(agents_cursor)]
 
-    def computeOverlappingRatio(self,*,*):
+    def computeOverlappingRatio(self,parallelism_task_type,main_task_start,main_task_end,parallel_task_start,parallel_task_end):
+        
+        if parallelism_task_type == PARTIAL_INITIAL:
+            overlapping_ratio = parallel_task_end - main_task_start
+        elif parallelism_task_type == PARTIAL_FINAL:
+            overlapping_ratio = main_task_end - parallel_task_start
+        elif parallelism_task_type == INNER:
+            overlapping_ratio = parallel_task_end - parallel_task_start
+        elif parallelism_task_type == OUTER:
+            overlapping_ratio = main_task_end - main_task_start
+        else:
+            overlapping_ratio = None
+        
+        assert overlapping_ratio > 0
+        
+        return overlapping_ratio
+           
         #TODO: Receive in input task if initial, ..., and time start-end of main task and concurrent task and parallel task
 
         
@@ -1028,7 +1053,7 @@ class MongoStatistics:
         
         available_stats = {"average_task_duration":"expected_duration","min_task_duration":"min","median_task_duration":"median"}
         
-        used_stat_index = available_stats["average_task_duration"]
+        used_stat_index = available_stats["expected_duration"]
         if used_stat_index=="median":   
             try:
                 self.addMedianToTaskStats()  
@@ -1085,8 +1110,8 @@ class MongoStatistics:
         
         #Retrive results with their concurrent tasks information
         pipeline = Pipeline.dynamicRiskPipeline(self.utils_results_name)
-        
-        parallelism_type = ["partial_task_initial", "partial_task_final","inner_task","outer_task"]
+
+        parallelism_type = [PARTIAL_INITIAL, PARTIAL_FINAL, INNER, OUTER]
         
         try:
             t_start = rospy.Time.now()
@@ -1138,110 +1163,43 @@ class MongoStatistics:
                 # inner_tasks = single_task['inner_task']
                 global_outer_task = single_task['outer_task']
 
-                overlapping_initial_time = 0.0
-                overlapping_final_time = 0.0
-                overlapping_inner_tasks = 0.0
-                overlapping_global_outer_task = 0.0
                 
-                print("**************************************************")
-                rospy.loginfo(RED + "DURATION: {}".format(single_task["delta_time"]) + END)
-                #Insert partial initial task
-                if p_initial_task:          # Not empty
-                    if len(p_initial_task)>1:                                               #Future note: It can be more than one agents in parallel, in that case filter to consider only concurrent task of concurrent agent
-                        rospy.loginfo(RED + "More than one partial initial task" + END)
-                    else:
-                        if p_initial_task[0]["outcome"] == 1:
-
-                            rospy.loginfo(RED + "Initial task: {}".format(p_initial_task[0]["name"]) + END)
-                            
-                            overlapping_initial_time = p_initial_task[0]["t_end"] - single_task["t_start"] 
-                            delta_initial = overlapping_initial_time / p_initial_task[0]["delta_time"]
-
-                            t_initial_mean = p_initial_task[0]["task_mean_informations"][0][used_stat_index] #"task_mean_informations":[{"exp_dur":**}]
-
-                            col_index_reg_mat = task_index[concurrent_agent].index(p_initial_task[0]["name"])
-                            
-                            #regression_mat[row, col_index_reg_mat] = delta_initial*t_initial_mean
-                            
-                            row_vect[0,col_index_reg_mat] += delta_initial*t_initial_mean
-                            add_task_to_regmat = True
-                            
-                        self.updateConcurrentTaskCounters(p_initial_task[0]["name"], p_initial_task[0]["outcome"])
-                        
-                        
-                #Insert partial final task
-                if p_final_task:          # Not empty
-                    if len(p_final_task)>1:
-                        rospy.loginfo(RED + "More than one partial final task" + END)        #Future note: It can be more than one agents in parallel, in that case filter to consider only concurrent task of concurrent agent
-                    else:
-                        if p_final_task[0]["outcome"] == 1:          
-                            rospy.loginfo(RED + "Final task: {}".format(p_final_task[0]["name"]) + END)
-
-                            overlapping_final_time = single_task["t_end"] - p_final_task[0]["t_start"]
-                            delta_final = overlapping_final_time / p_final_task[0]["delta_time"]
-
-                            t_final_mean = p_final_task[0]["task_mean_informations"][0][used_stat_index] #"task_mean_informations":[{"exp_dur":**}]
-
-                            col_index_reg_mat = task_index[concurrent_agent].index(p_final_task[0]["name"])
-                            
-                            #regression_mat[row, col_index_reg_mat] = delta_final*t_final_mean
-                            row_vect[0,col_index_reg_mat] += delta_final*t_final_mean
-                            add_task_to_regmat = True
-
-                        self.updateConcurrentTaskCounters(p_final_task[0]["name"], p_final_task[0]["outcome"])
-                        
-                        
-                                  
-                if single_task['inner_task']:
-                    rospy.loginfo(RED + "Inner tasks: " + END)
-                    # print(single_task['inner_task'])
-                    # print("...............................................")
-                    # print(single_task['inner_task'])
-                    # print(type(single_task['inner_task']))
-                    for inner_task in single_task['inner_task']:
-                        if inner_task["outcome"] == 1:               #QUesto [0] non sono sicuro
-                            col_index_reg_mat = task_index[concurrent_agent].index(inner_task["name"])
-
-
-                            
-                            row_vect[0,col_index_reg_mat] += inner_task["task_mean_informations"][0][used_stat_index]
-                            
-                            overlapping_inner_tasks += inner_task["delta_time"]
-                            add_task_to_regmat = True
-                        
-                        self.updateConcurrentTaskCounters(inner_task["name"], inner_task["outcome"])
-
-                
-                if global_outer_task:
-                    if len(global_outer_task)>1:
-                        rospy.loginfo(RED + "More than one global outside final task" + END)        #Future note: It can be more than one agents in parallel, in that case filter to consider only concurrent task of concurrent agent
-                    else:
-                        if global_outer_task[0]["outcome"] == 1:          
-                            rospy.loginfo(RED + "Global outside task: {}".format(global_outer_task[0]["name"]) + END)
-
-                            delta_global_outside = single_task["delta_time"] / global_outer_task[0]["delta_time"]
-                            
-                            t_global_outside_task_mean = global_outer_task[0]["task_mean_informations"][0][used_stat_index] #"task_mean_informations":[{"exp_dur":**}]
-                            
-                            col_index_reg_mat = task_index[concurrent_agent].index(global_outer_task[0]["name"])
-                            #regression_mat[row, col_index_reg_mat] = delta_global_outside * t_global_outside_task_mean     # delta_time is the real duration of "inner task"
-
-                            row_vect[0,col_index_reg_mat] += delta_global_outside * t_global_outside_task_mean
-
-                            overlapping_global_outer_task = single_task["delta_time"]                                      # All the little task   |---|
-                            add_task_to_regmat = True                                                                                                   # |--------|
-                        self.updateConcurrentTaskCounters(global_outer_task[0]["name"], global_outer_task[0]["outcome"])
-
+                overlapping_tot = 0.0
+                for parallelism_task_type in parallelism_type:
+                    task = single_task[parallelism_task_type]
+                    if parallelism_task_type != INNER and len(task)>1:   
+                         rospy.loginfo(RED + "More than one {} task".format(parallelism_task_type) + END)
+                         raise Exception("More than one {} task".format(parallelism_task_type))
+                    if task:
+                        for parallel_task in task:      #per i task inner possono essere più di uno
+                            if parallel_task["outcome"] == 1:
+                                overlapping_time = self.computeOverlappingRatio(parallelism_task_type,
+                                                                                single_task["t_start"],
+                                                                                single_task["t_end"],
+                                                                                parallel_task["t_start"],
+                                                                                parallel_task["t_end"])
+                                delta = overlapping_time / parallel_task["delta_time"]                   
+                                parallel_task_stat_cost = parallel_task["task_mean_informations"][0][used_stat_index]
+                                
+                                col_index_reg_mat = task_index[concurrent_agent].index(parallel_task["name"]) 
+                                row_vect[0,col_index_reg_mat] += delta*parallel_task_stat_cost
+                                overlapping_tot += overlapping_time                        
+                                
+                                add_task_to_regmat = True
+                            self.updateConcurrentTaskCounters(parallel_task["name"], parallel_task["outcome"])
+                     
+                    
                 if add_task_to_regmat:
                     # Nota TODO solo se almeno uno di quelli sopra
                     regression_mat = np.append(regression_mat, row_vect,axis=0)
 
                     
-                    known_vect = np.append(known_vect, overlapping_initial_time + overlapping_final_time + overlapping_inner_tasks + overlapping_global_outer_task)
+                    known_vect = np.append(known_vect, overlapping_tot)
 
             print(regression_mat)
             print(known_vect)
             rospy.loginfo(YELLOW + "****************"+ END)
+            input("Verifica")
             # if agent == "human_right_arm":
             clf = IsolationForest(n_estimators=20, warm_start=True)
             estimator=clf.fit(known_vect.reshape(-1,1))  # fit 10 trees  
@@ -1261,14 +1219,14 @@ class MongoStatistics:
             # print(regression_mat.shape)
             # print(known_vect.shape)
             
-            t_start=rospy.Time.now()
-            try:
-                lstsq_results=np.linalg.lstsq(regression_mat, known_vect, rcond=None)
-                print(lstsq_results)
-                dynamic_risk = lstsq_results[0]
-            except np.linalg.LinAlgError:
-                rospy.loginfo(RED + "Least square does not converge" + END)
-                return SetBoolResponse(False,NOT_SUCCESSFUL)        
+            # t_start=rospy.Time.now()
+            # try:
+            #     lstsq_results=np.linalg.lstsq(regression_mat, known_vect, rcond=None)
+            #     print(lstsq_results)
+            #     dynamic_risk = lstsq_results[0]
+            # except np.linalg.LinAlgError:
+            #     rospy.loginfo(RED + "Least square does not converge" + END)
+            #     return SetBoolResponse(False,NOT_SUCCESSFUL)        
             
             print("**************")
             (row,col) = regression_mat.shape
@@ -1284,6 +1242,9 @@ class MongoStatistics:
             dizionario["duration"] = known_vect
             print(dizionario)    
             dataF = pd.DataFrame(dizionario)
+            
+            print(dataF)
+            input("Look at dataframe")
             
             reg_model = smf.ols(formula="duration ~ " + formula_string + " -1 ", data=dataF)
             reg_result = reg_model.fit()
@@ -1314,7 +1275,7 @@ class MongoStatistics:
             print(single_task["name"])
             print(task_index[concurrent_agent])
             print(dynamic_risk)
-            input("Look at results")
+            # input("Look at results")
                 
             print((rospy.Time.now()-t_start).to_sec())
             
@@ -1570,6 +1531,298 @@ class MongoStatistics:
             agent_label = "Human"
         return agent_label
 
+
+    def model(self,task_data,main_task_duration,concurrent_task_name):
+        # concurrent_task_name = task_data.columns.get_values()[:-1]
+        concurrent_synergy = dict()
+        mean = 0.
+        for id, concurrent_task in enumerate(concurrent_task_name):
+            concurrent_synergy[concurrent_task] = pyro.sample(concurrent_task, dist.Gamma(50.0,50.0))
+            
+            mean += concurrent_synergy[concurrent_task] * task_data[:,id]
+        sigma = pyro.sample("sigma",dist.Uniform(0.,10.))
+        
+        with pyro.plate("data", len(main_task_duration)):
+            pyro.sample("obs", dist.Normal(mean, sigma), obs=main_task_duration)    
+
+    def guide(self,main_task,task_data,main_task_duration):
+        pass    
+    
+    def computeBayesianDynamicRisk(self,request):   
+        """Method for creating a collection of results with added the concurrent tasks
+
+        Args:
+            request (SetBoolRequest): _description_
+
+        Returns:
+            SetBoolResponse: _description_
+        """
+
+
+        t_start = rospy.Time.now()
+        
+        # Delete older dynamic risk collection
+        try:
+            self.coll_interaction.delete_many({})
+        except pymongo.errors.AutoReconnect:
+            rospy.logerr(CONNECTION_LOST)
+            return SetBoolResponse(False,NOT_SUCCESSFUL)
+        
+        available_stats = {"average_task_duration":"expected_duration","min_task_duration":"min","median_task_duration":"median"}
+        
+        used_stat_index = available_stats["average_task_duration"]
+        if used_stat_index=="median":   
+            try:
+                self.addMedianToTaskStats()  
+            except pymongo.errors.AutoReconnect:
+                rospy.logerr(CONNECTION_LOST)
+                return SetBoolResponse(False,NOT_SUCCESSFUL)
+
+        # Create collection with results task + task mean information
+        if not self.createUtilsResults():
+            return SetBoolResponse(False,NOT_SUCCESSFUL)
+        
+        # Pipeline for: retriving task name, unwinded for agents, each task only 1 agents
+        pipeline_agents_task_name =[
+        {
+            '$unwind': {
+                'path': '$agent', 
+                'preserveNullAndEmptyArrays': False
+            }
+        }, {
+            '$project': {
+                '_id': 0, 
+                'name': 1, 
+                'agent': 1
+            }
+        }
+        ]
+
+        try:
+            cursor_task_properties = self.coll_skills.aggregate(pipeline_agents_task_name)
+        except pymongo.errors.AutoReconnect:
+            rospy.logerr(CONNECTION_LOST)
+            return SetBoolResponse(False,NOT_SUCCESSFUL)
+                
+        task_index = dict()                                                         # It will be as: {"agent_name":[list with all tasks that it can perform],..}
+        for single_task in cursor_task_properties:
+            if "name" in single_task.keys() and "agent" in single_task.keys() :     # Ensure it has nedded attributes
+                if not single_task["name"] == "end":                                # Excule task end (not interesting)
+                    if single_task["agent"] not in task_index:                      # If not exist already that agents
+                        task_index[single_task["agent"]] = set()                    # A SET for each agent to ensure unique task
+                    task_index[single_task["agent"]].add(single_task["name"])
+                                    
+        task_index = {key: list(values) for key, values in task_index.items()}       # Convert agents tasks from set to list (for have index)
+        
+        rospy.loginfo("Dizionario: agente->task list: ")
+        rospy.loginfo(task_index)
+
+        # input("wait...")
+        
+        agents = list(task_index.keys())
+        
+        if len(agents)>2:
+            rospy.loginfo(RED + "There are more than 2 agents in task properties" + END)
+            return SetBoolResponse(False,NOT_SUCCESSFUL)
+        
+        #Retrive results with their concurrent tasks information
+        pipeline = Pipeline.dynamicRiskPipeline(self.utils_results_name)
+
+        parallelism_type = [PARTIAL_INITIAL, PARTIAL_FINAL, INNER, OUTER]
+        
+        try:
+            t_start = rospy.Time.now()
+            results = self.coll_utils_results.aggregate(pipeline)
+            t_end = (rospy.Time.now() - t_start).to_sec()
+            rospy.loginfo("Computational time for dynamic risk" + str(t_end))
+        except pymongo.errors.AutoReconnect:
+            rospy.logerr(CONNECTION_LOST)
+            return SetBoolResponse(False,NOT_SUCCESSFUL)
+        
+        rospy.loginfo(GREEN + "Agents: {}".format(agents) + END)
+        
+        for task_group in results:          #A task_group contains vector of all (task_j, agent_i) same task computed by same agent
+            # input("New task group...")    #usefull for debug
+            
+            #Number of rows of regression matrix
+            n_rows = len(task_group['grouped_task_agent'])
+            
+            # print(agents)
+            
+            #Compute other agents different from current task agent
+            agent = task_group["_id"][1]                                    #First element of _id is name
+            concurrent_agent = set(agents).difference(set([agent])).pop()         # If only one agent ok, otherwise there is also others agents in the set.
+            
+            rospy.loginfo("Principal agent: {}".format(agent))
+            rospy.loginfo("Concurrent agent: {}".format(concurrent_agent))
+                        
+                    
+            #for concurrent_agent in other_agents:                   #If more than one agents
+            
+            #Number of column of regression matrix = concurrent_agent task
+            n_col = len(task_index[concurrent_agent])
+            
+            #Initialize regression matrix
+                    
+            regression_mat = np.empty((0,n_col)) 
+            known_vect = np.empty((0,1))
+            
+            rospy.loginfo(GREEN + "Fondamental task: {}".format(task_group["_id"][0]) + END)
+            
+            self.resetConcurrentTaskCounters()
+            
+            for row, single_task in enumerate(task_group['grouped_task_agent']):
+                add_task_to_regmat = False
+                row_vect = np.zeros((1,n_col))
+                
+                p_initial_task = single_task['partial_task_initial']
+                p_final_task = single_task['partial_task_final']
+                # inner_tasks = single_task['inner_task']
+                global_outer_task = single_task['outer_task']
+
+                
+                overlapping_tot = 0.0
+                for parallelism_task_type in parallelism_type:
+                    task = single_task[parallelism_task_type]
+                    if parallelism_task_type != INNER and len(task)>1:   
+                        rospy.loginfo(RED + "More than one {} task".format(parallelism_task_type) + END)
+                        raise Exception("More than one {} task".format(parallelism_task_type))
+                    if task:
+                        for parallel_task in task:      #per i task inner possono essere più di uno
+                            if parallel_task["outcome"] == 1:
+                                overlapping_time = self.computeOverlappingRatio(parallelism_task_type,
+                                                                                single_task["t_start"],
+                                                                                single_task["t_end"],
+                                                                                parallel_task["t_start"],
+                                                                                parallel_task["t_end"])
+                                delta = overlapping_time / parallel_task["delta_time"]                   
+                                parallel_task_stat_cost = parallel_task["task_mean_informations"][0][used_stat_index]
+                                
+                                col_index_reg_mat = task_index[concurrent_agent].index(parallel_task["name"]) 
+                                row_vect[0,col_index_reg_mat] += delta*parallel_task_stat_cost
+                                overlapping_tot += overlapping_time                        
+                                
+                                add_task_to_regmat = True
+                            self.updateConcurrentTaskCounters(parallel_task["name"], parallel_task["outcome"])
+                    
+                    
+                if add_task_to_regmat:
+                    # Nota TODO solo se almeno uno di quelli sopra
+                    regression_mat = np.append(regression_mat, row_vect,axis=0)
+
+                    
+                    known_vect = np.append(known_vect, overlapping_tot)
+
+            print(regression_mat)
+            print(known_vect)
+            rospy.loginfo(YELLOW + "****************"+ END)
+            # if agent == "human_right_arm":
+            clf = IsolationForest(n_estimators=20, warm_start=True)
+            estimator=clf.fit(known_vect.reshape(-1,1))  # fit 10 trees  
+            check = estimator.decision_function(known_vect.reshape(-1,1))
+            outliers = check > 0
+            
+            
+            
+            
+            # outliers=np.abs(known_vect-np.mean(known_vect))<np.std(known_vect)*1.8
+            # outliers = known_vect<15
+            print(outliers)
+            regression_mat=regression_mat[outliers,:]
+            known_vect = known_vect[outliers]
+        
+            
+            # print(outliers)
+            rospy.loginfo(YELLOW + "****************"+ END)
+
+            # print(regression_mat.shape)
+            # print(known_vect.shape)
+            
+            # t_start=rospy.Time.now()
+            # try:
+            #     lstsq_results=np.linalg.lstsq(regression_mat, known_vect, rcond=None)
+            #     print(lstsq_results)
+            #     dynamic_risk = lstsq_results[0]
+            # except np.linalg.LinAlgError:
+            #     rospy.loginfo(RED + "Least square does not converge" + END)
+            #     return SetBoolResponse(False,NOT_SUCCESSFUL)        
+            
+            print("**************")
+            (row,col) = regression_mat.shape
+            dizionario = dict()
+            formula_string = ""
+            for index in range(0,col):
+                dizionario[task_index[concurrent_agent][index]] = regression_mat[:,index]
+                formula_string +=task_index[concurrent_agent][index]
+                if index < col - 1:
+                    formula_string += " + "
+            rospy.loginfo(formula_string)     
+            # input("Look at formula")  #usefull for debug   
+            dizionario["duration"] = known_vect
+            print(dizionario)    
+            
+            dataF = pd.DataFrame(dizionario)
+            concurrent_task_name = dataF.columns.get_values()[:-1]
+            
+            
+            train = torch.tensor(dataF.values, dtype=torch.float)
+
+            task_data,main_task_duration =  train[:, 0:-1], train[:, -1]
+            nuts_kernel = NUTS(self.model)
+            mcmc = MCMC(nuts_kernel, num_samples=1000, warmup_steps=200)
+            mcmc.run(task_data, main_task_duration,concurrent_task_name)
+            hmc_samples = {k: v.detach().cpu().numpy() for k, v in mcmc.get_samples().items()}
+
+            
+            fig, axs = plt.subplots(nrows=2, ncols=2, figsize=(12, 10))
+            fig.suptitle("Marginal Posterior density - Regression Coefficients. Main agent: {}, Main Task: {}".format(agent,task_group["_id"][0]), fontsize=16)
+            for i, ax in enumerate(axs.reshape(-1)):
+                site = concurrent_task_name[i]
+                # sns.distplot(svi_samples[site], ax=ax, label="SVI (DiagNormal)")
+                sns.distplot(hmc_samples[site], ax=ax, label="HMC")
+                ax.set_title(site)
+            handles, labels = ax.get_legend_handles_labels()
+            fig.legend(handles, labels, loc='upper right');
+            plt.show()
+            
+            reg_model = smf.ols(formula="duration ~ " + formula_string + " -1 ", data=dataF)
+            reg_result = reg_model.fit()
+            print(reg_result.summary())
+            
+
+            
+            # #Here agent and concurrent_agent change role for dynamic risk 
+            for index, task in enumerate(task_index[concurrent_agent]):
+                counter, success_rate = self.getConcurrentTaskStatistics(task)
+                print(task)
+                print(reg_result.bse[task])
+                print(hmc_samples[task])
+                dynamic_risk = pd.DataFrame(hmc_samples[task])[0].describe()
+                try:
+                    # results = self.coll_utils_results.aggregate(pipeline)
+                    self.coll_interaction.insert_one({"agent": concurrent_agent, 
+                                                    "concurrent_agent": agent,
+                                                    "agent_skill": task, 
+                                                    "concurrent_skill": task_group["_id"][0],
+                                                    "success_rate": success_rate,
+                                                    "dynamic_risk": dynamic_risk["mean"],
+                                                    "std_err": dynamic_risk["std"],
+                                                    "counter": counter})
+                except pymongo.errors.AutoReconnect:
+                    rospy.logerr(CONNECTION_LOST)
+                    return SetBoolResponse(False,NOT_SUCCESSFUL)
+                
+            rospy.loginfo(GREEN + "Fondamental task:" + END)
+            print(single_task["name"])
+            print(task_index[concurrent_agent])
+            # print(dynamic_risk)
+            # input("Look at results")
+                
+            print((rospy.Time.now()-t_start).to_sec())
+            
+        return SetBoolResponse(True,SUCCESSFUL)
+        
+        
 def main():
 
     rospy.init_node("mongo_statistics")
@@ -1620,7 +1873,9 @@ def main():
     # COMPUTE_DYNAMIC_RISK_SERVICE_MIN = "mongo_statistics/compute_dynamic_risk_min"
     # rospy.Service(COMPUTE_DYNAMIC_RISK_SERVICE_MIN,SetBool,mongo_statistics.computeDynamicRiskMin)
 
-    rospy.Service(COMPUTE_DYNAMIC_RISK_WITH_UNC_SERVICE,SetBool,mongo_statistics.computeDynamicRiskWithUncertainty) 
+    rospy.Service(COMPUTE_DYNAMIC_RISK_WITH_UNC_SERVICE,SetBool,mongo_statistics.computeDynamicRiskWithUncertainty)
+    rospy.Service(COMPUTE_BAYESIAN_DYNAMIC_RISK_SERVICE,SetBool,mongo_statistics.computeBayesianDynamicRisk) 
+ 
     # rospy.Service("prova_regressione_median",SetBool,mongo_statistics.computeDynamicRiskWithUncertaintyMedian) 
 
     rospy.Service(TASK_DURATION_CHART_SERVICE,SetBool,mongo_statistics.taskDurationChart)    

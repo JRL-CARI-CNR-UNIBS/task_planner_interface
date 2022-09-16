@@ -1,1 +1,0 @@
-/usr/bin/clang++ -fPIC -g  -shared -Wl,-soname,libgmock_maind.so -o ../lib/libgmock_maind.so CMakeFiles/gmock_main.dir/src/gmock_main.cc.o  -Wl,-rpath,/home/samuele/projects/planning_ws/src/task-planner-interface/task_planner_interface_msgs/build/gtest/lib ../lib/libgmockd.so ../lib/libgtestd.so -lpthread 

@@ -39,7 +39,8 @@
 *kdev4*
 *.autosave
 
-#file/   #to exclude folder file
+**/file   #to exclude folder file
+
 .vscode/
 !.vscode/settings.json
 !.vscode/tasks.json
