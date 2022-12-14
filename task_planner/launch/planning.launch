@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+
+<launch>
+
+  <!-- General Parameters -->
+  <rosparam command="load" file="$(find task_planner)/config/task_goal_example.yaml" />
+
+
+</launch>
