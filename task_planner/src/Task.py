@@ -8,17 +8,24 @@ class Task:
     type: str
     agents: List[str]
     precedence_constraints: List[str]
-    exp_duration: float = field(default=None, init=False)
-    synergy: Dict[str, float] = field(default=None, init=False)
+    exp_duration: Dict[str, float] = field(default=None, init=False)
+    synergy: Dict[str, Dict[str, float]] = field(default=None, init=False)
 
-    def update_duration(self, duration: float) -> bool:
+    def update_duration(self, agent: str, duration: float) -> bool:
+        assert agent in self.agents
         assert duration > 0
+
+        if self.exp_duration is None:
+            self.exp_duration = {}
         if duration < 0:
             return False
-        self.exp_duration = duration
+        if agent not in self.agents:
+            return False
+
+        self.exp_duration[agent] = duration
         return True
 
-    def update_synergy(self, synergy: List[float]) -> None:
+    def update_synergy(self, synergy: Dict[str, float]) -> None:
         self.synergy = synergy
 
     def update_agents(self, agents: List[str]) -> None:
@@ -41,7 +48,8 @@ class Task:
 
     def get_id(self) -> str:
         return self.id
-
+    def get_type(self) -> str:
+        return self.type
     def get_agents(self) -> List[str]:
         return self.agents
 
