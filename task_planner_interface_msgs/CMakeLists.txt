@@ -14,6 +14,8 @@ add_message_files(
   MotionTaskExecutionFeedback.msg
   MotionTaskExecutionRequest.msg
   MotionTaskExecutionRequestArray.msg
+  TaskAgents.msg
+  TaskStatistics.msg
 )
 
 add_service_files(
@@ -23,10 +25,12 @@ add_service_files(
   BasicSkill.srv
   PickPlaceSkill.srv
   PauseSkill.srv
+  TasksInformation.srv
+  TasksStatistics.srv
 )
 add_action_files(
   DIRECTORY action
-  FILES 
+  FILES
   TaskExecute.action
 )
 generate_messages(

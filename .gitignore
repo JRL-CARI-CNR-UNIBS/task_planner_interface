@@ -47,3 +47,8 @@
 !.vscode/launch.json
 !.vscode/extensions.json
 !.vscode/*.code-snippets
+
+ __pycache__/
+ *.pyc
+ **/__pycache__
+**/*.pyc
