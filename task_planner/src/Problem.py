@@ -109,4 +109,7 @@ class Problem:
         return combinations
 
     def get_tasks_list(self) -> List[str]:
-        return [task.get_type() for task in self.task_list]
+        return [task.get_id() for task in self.task_list]
+
+    def get_agents(self):
+        return self.agents

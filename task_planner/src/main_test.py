@@ -2,6 +2,7 @@ import rospy
 from utils import *
 from Task import Task
 from Problem import Problem
+from TaskPlanner import TaskPlanner
 
 
 def main():
@@ -13,7 +14,7 @@ def main():
         rospy.logerr(UserMessages.PARAM_NOT_DEFINED_ERROR.value.format("goal"))
         return 0
 
-    problem_to_solve = Problem()
+    problem_to_solve = Problem(["human_right_arm", "ur5_on_guide"])
     for task in task_goal:
         assert len(task.keys()) == 1
         if len(task.keys()) != 1:
@@ -36,6 +37,8 @@ def main():
     problem_to_solve.fill_task_agents()
     problem_to_solve.update_tasks_statistics()
     print(problem_to_solve)
+    tp = TaskPlanner("Task_Planning&Scheduling", problem_to_solve)
+    tp.create_model()
     # rospy.loginfo(f"Consistency Check: {problem_to_solve.consistency_check()}")
 
 
