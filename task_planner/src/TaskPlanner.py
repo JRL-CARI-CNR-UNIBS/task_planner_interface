@@ -1,15 +1,15 @@
 from Problem import Problem
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import List, Dict, Optional
 
 import gurobipy as gp
-
 
 @dataclass
 class TaskPlanner:
     name: str
     problem_definition: Problem
     model: gp.Model = field(init=False)
+    decision_variables: Dict[str,gp.tupledict] = field(init=False)
 
     def initialize(self):
         e = gp.Env(empty=True)
@@ -23,11 +23,15 @@ class TaskPlanner:
         self.model = gp.Model(self.name, env=e)
 
     def create_model(self):
-        for task in self.problem_definition:
-            for agent in task.get_agents():     #Note that if empty is a free param, it can be assigned to all existing agents
-                #TODO: Add assignament constraints
-            for precedence_tasks in task.get_precedence_constraints():
-                #TODO: Add precedence constraints
+        agent_task_combination, cost = gp.multidict(self.problem_definition.get_combinations())
+        tasks_list = self.problem_definition.get_tasks_list()
+        self.decision_variables["assignment"] = self.agent_task_combination(agent_task_combination, name = "assign", vtype = gp.GRB.BINARY)
+        # self.decision_variables["t_start"]
+        # for task in self.problem_definition:
+        #     for agent in task.get_agents():     #Note that if empty is a free param, it can be assigned to all existing agents
+        #         #TODO: Add assignament constraints
+        #     for precedence_tasks in task.get_precedence_constraints():
+        #         #TODO: Add precedence constraints
 
     def add_problem(self, problem):
         # self.problem_definition.append(problem)

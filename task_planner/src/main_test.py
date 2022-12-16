@@ -35,7 +35,7 @@ def main():
 
     problem_to_solve.fill_task_agents()
     problem_to_solve.update_tasks_statistics()
-    # print(problem_to_solve)
+    print(problem_to_solve)
     # rospy.loginfo(f"Consistency Check: {problem_to_solve.consistency_check()}")
 
 

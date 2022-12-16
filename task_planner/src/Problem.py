@@ -1,6 +1,6 @@
 from Task import Task
 from dataclasses import dataclass, field
-from typing import List, Dict, Optional
+from typing import List, Dict, Tuple, Optional
 import rospy
 from task_planner_interface_msgs.srv import TaskType, TaskTypeResponse, TasksInformation, TasksInformationResponse, \
     TasksStatistics, TasksStatisticsResponse
@@ -10,6 +10,7 @@ from utils import *
 @dataclass
 class Problem:
     task_list: List[Task] = field(default_factory=list, init=False)
+    agents: List[str]
 
     def __post_init__(self):
         # rospy.wait_for_service('mongo_handler/check_task_type')
@@ -56,9 +57,6 @@ class Problem:
                 return False
         return True
 
-    def _retrieve_task_info(self):
-        pass
-
     def fill_task_agents(self):
         try:
             tasks_info_result = self.get_tasks_info_srv()
@@ -102,4 +100,13 @@ class Problem:
         for task in self.task_list:
             for agent in task.get_agents():
                 task.update_duration(agent, tasks_stasts_dict[task.get_type()][agent]["exp_duration"])
-            print(task)
+
+    def get_combinations(self) -> Dict[Tuple[str, str], str]:
+        combinations = {}
+        for task in self.task_list:
+            for agent in task.get_agents():
+                combinations[(agent, task.get_id())] = task.get_duration(agent)
+        return combinations
+
+    def get_tasks_list(self) -> List[str]:
+        return [task.get_type() for task in self.task_list]

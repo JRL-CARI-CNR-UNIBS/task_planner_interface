@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, overload
 
 
 @dataclass
@@ -31,15 +31,32 @@ class Task:
     def update_agents(self, agents: List[str]) -> None:
         self.agents = agents
 
-    def add_agent(self, agent: List[str]) -> None:
+    def add_agent(self, agent: str) -> None:
         if agent not in self.agents:
             self.agents.append(agent)
 
     def update_precedence_constraints(self) -> None:
         pass
 
-    def get_duration(self) -> float:
-        return self.exp_duration
+    @overload
+    def get_duration(self) -> Dict[str, float]:
+        ...
+
+    @overload
+    def get_duration(self, agent: str) -> float:
+        ...
+
+    def get_duration(self, *args):
+        if len(args) == 1 and isinstance(args[0], str):
+            agent = args[0]
+            assert agent in self.agents
+            if agent not in self.agents:
+                raise Exception
+            return self.exp_duration[agent]
+        elif len(args) == 0:
+            return self.exp_duration
+        else:
+            raise NotImplemented
 
     def get_synergy(self, task: str) -> Optional[str]:
         if task in self.synergy:
@@ -48,8 +65,10 @@ class Task:
 
     def get_id(self) -> str:
         return self.id
+
     def get_type(self) -> str:
         return self.type
+
     def get_agents(self) -> List[str]:
         return self.agents
 
