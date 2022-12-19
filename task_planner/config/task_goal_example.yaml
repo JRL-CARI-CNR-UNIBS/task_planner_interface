@@ -50,6 +50,10 @@ goal:
       required_agents: []
       precedence_constraints: []
 
+  - prova2:
+      task_name: prova
+      required_agents: ["human_right_arm","ur5_on_guide"]
+      precedence_constraints: []
  # - pick_orange_box: 4
  #    precedence_constraints: []
  # - place_orange_box: 4

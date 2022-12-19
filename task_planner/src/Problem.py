@@ -63,19 +63,20 @@ class Problem:
         except rospy.ServiceException as e:
             rospy.logerr(UserMessages.SERVICE_FAILED)
             return False
-        # print(tasks_info_result)
+
+        # Retrieve agents-task ability
         # task_agents_correspondence = {task_info.name: task_info.agents for task_info in tasks_info_result.tasks_info}
         task_agents_correspondence = {}
         for task_info in tasks_info_result.tasks_info:
             task_agents_correspondence[task_info.name] = task_info.agents
 
         for task in self.task_list:
-            if not task.get_agents():  # Empty
+            if not task.get_agents():  # Empty => Take mongoDB agents
                 task.update_agents(task_agents_correspondence[task.get_type()])
             else:
-                # Check if the specified agent can actually perform it
+                # Check if the specified agent (in task goal) can actually perform it
                 # if not all(required_agent in task_agents_correspondence[task.get_type()] for required_agent in task.get_agents()):
-                for required_agent in task.get_agents():
+                for required_agent in task.get_agents_constraint():
                     if required_agent not in task_agents_correspondence[task.get_type()]:
                         rospy.loginfo(
                             f"{Color.RED.value}The specified agent: {required_agent} cannot perform task: {task.get_id()} {Color.END.value}")
@@ -99,6 +100,13 @@ class Problem:
 
         for task in self.task_list:
             for agent in task.get_agents():
+                if agent not in tasks_stasts_dict[task.get_type()].keys():
+                    print(f"Missing task statistics for: {task}, for agent: {agent}")
+                    return False
+                task.update_duration(agent, tasks_stasts_dict[task.get_type()][agent]["exp_duration"])
+            # Update also statistics for agents present in Knowledge base but not in task-Goal
+            for agent in set(tasks_stasts_dict[task.get_type()].keys()).difference({*task.get_agents()}):    # Agents in KnowledgeBase but not specified in Task-Goal
+                print(agent)
                 task.update_duration(agent, tasks_stasts_dict[task.get_type()][agent]["exp_duration"])
 
     def get_combinations(self) -> Dict[Tuple[str, str], str]:
