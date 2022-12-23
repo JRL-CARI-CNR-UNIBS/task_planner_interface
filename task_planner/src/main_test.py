@@ -36,9 +36,19 @@ def main():
 
     problem_to_solve.fill_task_agents()
     problem_to_solve.update_tasks_statistics()
-    print(problem_to_solve)
+    print("------------")
+    print(problem_to_solve.get_combinations())
+    # print(problem_to_solve)
     tp = TaskPlanner("Task_Planning&Scheduling", problem_to_solve)
+    tp.initialize()
     tp.create_model()
+    tp.add_precedence_constraints()
+    print(tp.check_feasibility())
+    # tp.add_constraints()
+    tp.add_constraints()
+    tp.set_objective()
+    print(tp.check_feasibility())
+    tp.solve()
     # rospy.loginfo(f"Consistency Check: {problem_to_solve.consistency_check()}")
 
 

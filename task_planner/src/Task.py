@@ -13,8 +13,8 @@ class Task:
     synergy: Dict[str, Dict[str, float]] = field(default=None, init=False)
 
     def update_duration(self, agent: str, duration: float) -> bool:
-        assert agent is not None
-        if agent is None:
+        assert self.agents is not None
+        if self.agents is None:
             print(f"Empy agents List")
             return False
         assert agent in self.agents
@@ -36,8 +36,10 @@ class Task:
 
     def update_agents(self, agents: List[str]) -> None:
         self.agents = agents
+
     def update_agents_constraint(self, agents: List[str]) -> None:
         self.agents_constraint = agents
+
     def add_agent(self, agent: str) -> None:
         if agent not in self.agents:
             self.agents.append(agent)
@@ -79,8 +81,10 @@ class Task:
 
     def get_agents(self) -> List[str]:
         return self.agents
+
     def get_agents_constraint(self) -> List[str]:
         return self.agents_constraint
+
     def get_precedence_constraints(self) -> Optional[str]:
         return self.precedence_constraints
 
@@ -88,3 +92,6 @@ class Task:
         if task in self.precedence_constraints:
             return True
         return False
+
+    def get_max_duration(self) -> float:
+        return max(self.exp_duration.values())

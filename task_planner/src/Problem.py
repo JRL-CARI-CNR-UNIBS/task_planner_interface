@@ -40,11 +40,11 @@ class Problem:
                     rospy.loginfo(f"The precedence task: {precedence_task}, of task: {task.get_id()}, does not exist.")
                     return False
 
-                # Check if loop constraints
-                if task.get_id() in tasks_dict[precedence_task].get_precedence_constraints():
-                    rospy.loginfo(f"Loop constraints between: {task.get_id()}, and: {task.get_id()}.")
-                    return False
-
+                # Check if loop constraints : REMOVED MADE IN Task Planner
+            #         if task.get_id() in tasks_dict[precedence_task].get_precedence_constraints():
+            #             rospy.loginfo(f"Loop constraints between: {task.get_id()}, and: {task.get_id()}.")
+            #             return False
+            # # TODO: A after B, B after C, C after A.
             # Check if all task type exist
             try:
                 task_check_result = self.task_check_srv(task.get_type())
@@ -105,9 +105,9 @@ class Problem:
                     return False
                 task.update_duration(agent, tasks_stasts_dict[task.get_type()][agent]["exp_duration"])
             # Update also statistics for agents present in Knowledge base but not in task-Goal
-            for agent in set(tasks_stasts_dict[task.get_type()].keys()).difference({*task.get_agents()}):    # Agents in KnowledgeBase but not specified in Task-Goal
-                print(agent)
-                task.update_duration(agent, tasks_stasts_dict[task.get_type()][agent]["exp_duration"])
+            # for agent in set(tasks_stasts_dict[task.get_type()].keys()).difference({*task.get_agents()}):    # Agents in KnowledgeBase but not specified in Task-Goal
+            #     print(agent)
+            #     task.update_duration(agent, tasks_stasts_dict[task.get_type()][agent]["exp_duration"])
 
     def get_combinations(self) -> Dict[Tuple[str, str], str]:
         combinations = {}
@@ -121,3 +121,21 @@ class Problem:
 
     def get_agents(self):
         return self.agents
+
+    def get_nominal_upper_bound(self) -> float:
+        return sum([task.get_max_duration() for task in self.task_list])
+
+    def get_precedence_constraints(self):
+        precedence_constraints = {}
+        for task in self.task_list:
+            precedence_constraints[task.get_id()] = task.get_precedence_constraints()
+        return precedence_constraints
+
+    def get_tasks_per_agent(self):
+        tasks_per_agent = {}
+        for task in self.task_list:
+            for agent in task.get_agents():
+                if agent not in tasks_per_agent:
+                    tasks_per_agent[agent] = []
+                tasks_per_agent[agent].append(task.get_id())
+        return tasks_per_agent
