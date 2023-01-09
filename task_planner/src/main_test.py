@@ -49,6 +49,7 @@ def main():
     tp.set_objective()
     print(tp.check_feasibility())
     tp.solve()
+    show_timeline(tp.get_solution())
     # rospy.loginfo(f"Consistency Check: {problem_to_solve.consistency_check()}")
 
 

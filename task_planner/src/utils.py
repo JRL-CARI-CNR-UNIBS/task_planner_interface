@@ -1,5 +1,12 @@
 from enum import Enum
 
+from Task import TaskSolution
+from typing import List
+import pandas as pd
+from datetime import datetime
+import plotly.express as px
+import plotly.express as px
+
 
 class Color(Enum):
     """
@@ -44,3 +51,15 @@ class UserMessages(Enum):
     CONNECTION_LOST = Color.RED.value + "Connection to Database lost" + Color.END.value
     UPDATE_OK = Color.GREEN.value + "Update performed correctly" + Color.END.value
 
+
+def show_timeline(problem_solution: List[TaskSolution]) -> None:
+    solution = []
+    for task in problem_solution:
+        solution.append(dict(Task=task.get_id(),
+                             Start=datetime.fromtimestamp(task.get_start_time()).strftime("2020-04-06 %I:%M:%S"),
+                             Finish=datetime.fromtimestamp(task.get_end_time()).strftime("2020-04-06 %I:%M:%S"),
+                             Agents=task.get_assignment()))
+    df = pd.DataFrame(solution)
+    fig = px.timeline(df, x_start="Start", x_end="Finish", y="Agents", color="Task", title="TimeLine")
+    fig.update_layout(xaxis_title="Time")
+    fig.show()

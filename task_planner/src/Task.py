@@ -3,6 +3,38 @@ from typing import List, Dict, Optional, overload
 
 
 @dataclass
+class TaskSolution:
+    id: str
+    t_start: float
+    t_end: float
+    assignment: str
+
+    def __post_init__(self):
+        if self.t_end < 0 or self.t_start < 0 or self.t_end < self.t_start:
+            raise ValueError
+
+    # def set_start_time(self, t_start: float) -> None:
+    #     self.t_start = t_start
+    #
+    # def set_end_time(self, t_end: float) -> None:
+    #     self.t_end = t_end
+    #
+    # def set_assignment(self, assignment: str) -> None:
+    #     self.assignment = assignment
+
+    def get_id(self) -> str:
+        return self.id
+    def get_start_time(self) -> float:
+        return self.t_start
+
+    def get_end_time(self) -> float:
+        return self.t_end
+
+    def get_assignment(self) -> str:
+        return self.assignment
+
+
+@dataclass
 class Task:
     id: str
     type: str

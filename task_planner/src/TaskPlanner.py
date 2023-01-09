@@ -1,4 +1,8 @@
+import gurobipy
+
 from Problem import Problem
+from Task import TaskSolution
+
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional
 
@@ -19,6 +23,8 @@ class TaskPlanner:
     use_synergy: bool = False
     alpha: float = 0.0
 
+    solution: Dict[str, float] = field(default=None, init=False)
+
     def initialize(self):
         e = gp.Env(empty=True)
         if False:
@@ -31,7 +37,7 @@ class TaskPlanner:
         self.model = gp.Model(self.name, env=e)
         self.decision_variables = {}
 
-    def create_model(self):
+    def create_model(self) -> None:
         agent_task_combination, cost = gp.multidict(self.problem_definition.get_combinations())
         tasks_list = self.problem_definition.get_tasks_list()
 
@@ -86,13 +92,12 @@ class TaskPlanner:
                                                                   lb=-gp.GRB.INFINITY,
                                                                   ub=gp.GRB.INFINITY)
 
-    def add_constraints(self):
+    def add_constraints(self) -> None:
         for couple_of_tasks, agent in self.decision_variables["delta_ij"]:
             # Utility variable
             task_i = couple_of_tasks[0]
             task_j = couple_of_tasks[1]
             agent = agent
-
 
             # other_agent = {*self.agents}.difference({agent})
             t_start_i = self.decision_variables["t_start"][task_i]
@@ -117,7 +122,7 @@ class TaskPlanner:
             self.model.addConstr((assigned_both == 1) >> (t_start_i >= t_end_j - BIG_M * (1 - delta_ij)))
             self.model.addConstr((assigned_both == 1) >> (t_start_j >= t_end_i - BIG_M * delta_ij))
 
-    def set_objective(self):
+    def set_objective(self) -> None:
         # Makespan
         makespan = self.model.addVar(name="makespan", vtype=gp.GRB.CONTINUOUS)
 
@@ -125,23 +130,37 @@ class TaskPlanner:
 
         # Objective function
         self.model.setObjective(makespan, gp.GRB.MINIMIZE)
+        self.model.write('MODEL.lp')
 
-    def solve(self):
+    def solve(self) -> None:
         # Optimization
         self.model.params.NonConvex = 2
         self.model.optimize()
-        self.model.write('MODEL.lp')
-        for v in self.model.getVars():
-            # if v.x > 1e-6:
-            print(v.varName, v.x)
 
-    def add_precedence_constraints(self):
+    def get_solution(self) -> List[TaskSolution]:
+        agents = self.problem_definition.get_agents()
+        task_lists = self.problem_definition.get_tasks_list()
+
+        problem_solution = []
+        for task in task_lists:
+            t_start = self.decision_variables["t_start"][task].X
+            t_end = self.decision_variables["t_end"][task].X
+            # assignments = self.decision_variables["assignment"].select("*", task)
+
+            assignment = None
+            for agent in agents:
+                if self.decision_variables["assignment"].select(agent, task):
+                    assignment = agent
+            problem_solution.append(TaskSolution(task,t_start,t_end,assignment))
+        return problem_solution
+
+    def add_precedence_constraints(self) -> None:
         for task, precedence_tasks in self.problem_definition.get_precedence_constraints().items():
             for precedence_task in precedence_tasks:
                 self.model.addConstr(
                     self.decision_variables["t_start"][task] >= self.decision_variables["t_end"][precedence_task])
 
-    def add_problem(self, problem):
+    def add_problem(self, problem) -> None:
         # self.problem_definition.append(problem)
         self.problem_definition = problem
 
