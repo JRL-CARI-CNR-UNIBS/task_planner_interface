@@ -15,7 +15,6 @@ find_package(catkin REQUIRED COMPONENTS
   task_planner_interface_msgs
   subscription_notifier
   behaviortree_cpp_v3
-  mqtt_scene_integration
 )
 
 ## System dependencies are found with CMake's conventions
@@ -110,7 +109,7 @@ find_package(catkin REQUIRED COMPONENTS
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES ${PROJECT_NAME}
-  CATKIN_DEPENDS roscpp rospy std_msgs subscription_notifier behaviortree_cpp_v3 mqtt_scene_integration
+  CATKIN_DEPENDS roscpp rospy std_msgs subscription_notifier behaviortree_cpp_v3
   DEPENDS
 )
 
@@ -130,7 +129,6 @@ add_library(${PROJECT_NAME}
   src/${PROJECT_NAME}/single_task_dispatcher.cpp
   src/${PROJECT_NAME}/double_task_dispatcher.cpp
   src/${PROJECT_NAME}/wait_agent_feedback.cpp
-  src/${PROJECT_NAME}/trigger_new_piece.cpp
   src/${PROJECT_NAME}/there_is_new_piece.cpp
   src/${PROJECT_NAME}/check_agent_state.cpp
   src/${PROJECT_NAME}/reset_new_piece.cpp

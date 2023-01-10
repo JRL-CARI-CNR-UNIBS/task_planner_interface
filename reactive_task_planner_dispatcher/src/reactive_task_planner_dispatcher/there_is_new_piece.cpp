@@ -16,7 +16,6 @@ ThereIsNewPiece::ThereIsNewPiece(const std::string &name, const BT::NodeConfigur
     ROS_ERROR_STREAM("check_station_srv_name not defined");
     throw BT::RuntimeError("Missing required parameter check_station_srv_name");
   }
-  task_feedback_sub_.reset(new ros_helper::SubscriptionNotifier<mqtt_scene_integration::Fixture> (nh_, trigger_topic_name_,10));
   check_station_srv_client_ = nh_.serviceClient<std_srvs::Trigger>(check_station_srv_name);
 }
 
