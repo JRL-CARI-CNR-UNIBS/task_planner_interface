@@ -15,6 +15,7 @@ def main():
         return 0
 
     problem_to_solve = Problem(["human_right_arm", "ur5_on_guide"])
+    print(type(task_goal))
     for task in task_goal:
         assert len(task.keys()) == 1
         if len(task.keys()) != 1:
@@ -32,23 +33,34 @@ def main():
                         task_properties["required_agents"],
                         task_properties["precedence_constraints"])
         # print(task_obj)
-        problem_to_solve.add_task(task_obj)
-
-    problem_to_solve.fill_task_agents()
+        try:
+            problem_to_solve.add_task(task_obj)
+        except Exception:       #TODO: Specify Excpetion
+            rospy.logerr(UserMessages.TASK_DUPLICATION.value.format(task_id))
+            return 0
+    if not problem_to_solve.fill_task_agents(): #TODO : Manage as exception?
+        return 0
     problem_to_solve.update_tasks_statistics()
-    print("------------")
-    print(problem_to_solve.get_combinations())
-    # print(problem_to_solve)
-    tp = TaskPlanner("Task_Planning&Scheduling", problem_to_solve)
+    rospy.loginfo(f"Consistency Check: {problem_to_solve.consistency_check()}")
+
+    try:
+        tp = TaskPlanner("Task_Planning&Scheduling", problem_to_solve)
+    except ValueError:
+        rospy.logerr(UserMessages.CONSISTENCY_CHECK_FAILED.value)
+        return 0
     tp.initialize()
     tp.create_model()
     tp.add_precedence_constraints()
-    print(tp.check_feasibility())
-    # tp.add_constraints()
+    if not tp.check_feasibility():
+        rospy.logerr(UserMessages.PROBLEM_NOT_FEASIBLE.value.format())
+        return 0
     tp.add_constraints()
     tp.set_objective()
-    print(tp.check_feasibility())
+    if not tp.check_feasibility():
+        rospy.logerr(UserMessages.PROBLEM_NOT_FEASIBLE_DATA.value.format())
+        return 0
     tp.solve()
+    # print(tp.get_solution())
     show_timeline(tp.get_solution())
     # rospy.loginfo(f"Consistency Check: {problem_to_solve.consistency_check()}")
 

@@ -11,6 +11,7 @@ from utils import *
 class Problem:
     task_list: List[Task] = field(default_factory=list, init=False)
     agents: List[str]
+    solution: List[TaskSolution] = field(default_factory=list, init=False)
 
     def __post_init__(self):
         # rospy.wait_for_service('mongo_handler/check_task_type')
@@ -21,7 +22,10 @@ class Problem:
         self.get_tasks_stats_srv = rospy.ServiceProxy("mongo_handler/get_tasks_statistics", TasksStatistics)
 
     def add_task(self, task: Task) -> None:
-        self.task_list.append(task)
+        if task not in self.task_list:
+            self.task_list.append(task)
+        else:
+            raise Exception("Task already present")
 
     def get_task_list_as_dictionary(self) -> Dict[str, Task]:
         return {task.get_id(): task for task in self.task_list}
@@ -37,19 +41,16 @@ class Problem:
             for precedence_task in task.get_precedence_constraints():
                 # Check if exist all precedence constraints among task_ids
                 if precedence_task not in tasks_dict.keys():
-                    rospy.loginfo(f"The precedence task: {precedence_task}, of task: {task.get_id()}, does not exist.")
+                    rospy.logerr(f"The precedence task: {precedence_task}, of task: {task.get_id()}, does not exist.")
                     return False
 
-                # Check if loop constraints : REMOVED MADE IN Task Planner
-            #         if task.get_id() in tasks_dict[precedence_task].get_precedence_constraints():
-            #             rospy.loginfo(f"Loop constraints between: {task.get_id()}, and: {task.get_id()}.")
-            #             return False
-            # # TODO: A after B, B after C, C after A.
+            # Check if loop constraints : Removed from here and put in Task Planner
+
             # Check if all task type exist
             try:
                 task_check_result = self.task_check_srv(task.get_type())
                 if not task_check_result.exist:
-                    rospy.loginfo(
+                    rospy.logerr(
                         f"{Color.RED.value} Type {task.get_type()} not present in Knowledge Base {Color.END.value}")
                     return False
             except rospy.ServiceException as e:
@@ -57,9 +58,9 @@ class Problem:
                 return False
         return True
 
-    def fill_task_agents(self):
+    def fill_task_agents(self) -> bool:
         try:
-            tasks_info_result = self.get_tasks_info_srv()
+            tasks_info_srv_result = self.get_tasks_info_srv()
         except rospy.ServiceException as e:
             rospy.logerr(UserMessages.SERVICE_FAILED)
             return False
@@ -67,19 +68,29 @@ class Problem:
         # Retrieve agents-task ability
         # task_agents_correspondence = {task_info.name: task_info.agents for task_info in tasks_info_result.tasks_info}
         task_agents_correspondence = {}
-        for task_info in tasks_info_result.tasks_info:
+        for task_info in tasks_info_srv_result.tasks_info:
             task_agents_correspondence[task_info.name] = task_info.agents
 
         for task in self.task_list:
             if not task.get_agents():  # Empty => Take mongoDB agents
                 task.update_agents(task_agents_correspondence[task.get_type()])
-            else:
+
+            # Check if the specified agent (in task goal) can actually perform it
+            # if not all(required_agent in task_agents_correspondence[task.get_type()] for required_agent in task.get_agents()):
+            for required_agent in task.get_agents_constraint():
+                # Check if that agent exist at Knowledge-Based
+                if required_agent not in self.agents:
+                    rospy.loginfo(
+                        f"{Color.RED.value}The specified agent: {required_agent}, for task: {task.get_id()},"
+                        f" does not exist {Color.END.value}")
+                    return False
                 # Check if the specified agent (in task goal) can actually perform it
-                # if not all(required_agent in task_agents_correspondence[task.get_type()] for required_agent in task.get_agents()):
-                for required_agent in task.get_agents_constraint():
-                    if required_agent not in task_agents_correspondence[task.get_type()]:
-                        rospy.loginfo(
-                            f"{Color.RED.value}The specified agent: {required_agent} cannot perform task: {task.get_id()} {Color.END.value}")
+                if required_agent not in task_agents_correspondence[task.get_type()]:
+                    rospy.loginfo(
+                        f"{Color.RED.value}The specified agent: {required_agent}, "
+                        f"for task: {task.get_id()}, cannot perform task: {task.get_id()} {Color.END.value}")
+                    return False
+        return True
 
     def update_tasks_statistics(self):
         try:
@@ -139,3 +150,23 @@ class Problem:
                     tasks_per_agent[agent] = []
                 tasks_per_agent[agent].append(task.get_id())
         return tasks_per_agent
+
+    def get_not_enabled_agents_constraints(self):
+        not_enabled_agents = {}
+        for task in self.task_list:
+            not_enabled_agents[task.get_id()] = task.get_not_enabled_agents()
+        print(not_enabled_agents)
+        return not_enabled_agents
+
+    def add_task_solution(self, task_id: str, t_start: float, t_end: float, assignment: str) -> TaskSolution:
+        # Potrebbe essere inutile avere una soluzione nella classe problem
+        for task in self.task_list:
+            if task.get_id() == task_id:
+                task_solution = TaskSolution(task, t_start, t_end, assignment)
+                self.solution.append(task_solution)
+                return task_solution
+        raise Exception("Task not present in problem task list")
+
+    def remove_task(self, task: Task):
+        if task in self.task_list:
+            self.task_list.remove(task)

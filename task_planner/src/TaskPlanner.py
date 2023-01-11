@@ -23,7 +23,9 @@ class TaskPlanner:
     use_synergy: bool = False
     alpha: float = 0.0
 
-    solution: Dict[str, float] = field(default=None, init=False)
+    def __post_init__(self):
+        if self.problem_definition.consistency_check() is not True:
+            raise ValueError("The problem is not consistent. Check it!")
 
     def initialize(self):
         e = gp.Env(empty=True)
@@ -41,15 +43,23 @@ class TaskPlanner:
         agent_task_combination, cost = gp.multidict(self.problem_definition.get_combinations())
         tasks_list = self.problem_definition.get_tasks_list()
 
-        # TODO: Ragionare sulle possibili combination
-
         upper_bound = self.problem_definition.get_nominal_upper_bound() * 2
+
+        # TODO: Ragionare sulle possibili combination
+        tasks_pairs = itertools.combinations(tasks_list, 2)
+        tasks_per_agent = self.problem_definition.get_tasks_per_agent()
+
+        couple_of_tasks_per_agent = \
+            [list(itertools.product(itertools.combinations(tasks_per_agent[agent], 2), [agent])) for agent in
+             tasks_per_agent.keys()]
+        couple_of_tasks_per_agent = [item for sublist in couple_of_tasks_per_agent for item in sublist]
+        # print(couple_of_tasks_per_agent)
 
         # Decision variables
         self.decision_variables["assignment"] = self.model.addVars(agent_task_combination,
                                                                    name="assignment",
                                                                    vtype=gp.GRB.BINARY)
-
+        # print(tasks_list)
         self.decision_variables["t_start"] = self.model.addVars(tasks_list,
                                                                 name="t_start",
                                                                 vtype=gp.GRB.CONTINUOUS,
@@ -58,7 +68,18 @@ class TaskPlanner:
                                                               name="t_end",
                                                               vtype=gp.GRB.CONTINUOUS,
                                                               lb=0, ub=upper_bound)
-        # Build t_end variable
+
+        self.decision_variables["delta_ij"] = self.model.addVars(couple_of_tasks_per_agent,
+                                                                 name="same_agent",
+                                                                 vtype=gp.GRB.BINARY)
+
+        if self.use_synergy:
+            self.decision_variables["overlapping"] = self.addVars(tasks_pairs,
+                                                                  name="overlapping",
+                                                                  vtype=gp.GRB.CONTINUOUS,
+                                                                  lb=-gp.GRB.INFINITY,
+                                                                  ub=gp.GRB.INFINITY)
+        # Tend constraints
         t_end = {}
         for agent, task in agent_task_combination:
             if task not in t_end:
@@ -70,27 +91,15 @@ class TaskPlanner:
 
         # Unique task-agent assignment
         self.model.addConstrs(
-            (self.decision_variables["assignment"].sum('*', task) == 1 for task in tasks_list), name='Tasks')
+            (self.decision_variables["assignment"].sum('*', task) == 1 for task in tasks_list),
+            name='unique_assignment')
 
-        tasks_pairs = itertools.combinations(tasks_list, 2)
-        tasks_per_agent = self.problem_definition.get_tasks_per_agent()
-
-        couple_of_tasks_per_agent = \
-            [list(itertools.product(itertools.combinations(tasks_per_agent[agent], 2), [agent])) for agent in
-             tasks_per_agent.keys()]
-        couple_of_tasks_per_agent = [item for sublist in couple_of_tasks_per_agent for item in sublist]
-
-        print(couple_of_tasks_per_agent)
-        self.decision_variables["delta_ij"] = self.model.addVars(couple_of_tasks_per_agent,
-                                                                 name="same_agent",
-                                                                 vtype=gp.GRB.BINARY)
-
-        if self.use_synergy:
-            self.decision_variables["overlapping"] = self.addVars(tasks_pairs,
-                                                                  name="overlapping",
-                                                                  vtype=gp.GRB.CONTINUOUS,
-                                                                  lb=-gp.GRB.INFINITY,
-                                                                  ub=gp.GRB.INFINITY)
+        # Assignments constraints
+        for task, not_enabled_agents in self.problem_definition.get_not_enabled_agents_constraints().items():
+            print(task, not_enabled_agents)
+            for agent in not_enabled_agents:
+                self.model.addConstr(self.decision_variables["assignment"][(agent, task)] == 0,
+                                     name=f'not_enabled_assignment_{task}')
 
     def add_constraints(self) -> None:
         for couple_of_tasks, agent in self.decision_variables["delta_ij"]:
@@ -149,16 +158,26 @@ class TaskPlanner:
 
             assignment = None
             for agent in agents:
-                if self.decision_variables["assignment"].select(agent, task):
-                    assignment = agent
-            problem_solution.append(TaskSolution(task,t_start,t_end,assignment))
+                decision_variable = self.decision_variables["assignment"].select(agent, task)
+                if decision_variable:
+                    assert len(decision_variable) == 1
+                    if len(decision_variable) == 1 and decision_variable[0].X == 1:  # if len(decision_variable) == 1 and decision_variable[0].X == 1:
+                        assignment = agent
+            try:
+                task_solution = self.problem_definition.add_task_solution(task, t_start, t_end, assignment)
+            except Exception:
+                print(f"Error during solution filling")
+                raise Exception(f"{task}, not presence in problem task list")
+            problem_solution.append(task_solution)
         return problem_solution
 
     def add_precedence_constraints(self) -> None:
         for task, precedence_tasks in self.problem_definition.get_precedence_constraints().items():
             for precedence_task in precedence_tasks:
+                # print(self.decision_variables["t_start"])
+                # print(self.decision_variables["t_end"])
                 self.model.addConstr(
-                    self.decision_variables["t_start"][task] >= self.decision_variables["t_end"][precedence_task])
+                    self.decision_variables["t_start"][task] == self.decision_variables["t_end"][precedence_task])
 
     def add_problem(self, problem) -> None:
         # self.problem_definition.append(problem)
@@ -168,7 +187,7 @@ class TaskPlanner:
         try:
             self.model.computeIIS()
             if self.model.status == gp.GRB.INFEASIBLE:
-                print(f"Precedence constraints infeasible")
+                # print(f"Precedence constraints infeasible")
                 for constraint in self.model.getConstrs():
                     if constraint.IISConstr:
                         print(f"{self.model.getRow(constraint)} {constraint.Sense} {constraint.RHS}")
