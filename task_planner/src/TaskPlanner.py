@@ -1,5 +1,3 @@
-import gurobipy
-
 from Problem import Problem
 from Task import TaskSolution
 
@@ -21,7 +19,8 @@ class TaskPlanner:
     decision_variables: Dict[str, gp.tupledict] = field(init=False)
 
     use_synergy: bool = False
-    alpha: float = 0.0
+
+    # alpha: float = 0.0
 
     def __post_init__(self):
         if self.problem_definition.consistency_check() is not True:
@@ -74,11 +73,11 @@ class TaskPlanner:
                                                                  vtype=gp.GRB.BINARY)
 
         if self.use_synergy:
-            self.decision_variables["overlapping"] = self.addVars(tasks_pairs,
-                                                                  name="overlapping",
-                                                                  vtype=gp.GRB.CONTINUOUS,
-                                                                  lb=-gp.GRB.INFINITY,
-                                                                  ub=gp.GRB.INFINITY)
+            self.decision_variables["overlapping"] = self.model.addVars(tasks_pairs,
+                                                                        name="overlapping",
+                                                                        vtype=gp.GRB.CONTINUOUS,
+                                                                        lb=-gp.GRB.INFINITY,
+                                                                        ub=gp.GRB.INFINITY)
         # Tend constraints
         t_end = {}
         for agent, task in agent_task_combination:
@@ -101,7 +100,7 @@ class TaskPlanner:
                 self.model.addConstr(self.decision_variables["assignment"][(agent, task)] == 0,
                                      name=f'not_enabled_assignment_{task}')
 
-    def add_constraints(self) -> None:
+    def add_general_constraints(self) -> None:
         for couple_of_tasks, agent in self.decision_variables["delta_ij"]:
             # Utility variable
             task_i = couple_of_tasks[0]
@@ -161,10 +160,12 @@ class TaskPlanner:
                 decision_variable = self.decision_variables["assignment"].select(agent, task)
                 if decision_variable:
                     assert len(decision_variable) == 1
-                    if len(decision_variable) == 1 and decision_variable[0].X == 1:  # if len(decision_variable) == 1 and decision_variable[0].X == 1:
+                    if len(decision_variable) == 1 and decision_variable[
+                        0].X == 1:  # if len(decision_variable) == 1 and decision_variable[0].X == 1:
                         assignment = agent
             try:
                 task_solution = self.problem_definition.add_task_solution(task, t_start, t_end, assignment)
+                print(task_solution)
             except Exception:
                 print(f"Error during solution filling")
                 raise Exception(f"{task}, not presence in problem task list")

@@ -4,7 +4,6 @@ from Task import Task
 from Problem import Problem
 from TaskPlanner import TaskPlanner
 
-
 def main():
     rospy.init_node("task_planner")
 

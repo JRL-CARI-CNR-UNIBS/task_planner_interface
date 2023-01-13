@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional, overload
 
+
 @dataclass
 class Task:
     id: str
@@ -106,6 +107,8 @@ class Task:
 
     def __hash__(self):
         return hash(self.id)
+
+
 @dataclass
 class TaskSolution:
     task: Task
@@ -137,3 +140,6 @@ class TaskSolution:
 
     def get_assignment(self) -> str:
         return self.assignment
+
+    def __repr__(self):
+        return f"{self.task.get_id()}, t_start: {self.t_start}, t_end: {self.t_end}, by: {self.assignment}"
