@@ -31,8 +31,15 @@ class Task:
         self.exp_duration[agent] = duration
         return True
 
-    def update_synergy(self, synergy: Dict[str, float]) -> None:
-        self.synergy = synergy
+    def update_synergy(self, agent, synergies: Dict[str, float]) -> None:
+        if agent not in self.agents:
+            raise Exception(f"Agent {agent} is not defined for task: {self.task_id}")
+        if agent not in self.synergy:
+            self.synergy[agent] = dict()
+        for synergy_info in synergies:
+            # TODO: Da capire cosa fare qui e cosa fare in problem.
+            #self.synergy[agent][] = synergies     #TODO: .COPY() ???
+        print(self.synergy)
 
     def update_agents(self, agents: List[str]) -> None:
         self.agents = agents

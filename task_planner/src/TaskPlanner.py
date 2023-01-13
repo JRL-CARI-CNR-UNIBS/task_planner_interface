@@ -72,22 +72,17 @@ class TaskPlanner:
                                                                  name="same_agent",
                                                                  vtype=gp.GRB.BINARY)
 
-        if self.use_synergy:
-            self.decision_variables["overlapping"] = self.model.addVars(tasks_pairs,
-                                                                        name="overlapping",
-                                                                        vtype=gp.GRB.CONTINUOUS,
-                                                                        lb=-gp.GRB.INFINITY,
-                                                                        ub=gp.GRB.INFINITY)
-        # Tend constraints
-        t_end = {}
-        for agent, task in agent_task_combination:
-            if task not in t_end:
-                t_end[task] = self.decision_variables["t_start"][task]
-            t_end[task] += self.decision_variables["assignment"][(agent, task)] * cost[(agent, task)]
+        self.add_t_end_constraints(agent_task_combination, cost)
+        self.add_assignment_constraints(tasks_list)
 
-        [self.model.addConstr(
-            self.decision_variables["t_end"][task] == t_end_value) for task, t_end_value in t_end.items()]
+        # if self.use_synergy:
+        #     self.decision_variables["overlapping"] = self.model.addVars(tasks_pairs,
+        #                                                                 name="overlapping",
+        #                                                                 vtype=gp.GRB.CONTINUOUS,
+        #                                                                 lb=-gp.GRB.INFINITY,
+        #                                                                 ub=gp.GRB.INFINITY)
 
+    def add_assignment_constraints(self, tasks_list):
         # Unique task-agent assignment
         self.model.addConstrs(
             (self.decision_variables["assignment"].sum('*', task) == 1 for task in tasks_list),
@@ -99,6 +94,17 @@ class TaskPlanner:
             for agent in not_enabled_agents:
                 self.model.addConstr(self.decision_variables["assignment"][(agent, task)] == 0,
                                      name=f'not_enabled_assignment_{task}')
+
+    def add_t_end_constraints(self, agent_task_combination, cost) -> None:
+        # Tend constraints
+        t_end = {}
+        for agent, task in agent_task_combination:
+            if task not in t_end:
+                t_end[task] = self.decision_variables["t_start"][task]
+            t_end[task] += self.decision_variables["assignment"][(agent, task)] * cost[(agent, task)]
+
+        [self.model.addConstr(
+            self.decision_variables["t_end"][task] == t_end_value) for task, t_end_value in t_end.items()]
 
     def add_general_constraints(self) -> None:
         for couple_of_tasks, agent in self.decision_variables["delta_ij"]:

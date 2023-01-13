@@ -4,6 +4,7 @@ from typing import List, Dict, Tuple, Optional
 import rospy
 from task_planner_interface_msgs.srv import TaskType, TaskTypeResponse, TasksInformation, TasksInformationResponse, \
     TasksStatistics, TasksStatisticsResponse
+from task_planner_statistics.srv import TaskSynergies, TaskSynergiesResponse
 from utils import *
 
 
@@ -20,6 +21,7 @@ class Problem:
         self.task_check_srv = rospy.ServiceProxy("mongo_handler/check_task_type", TaskType)
         self.get_tasks_info_srv = rospy.ServiceProxy("mongo_handler/get_task_agents", TasksInformation)
         self.get_tasks_stats_srv = rospy.ServiceProxy("mongo_handler/get_tasks_statistics", TasksStatistics)
+        self.get_task_synergies_srv = rospy.ServiceProxy("mongo_statistics/get_task_synergies", Task)
 
     def add_task(self, task: Task) -> None:
         if task not in self.task_list:
@@ -119,6 +121,26 @@ class Problem:
             # for agent in set(tasks_stasts_dict[task.get_type()].keys()).difference({*task.get_agents()}):    # Agents in KnowledgeBase but not specified in Task-Goal
             #     print(agent)
             #     task.update_duration(agent, tasks_stasts_dict[task.get_type()][agent]["exp_duration"])
+    def update_tasks_synergy(self):
+        synergy_values = dict()
+        for task in self.task_list:
+            task_type = task.get_type()
+            task_agents = self.get_agents()
+            for agent in task_agents:
+
+                if task not in synergy_values:
+                    if agent not in synergy_values[task]:
+                        #TODO: RAGIONARCI
+
+                task_synergies_request = TaskSynergies()
+                task_synergies_request.task_name = task
+                task_synergies_request.agent = agent
+
+                try:
+                    task_synergies_result = self.get_task_synergies_srv(task_synergies_request)
+                except rospy.ServiceException as e:
+                    rospy.logerr(UserMessages.SERVICE_FAILED)
+                    return False
 
     def get_combinations(self) -> Dict[Tuple[str, str], str]:
         combinations = {}
@@ -170,3 +192,7 @@ class Problem:
     def remove_task(self, task: Task):
         if task in self.task_list:
             self.task_list.remove(task)
+
+    def get_tasks_synergy(self):
+        pass
+        #TODO: Finire
