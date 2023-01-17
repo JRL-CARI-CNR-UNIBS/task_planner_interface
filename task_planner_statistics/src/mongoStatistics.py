@@ -1847,7 +1847,7 @@ class MongoStatistics:
         return SetBoolResponse(True, SUCCESSFUL)
 
     def getTaskSynergy(self, request):
-        rospy.loginfo(SERVICE_CALLBACK.format(""))
+        rospy.loginfo(SERVICE_CALLBACK.format("get_task_synergies"))
 
         synergies_response = TaskSynergiesResponse()
         synergies_response.synergies = []
@@ -1874,6 +1874,7 @@ class MongoStatistics:
                 task_synergy.synergy = single_task_synergy["dynamic_risk"]
                 task_synergy.std_err = single_task_synergy["std_err"]
                 task_synergy.success_rate = single_task_synergy["success_rate"]
+                #TODO: Before append check that is unique
                 synergies_response.synergies.append(task_synergy)
         except pymongo.errors.AutoReconnect:  # Db connection failed
             rospy.logerr(CONNECTION_LOST)

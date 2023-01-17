@@ -4,7 +4,7 @@ from typing import List, Dict, Tuple, Optional
 import rospy
 from task_planner_interface_msgs.srv import TaskType, TaskTypeResponse, TasksInformation, TasksInformationResponse, \
     TasksStatistics, TasksStatisticsResponse
-from task_planner_statistics.srv import TaskSynergies, TaskSynergiesResponse
+from task_planner_statistics.srv import TaskSynergies, TaskSynergiesRequest, TaskSynergiesResponse
 from utils import *
 
 
@@ -18,10 +18,12 @@ class Problem:
         # rospy.wait_for_service('mongo_handler/check_task_type')
         # rospy.wait_for_service('mongo_handler/get_task_agents')
         # rospy.wait_for_service('mongo_handler/get_tasks_statistics')
+        # rospy.wait_for_service('mongo_statistics/get_task_synergies')
+
         self.task_check_srv = rospy.ServiceProxy("mongo_handler/check_task_type", TaskType)
         self.get_tasks_info_srv = rospy.ServiceProxy("mongo_handler/get_task_agents", TasksInformation)
         self.get_tasks_stats_srv = rospy.ServiceProxy("mongo_handler/get_tasks_statistics", TasksStatistics)
-        self.get_task_synergies_srv = rospy.ServiceProxy("mongo_statistics/get_task_synergies", Task)
+        self.get_task_synergies_srv = rospy.ServiceProxy("mongo_statistics/get_task_synergies", TaskSynergies)
 
     def add_task(self, task: Task) -> None:
         if task not in self.task_list:
@@ -56,7 +58,7 @@ class Problem:
                         f"{Color.RED.value} Type {task.get_type()} not present in Knowledge Base {Color.END.value}")
                     return False
             except rospy.ServiceException as e:
-                rospy.logerr(UserMessages.SERVICE_FAILED)
+                rospy.logerr(UserMessages.SERVICE_FAILED.value.format("check_task_type"))
                 return False
         return True
 
@@ -64,7 +66,7 @@ class Problem:
         try:
             tasks_info_srv_result = self.get_tasks_info_srv()
         except rospy.ServiceException as e:
-            rospy.logerr(UserMessages.SERVICE_FAILED)
+            rospy.logerr(UserMessages.SERVICE_FAILED.value.format("get_task_agents"))
             return False
 
         # Retrieve agents-task ability
@@ -98,7 +100,7 @@ class Problem:
         try:
             tasks_stats_result = self.get_tasks_stats_srv()
         except rospy.ServiceException as e:
-            rospy.logerr(UserMessages.SERVICE_FAILED)
+            rospy.logerr(UserMessages.SERVICE_FAILED.value.format("get_tasks_statistics"))
             return False
         # utils: tasks_stasts_dict : {task_name: {agent1: {stats}, agent2: {stats}}}
         tasks_stasts_dict = {}
@@ -117,30 +119,38 @@ class Problem:
                     print(f"Missing task statistics for: {task}, for agent: {agent}")
                     return False
                 task.update_duration(agent, tasks_stasts_dict[task.get_type()][agent]["exp_duration"])
+                # TODO: In future will be usefull store also duration_std
             # Update also statistics for agents present in Knowledge base but not in task-Goal
             # for agent in set(tasks_stasts_dict[task.get_type()].keys()).difference({*task.get_agents()}):    # Agents in KnowledgeBase but not specified in Task-Goal
             #     print(agent)
             #     task.update_duration(agent, tasks_stasts_dict[task.get_type()][agent]["exp_duration"])
+
     def update_tasks_synergy(self):
-        synergy_values = dict()
         for task in self.task_list:
             task_type = task.get_type()
-            task_agents = self.get_agents()
+            task_agents = task.get_agents()
             for agent in task_agents:
-
-                if task not in synergy_values:
-                    if agent not in synergy_values[task]:
-                        #TODO: RAGIONARCI
-
-                task_synergies_request = TaskSynergies()
-                task_synergies_request.task_name = task
+                task_synergies_request = TaskSynergiesRequest()
+                task_synergies_request.task_name = task_type
                 task_synergies_request.agent = agent
-
                 try:
                     task_synergies_result = self.get_task_synergies_srv(task_synergies_request)
                 except rospy.ServiceException as e:
-                    rospy.logerr(UserMessages.SERVICE_FAILED)
+                    rospy.logerr(UserMessages.SERVICE_FAILED.value.format("get_task_synergies"))
                     return False
+                synergies = task_synergies_result.synergies
+                synergies_dict = dict()
+                for task_synergy in synergies:
+                    assert task_synergy.agent is not agent
+                    if task_synergy.agent not in synergies_dict:
+                        synergies_dict[task_synergy.agent] = dict()
+                    synergies_dict[task_synergy.agent][task_synergy.task_name] = task_synergy.synergy
+                for parallel_agent in synergies_dict:
+                    task.update_synergy(parallel_agent, synergies_dict[parallel_agent])
+
+                # TODO: Is better to store as an object with all the info. Can i recycle TaskSynergy message? But i cannot add method.
+                # task_synergy.std_err
+                # task_synergy.success_rate
 
     def get_combinations(self) -> Dict[Tuple[str, str], str]:
         combinations = {}
@@ -195,4 +205,4 @@ class Problem:
 
     def get_tasks_synergy(self):
         pass
-        #TODO: Finire
+        # TODO: Finire

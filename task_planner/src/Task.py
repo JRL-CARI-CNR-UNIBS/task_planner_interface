@@ -10,7 +10,7 @@ class Task:
     agents_constraint: List[str]
     precedence_constraints: List[str]
     exp_duration: Dict[str, float] = field(default=None, init=False)
-    synergy: Dict[str, Dict[str, float]] = field(default=None, init=False)
+    synergy: Dict[str, Dict[str, float]] = field(default_factory=dict, init=False)
 
     def update_duration(self, agent: str, duration: float) -> bool:
         assert self.agents is not None
@@ -32,14 +32,20 @@ class Task:
         return True
 
     def update_synergy(self, agent, synergies: Dict[str, float]) -> None:
-        if agent not in self.agents:
-            raise Exception(f"Agent {agent} is not defined for task: {self.task_id}")
-        if agent not in self.synergy:
-            self.synergy[agent] = dict()
-        for synergy_info in synergies:
+        # if agent not in self.agents:
+        #     raise Exception(f"Agent {agent} is not defined for task: {self.id}")
+        # if not any([agent in synergies.keys() for agent in self.agents]):
+        #     raise Exception(f"Synergy dict not defined for all task agents")
+        self.synergy[agent] = synergies
+        # print(self.type)
+        # print(self.synergy)
+        # for synergy_info in synergies:
             # TODO: Da capire cosa fare qui e cosa fare in problem.
+            # Alternative solutions: pass only one synergy as single dict {name:, synergy}
+            #                        pass one synergy object
+            #                        pass a synergy objects list
             #self.synergy[agent][] = synergies     #TODO: .COPY() ???
-        print(self.synergy)
+        # print(self.synergy)
 
     def update_agents(self, agents: List[str]) -> None:
         self.agents = agents

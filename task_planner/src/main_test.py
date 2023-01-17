@@ -3,6 +3,7 @@ from utils import *
 from Task import Task
 from Problem import Problem
 from TaskPlanner import TaskPlanner
+from TaskPlannerHumanAware import TaskPlannerHumanAware
 
 def main():
     rospy.init_node("task_planner")
@@ -14,7 +15,7 @@ def main():
         return 0
 
     problem_to_solve = Problem(["human_right_arm", "ur5_on_guide"])
-    print(type(task_goal))
+
     for task in task_goal:
         assert len(task.keys()) == 1
         if len(task.keys()) != 1:
@@ -40,6 +41,8 @@ def main():
     if not problem_to_solve.fill_task_agents(): #TODO : Manage as exception?
         return 0
     problem_to_solve.update_tasks_statistics()
+    problem_to_solve.update_tasks_synergy()
+
     rospy.loginfo(f"Consistency Check: {problem_to_solve.consistency_check()}")
 
     try:
@@ -53,7 +56,7 @@ def main():
     if not tp.check_feasibility():
         rospy.logerr(UserMessages.PROBLEM_NOT_FEASIBLE.value.format())
         return 0
-    tp.add_constraints()
+    tp.add_general_constraints()
     tp.set_objective()
     if not tp.check_feasibility():
         rospy.logerr(UserMessages.PROBLEM_NOT_FEASIBLE_DATA.value.format())
@@ -61,7 +64,7 @@ def main():
     tp.solve()
     # print(tp.get_solution())
     show_timeline(tp.get_solution())
-    # rospy.loginfo(f"Consistency Check: {problem_to_solve.consistency_check()}")
+    rospy.loginfo(f"Consistency Check: {problem_to_solve.consistency_check()}")
 
 
 if __name__ == "__main__":

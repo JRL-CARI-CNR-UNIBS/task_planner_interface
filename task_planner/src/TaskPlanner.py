@@ -98,6 +98,7 @@ class TaskPlanner:
     def add_t_end_constraints(self, agent_task_combination, cost) -> None:
         # Tend constraints
         t_end = {}
+        print(agent_task_combination)
         for agent, task in agent_task_combination:
             if task not in t_end:
                 t_end[task] = self.decision_variables["t_start"][task]
