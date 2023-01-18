@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import List, Dict, Optional, overload
+from typing import List, Dict, Optional, overload, Tuple
 
 
 @dataclass
@@ -10,7 +10,7 @@ class Task:
     agents_constraint: List[str]
     precedence_constraints: List[str]
     exp_duration: Dict[str, float] = field(default=None, init=False)
-    synergy: Dict[str, Dict[str, float]] = field(default_factory=dict, init=False)
+    synergy: Dict[Tuple[str, str], Dict[str, float]] = field(default_factory=dict, init=False)
 
     def update_duration(self, agent: str, duration: float) -> bool:
         assert self.agents is not None
@@ -31,20 +31,20 @@ class Task:
         self.exp_duration[agent] = duration
         return True
 
-    def update_synergy(self, agent, synergies: Dict[str, float]) -> None:
-        # if agent not in self.agents:
-        #     raise Exception(f"Agent {agent} is not defined for task: {self.id}")
+    def update_synergy(self, agent, parallel_agent, synergies: Dict[str, float]) -> None:
+        if agent not in self.agents:
+            raise Exception(f"Agent {agent} is not defined for task: {self.id}")
         # if not any([agent in synergies.keys() for agent in self.agents]):
         #     raise Exception(f"Synergy dict not defined for all task agents")
-        self.synergy[agent] = synergies
+        self.synergy[(agent, parallel_agent)] = synergies
         # print(self.type)
         # print(self.synergy)
         # for synergy_info in synergies:
-            # TODO: Da capire cosa fare qui e cosa fare in problem.
-            # Alternative solutions: pass only one synergy as single dict {name:, synergy}
-            #                        pass one synergy object
-            #                        pass a synergy objects list
-            #self.synergy[agent][] = synergies     #TODO: .COPY() ???
+        # TODO: Da capire cosa fare qui e cosa fare in problem.
+        # Alternative solutions: pass only one synergy as single dict {name:, synergy}
+        #                        pass one synergy object
+        #                        pass a synergy objects list
+        # self.synergy[agent][] = synergies     #TODO: .COPY() ???
         # print(self.synergy)
 
     def update_agents(self, agents: List[str]) -> None:
@@ -81,10 +81,14 @@ class Task:
         else:
             raise NotImplemented
 
-    def get_synergy(self, task: str) -> Optional[str]:
-        if task in self.synergy:
-            return self.synergy[task]
+    def get_synergy(self, agent: str, parallel_agent: str, parallel_task: str) -> Optional[str]:
+        if (agent, parallel_agent) in self.synergy and parallel_task in self.synergy[(agent, parallel_agent)]:
+            return self.synergy[(agent, parallel_agent)][parallel_task]
         return None
+
+    def get_synergies(self) -> Optional[Dict[Tuple[str, str], Dict[str, float]]]:
+        # TODO : Può essere utile fare l'opzione con agente e agente parallelo
+        return self.synergy
 
     def get_id(self) -> str:
         return self.id

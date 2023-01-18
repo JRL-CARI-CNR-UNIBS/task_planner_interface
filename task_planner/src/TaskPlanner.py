@@ -6,6 +6,7 @@ from typing import List, Dict, Optional
 
 import gurobipy as gp
 import itertools
+import os
 
 EPS = 1E-6
 BIG_M = 1E7
@@ -18,8 +19,6 @@ class TaskPlanner:
     model: gp.Model = field(init=False)
     decision_variables: Dict[str, gp.tupledict] = field(init=False)
 
-    use_synergy: bool = False
-
     # alpha: float = 0.0
 
     def __post_init__(self):
@@ -28,10 +27,14 @@ class TaskPlanner:
 
     def initialize(self):
         e = gp.Env(empty=True)
-        if False:
-            e.setParam('WLSACCESSID', wls_access_id)
-            e.setParam('WLSSECRET', wls_secret)
-            e.setParam('LICENSEID', license_id)
+        if True:
+            wls_access_id = os.getenv('WLSACCESSID')
+            wls_secret = os.environ.get('WLSSECRET')
+            license_id = os.environ.get('LICENSEID')
+            if wls_access_id is not None and wls_secret is not None and license_id is not None:
+                e.setParam('WLSACCESSID', wls_access_id)
+                e.setParam('WLSSECRET', wls_secret)
+                e.setParam('LICENSEID', int(license_id))
         e.start()
 
         # Create the model within the Gurobi environment

@@ -146,7 +146,7 @@ class Problem:
                         synergies_dict[task_synergy.agent] = dict()
                     synergies_dict[task_synergy.agent][task_synergy.task_name] = task_synergy.synergy
                 for parallel_agent in synergies_dict:
-                    task.update_synergy(parallel_agent, synergies_dict[parallel_agent])
+                    task.update_synergy(agent, parallel_agent, synergies_dict[parallel_agent])
 
                 # TODO: Is better to store as an object with all the info. Can i recycle TaskSynergy message? But i cannot add method.
                 # task_synergy.std_err
@@ -203,6 +203,35 @@ class Problem:
         if task in self.task_list:
             self.task_list.remove(task)
 
-    def get_tasks_synergy(self):
-        pass
-        # TODO: Finire
+    # def get_tasks_synergy(self):
+    #     for task in self.task_list:
+    #         task.get_synergy()
+    #     pass
+    # TODO: Finire
+
+    def stampa_sinergie(self):
+        for task in self.task_list:
+            print(task.get_agents())
+            print(task.get_synergies())
+
+    def get_tasks_synergies(self) -> Dict[Tuple[str, str, str, str], float]:
+        tasks_synergies = {}
+        tasks_type = []
+        for task in self.task_list:
+            task_type = task.get_type()
+            # print(tasks_type)
+            if task_type not in tasks_type:
+                tasks_type.append(task_type)
+
+                synergies = task.get_synergies()
+                for agent, parallel_agent in synergies.keys():
+                    for parallel_task in synergies[(agent, parallel_agent)]:
+                        # TODO: Devo sapere come è formattata la synergy del task per farlo meglio una classe
+                        tasks_synergies[(task_type, agent, parallel_task, parallel_agent)] = \
+                            synergies[(agent, parallel_agent)][parallel_task]
+        return tasks_synergies
+    def get_tasks_type_correspondence(self) -> Dict[str, str]:
+        tasks_type_correspondence = {}
+        for task in self.task_list:
+            tasks_type_correspondence[task.get_id()] = task.get_type()
+        return tasks_type_correspondence

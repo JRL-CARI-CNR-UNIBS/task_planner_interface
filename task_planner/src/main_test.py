@@ -1,9 +1,11 @@
+#!/usr/bin/env python3
 import rospy
 from utils import *
 from Task import Task
 from Problem import Problem
 from TaskPlanner import TaskPlanner
-from TaskPlannerHumanAware import TaskPlannerHumanAware
+# from TaskPlannerHumanAware import TaskPlannerHumanAware
+
 
 def main():
     rospy.init_node("task_planner")
@@ -35,36 +37,38 @@ def main():
         # print(task_obj)
         try:
             problem_to_solve.add_task(task_obj)
-        except Exception:       #TODO: Specify Excpetion
+        except Exception:  # TODO: Specify Excpetion
             rospy.logerr(UserMessages.TASK_DUPLICATION.value.format(task_id))
             return 0
-    if not problem_to_solve.fill_task_agents(): #TODO : Manage as exception?
+    if not problem_to_solve.fill_task_agents():  # TODO : Manage as exception?
         return 0
     problem_to_solve.update_tasks_statistics()
     problem_to_solve.update_tasks_synergy()
-
+    print("----------------------------------")
+    problem_to_solve.stampa_sinergie()
+    print("----------------------------------")
     rospy.loginfo(f"Consistency Check: {problem_to_solve.consistency_check()}")
-
-    try:
-        tp = TaskPlanner("Task_Planning&Scheduling", problem_to_solve)
-    except ValueError:
-        rospy.logerr(UserMessages.CONSISTENCY_CHECK_FAILED.value)
-        return 0
-    tp.initialize()
-    tp.create_model()
-    tp.add_precedence_constraints()
-    if not tp.check_feasibility():
-        rospy.logerr(UserMessages.PROBLEM_NOT_FEASIBLE.value.format())
-        return 0
-    tp.add_general_constraints()
-    tp.set_objective()
-    if not tp.check_feasibility():
-        rospy.logerr(UserMessages.PROBLEM_NOT_FEASIBLE_DATA.value.format())
-        return 0
-    tp.solve()
-    # print(tp.get_solution())
-    show_timeline(tp.get_solution())
-    rospy.loginfo(f"Consistency Check: {problem_to_solve.consistency_check()}")
+    problem_to_solve.get_tasks_synergies()
+    # try:
+    #     tp = TaskPlanner("Task_Planning&Scheduling", problem_to_solve)
+    # except ValueError:
+    #     rospy.logerr(UserMessages.CONSISTENCY_CHECK_FAILED.value)
+    #     return 0
+    # tp.initialize()
+    # tp.create_model()
+    # tp.add_precedence_constraints()
+    # if not tp.check_feasibility():
+    #     rospy.logerr(UserMessages.PROBLEM_NOT_FEASIBLE.value.format())
+    #     return 0
+    # tp.add_general_constraints()
+    # tp.set_objective()
+    # if not tp.check_feasibility():
+    #     rospy.logerr(UserMessages.PROBLEM_NOT_FEASIBLE_DATA.value.format())
+    #     return 0
+    # tp.solve()
+    # # print(tp.get_solution())
+    # show_timeline(tp.get_solution())
+    # rospy.loginfo(f"Consistency Check: {problem_to_solve.consistency_check()}")
 
 
 if __name__ == "__main__":
