@@ -8,8 +8,8 @@ from typing import List, Dict, Optional
 import gurobipy as gp
 import itertools
 
-EPS = 1E-6
-BIG_M = 1E6
+EPS = 1E-12
+BIG_M = 1E12
 
 
 @dataclass
@@ -17,65 +17,61 @@ class TaskPlannerHumanAware(TaskPlanner):
     def create_model(self) -> None:
         tasks_list = self.problem_definition.get_tasks_list()
         tasks_pairs = itertools.combinations(tasks_list, 2)
+        upper_bound = self.problem_definition.get_nominal_upper_bound() * 10
+
         self.decision_variables["overlapping"] = self.model.addVars(tasks_pairs,
                                                                     name="overlapping",
                                                                     vtype=gp.GRB.CONTINUOUS,
-                                                                    lb=-gp.GRB.INFINITY,
-                                                                    ub=gp.GRB.INFINITY)
+                                                                    lb=0,
+                                                                    ub=self.problem_definition.get_nominal_upper_bound())
         super().create_model()
-        print(self.decision_variables.keys())
-        print(self.decision_variables.keys())
         self.add_overlapping_constraints()
-        for task in tasks_list:
-            self.model.addConstr(self.decision_variables["t_start"][task] >= 0)
+        self.model.setParam("MIPGapAbs", 0.28)
 
-    def add_overlapping_constraints(self):
+    def add_overlapping_constraints(self, upper_bound=None):
         for task_i, task_j in self.decision_variables["overlapping"].keys():
             t_end_i = self.decision_variables["t_end"][task_i]
             t_end_j = self.decision_variables["t_end"][task_j]
             t_start_i = self.decision_variables["t_start"][task_i]
             t_start_j = self.decision_variables["t_start"][task_j]
+            upper_bound = self.problem_definition.get_nominal_upper_bound()
 
-            check_parallelism = self.model.addVar(name=f"raw_overlapping({task_i},{task_j})",
-                                                  vtype=gp.GRB.CONTINUOUS,
-                                                  lb=-gp.GRB.INFINITY,
-                                                  ub=gp.GRB.INFINITY)
+            raw_overlapping = self.model.addVar(name=f"raw_overlapping({task_i},{task_j})",
+                                                vtype=gp.GRB.CONTINUOUS,
+                                                lb=-upper_bound,
+                                                ub=upper_bound)
             min_t_end = self.model.addVar(name=f"min_t_end({task_i}, {task_j})",
-                                          vtype=gp.GRB.CONTINUOUS)
+                                          vtype=gp.GRB.CONTINUOUS,
+                                          lb=-upper_bound,
+                                          ub=upper_bound)
             max_t_start = self.model.addVar(name=f"max_t_start({task_i}, {task_j})",
-                                            vtype=gp.GRB.CONTINUOUS)
+                                            vtype=gp.GRB.CONTINUOUS,
+                                            lb=-upper_bound,
+                                            ub=upper_bound)
             self.model.addConstr(min_t_end == gp.min_(t_end_i, t_end_j))
             self.model.addConstr(max_t_start == gp.max_(t_start_i, t_start_j))
-            self.model.addConstr(check_parallelism == (min_t_end - max_t_start))
+            self.model.addConstr(raw_overlapping == (min_t_end - max_t_start))
 
-            check_parallelism_geq_zero = self.model.addVar(name="check_parallelism_geq_zero_" + task_i + "_" + task_j,
-                                                           vtype=gp.GRB.BINARY, lb=0, ub=1)
+            check_parallelism = self.model.addVar(name=f"check_parallelism({task_i},{task_j})",
+                                                  vtype=gp.GRB.BINARY, lb=0, ub=1)
 
-            self.model.addConstr(check_parallelism >= -BIG_M * (1 - check_parallelism_geq_zero),
-                                 name="aux_1" + task_i + "_" + task_j)
-            self.model.addConstr(check_parallelism <= BIG_M * check_parallelism_geq_zero - EPS,
-                                 name="aux_2" + task_i + "_" + task_j)
+            self.model.addConstr(raw_overlapping >= -BIG_M * (1 - check_parallelism))
+            self.model.addConstr(raw_overlapping <= BIG_M * check_parallelism - EPS)
 
             self.model.addConstr((self.decision_variables["overlapping"][(task_i, task_j)] == (
-                    min_t_end - max_t_start) * check_parallelism_geq_zero))
+                    min_t_end - max_t_start) * check_parallelism))
 
     def add_t_end_constraints(self, agent_task_combination, cost) -> None:
         t_end = {}
-        # print(agent_task_combination)
         for agent, task in agent_task_combination:
             if task not in t_end:
                 t_end[task] = self.decision_variables["t_start"][task]
             t_end[task] += self.decision_variables["assignment"][(agent, task)] * cost[(agent, task)]
-            # t_end[task] +=
         tasks_type_correspondence = self.problem_definition.get_tasks_type_correspondence()
         tasks_synergies = self.problem_definition.get_tasks_synergies()
 
         parallel_agent = "human_right_arm"
         main_agent = "ur5_on_guide"
-        print("-----------------------------------------------")
-        print(self.decision_variables.keys())
-        print("-----------------------------------------------")
-        # print(self.decision_variables["overlapping"])
         for task in self.decision_variables["t_start"].keys():
             for task_pair in self.decision_variables["overlapping"].keys():
                 if task in task_pair:
@@ -83,11 +79,10 @@ class TaskPlannerHumanAware(TaskPlanner):
                     task_type = tasks_type_correspondence[task]
                     parallel_task_type = tasks_type_correspondence[parallel_task]
                     overlapping = self.decision_variables["overlapping"][task_pair]
-                    if ("ur5_on_guide", task) in self.decision_variables["assignment"].keys():
-                        assignment = self.decision_variables["assignment"][("ur5_on_guide", task)]
-
-                        if (task_type, "ur5_on_guide", parallel_task, "human_right_arm") in tasks_synergies:
-                            synergy = tasks_synergies[(task_type, "ur5_on_guide", parallel_task, "human_right_arm")]
+                    if (main_agent, task) in self.decision_variables["assignment"].keys():
+                        assignment = self.decision_variables["assignment"][(main_agent, task)]
+                        if (task_type, main_agent, parallel_task_type, parallel_agent) in tasks_synergies:
+                            synergy = tasks_synergies[(task_type, main_agent, parallel_task_type, parallel_agent)]
                             t_end[task] += overlapping * (synergy - 1) * assignment
             self.model.addConstr(self.decision_variables["t_end"][task] == t_end[task], name=f"t_end({task})")
             # t_end = t_end[task] + gp.quicksum([self.decision_variables["overlapping"][task_pair]*(synergy_val())*self.decision_variables["assignment"][("ur5_on_guide",task)] for task_pair in self.decision_variables["overlapping"].keys() if task in task_pair])
@@ -122,4 +117,13 @@ class TaskPlannerHumanAware(TaskPlanner):
                 print(f"Error during solution filling")
                 raise Exception(f"{task}, not presence in problem task list")
             problem_solution.append(task_solution)
+
+        for coppie in self.decision_variables["overlapping"].keys():
+            print("-------------------------------------------------------")
+            print(coppie)
+            print(self.decision_variables["overlapping"][coppie].X)
+            print("--------------------------------------------------------")
+        for v in self.model.getVars():
+            if "check_parallelism_geq_zero_" in v.varName:
+                print(v.varName, v.x)
         return problem_solution

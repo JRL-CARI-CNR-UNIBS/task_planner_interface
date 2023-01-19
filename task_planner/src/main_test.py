@@ -4,7 +4,7 @@ from utils import *
 from Task import Task
 from Problem import Problem
 from TaskPlanner import TaskPlanner
-# from TaskPlannerHumanAware import TaskPlannerHumanAware
+from TaskPlannerHumanAware import TaskPlannerHumanAware
 
 
 def main():
@@ -49,26 +49,27 @@ def main():
     print("----------------------------------")
     rospy.loginfo(f"Consistency Check: {problem_to_solve.consistency_check()}")
     problem_to_solve.get_tasks_synergies()
-    # try:
-    #     tp = TaskPlanner("Task_Planning&Scheduling", problem_to_solve)
-    # except ValueError:
-    #     rospy.logerr(UserMessages.CONSISTENCY_CHECK_FAILED.value)
-    #     return 0
-    # tp.initialize()
-    # tp.create_model()
-    # tp.add_precedence_constraints()
-    # if not tp.check_feasibility():
-    #     rospy.logerr(UserMessages.PROBLEM_NOT_FEASIBLE.value.format())
-    #     return 0
-    # tp.add_general_constraints()
-    # tp.set_objective()
-    # if not tp.check_feasibility():
-    #     rospy.logerr(UserMessages.PROBLEM_NOT_FEASIBLE_DATA.value.format())
-    #     return 0
-    # tp.solve()
-    # # print(tp.get_solution())
-    # show_timeline(tp.get_solution())
-    # rospy.loginfo(f"Consistency Check: {problem_to_solve.consistency_check()}")
+    try:
+        tp = TaskPlannerHumanAware("Task_Planning&Scheduling", problem_to_solve)
+    except ValueError:
+        rospy.logerr(UserMessages.CONSISTENCY_CHECK_FAILED.value)
+        return 0
+    tp.initialize()
+    tp.create_model()
+    tp.add_precedence_constraints()
+    if not tp.check_feasibility():
+        rospy.logerr(UserMessages.PROBLEM_NOT_FEASIBLE.value.format())
+        return 0
+    tp.add_general_constraints()
+    tp.set_objective()
+    if not tp.check_feasibility():
+        rospy.logerr(UserMessages.PROBLEM_NOT_FEASIBLE_DATA.value.format())
+        return 0
+    tp.solve()
+    # print(tp.get_solution())
+    show_timeline(tp.get_solution())
+    show_gantt(tp.get_solution())
+    rospy.loginfo(f"Consistency Check: {problem_to_solve.consistency_check()}")
 
 
 if __name__ == "__main__":
