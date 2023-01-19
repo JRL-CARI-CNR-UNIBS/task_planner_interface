@@ -65,7 +65,7 @@ class TaskPlanner:
         self.decision_variables["t_start"] = self.model.addVars(tasks_list,
                                                                 name="t_start",
                                                                 vtype=gp.GRB.CONTINUOUS,
-                                                                lb=-1, ub=upper_bound)
+                                                                lb=0, ub=upper_bound)
         self.decision_variables["t_end"] = self.model.addVars(tasks_list,
                                                               name="t_end",
                                                               vtype=gp.GRB.CONTINUOUS,
