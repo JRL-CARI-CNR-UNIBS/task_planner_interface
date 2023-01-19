@@ -50,10 +50,62 @@ goal:
       required_agents: []
       precedence_constraints: []
 
-  - prova2:
-      task_name: prova
-      required_agents: ["human_right_arm","ur5_on_guide"]
-      precedence_constraints: []
+
+  - place_orange_box_1:
+      task_name: place_orange_box
+      required_agents: []
+      precedence_constraints: [pick_orange_box_1]
+  - place_orange_box_2:
+      task_name: place_orange_box
+      required_agents: []
+      precedence_constraints: [pick_orange_box_2]
+  - place_orange_box_3:
+      task_name: place_orange_box
+      required_agents: []
+      precedence_constraints: [pick_orange_box_3]
+  - place_orange_box_4:
+      task_name: place_orange_box
+      required_agents: []
+      precedence_constraints: [pick_orange_box_4]
+
+  - place_blue_box_1:
+      task_name: place_blue_box_human_right_arm
+      required_agents: ["human_right_arm"]
+      precedence_constraints: [pick_blue_box_1]
+  - place_blue_box_2:
+      task_name: place_blue_box_human_right_arm
+      required_agents: ["human_right_arm"]
+      precedence_constraints: [pick_blue_box_2]
+  - place_blue_box_3:
+      task_name: place_blue_box_ur5_on_guide
+      required_agents: ["ur5_on_guide"]
+      precedence_constraints: [pick_blue_box_3]
+  - place_blue_box_4:
+      task_name: place_blue_box_ur5_on_guide
+      required_agents: ["ur5_on_guide"]
+      precedence_constraints: [pick_blue_box_4]
+
+  - place_white_box_1:
+      task_name: place_white_box
+      required_agents: []
+      precedence_constraints: [pick_white_box_1]
+  - place_white_box_2:
+      task_name: place_white_box
+      required_agents: []
+      precedence_constraints: [pick_white_box_2]
+  - place_white_box_3:
+      task_name: place_white_box
+      required_agents: []
+      precedence_constraints: [pick_white_box_3]
+  - place_white_box_4:
+      task_name: place_white_box
+      required_agents: []
+      precedence_constraints: [pick_white_box_4]
+
+#  - prova2:
+#      task_name: prova
+#      required_agents: ["human_right_arm","ur5_on_guide"]
+#      precedence_constraints: []
  # - pick_orange_box: 4
  #    precedence_constraints: []
  # - place_orange_box: 4
