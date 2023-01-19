@@ -45,7 +45,7 @@ class TaskPlanner:
         agent_task_combination, cost = gp.multidict(self.problem_definition.get_combinations())
         tasks_list = self.problem_definition.get_tasks_list()
 
-        upper_bound = self.problem_definition.get_nominal_upper_bound() * 2
+        upper_bound = self.problem_definition.get_nominal_upper_bound() * 10
 
         # TODO: Ragionare sulle possibili combination
         tasks_pairs = itertools.combinations(tasks_list, 2)
@@ -65,7 +65,7 @@ class TaskPlanner:
         self.decision_variables["t_start"] = self.model.addVars(tasks_list,
                                                                 name="t_start",
                                                                 vtype=gp.GRB.CONTINUOUS,
-                                                                lb=0, ub=upper_bound)
+                                                                lb=-1, ub=upper_bound)
         self.decision_variables["t_end"] = self.model.addVars(tasks_list,
                                                               name="t_end",
                                                               vtype=gp.GRB.CONTINUOUS,

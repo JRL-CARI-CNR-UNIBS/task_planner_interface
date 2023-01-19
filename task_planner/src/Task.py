@@ -134,7 +134,7 @@ class TaskSolution:
     assignment: str
 
     def __post_init__(self):
-        if self.t_end < 0 or self.t_start < 0 or self.t_end < self.t_start:
+        if self.t_end < 0 or self.t_start < -1e-3 or self.t_end < self.t_start:
             raise ValueError
 
     # def set_start_time(self, t_start: float) -> None:

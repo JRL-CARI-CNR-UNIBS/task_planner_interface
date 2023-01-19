@@ -194,9 +194,14 @@ class Problem:
         # Potrebbe essere inutile avere una soluzione nella classe problem
         for task in self.task_list:
             if task.get_id() == task_id:
-                task_solution = TaskSolution(task, t_start, t_end, assignment)
+                try:
+                    task_solution = TaskSolution(task, t_start, t_end, assignment)
+                except ValueError:
+                    raise ValueError
                 self.solution.append(task_solution)
                 return task_solution
+        print(task_id)
+        print(self.task_list)
         raise Exception("Task not present in problem task list")
 
     def remove_task(self, task: Task):
