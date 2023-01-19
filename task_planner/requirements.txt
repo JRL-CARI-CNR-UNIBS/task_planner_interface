@@ -1,0 +1,4 @@
+gurobipy==9.5.2
+pandas==0.25.3
+plotly==5.11.0
+rospy==1.15.14
