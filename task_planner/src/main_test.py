@@ -5,6 +5,7 @@ from Task import Task
 from Problem import Problem
 from TaskPlanner import TaskPlanner
 from TaskPlannerHumanAware import TaskPlannerHumanAware
+from TaskPlannerHumanAwareEasier import TaskPlannerHumanAwareEasier
 
 
 def main():
@@ -50,7 +51,7 @@ def main():
     rospy.loginfo(f"Consistency Check: {problem_to_solve.consistency_check()}")
     problem_to_solve.get_tasks_synergies()
     try:
-        tp = TaskPlannerHumanAware("Task_Planning&Scheduling", problem_to_solve)
+        tp = TaskPlannerHumanAwareEasier("Task_Planning&Scheduling", problem_to_solve)
     except ValueError:
         rospy.logerr(UserMessages.CONSISTENCY_CHECK_FAILED.value)
         return 0
