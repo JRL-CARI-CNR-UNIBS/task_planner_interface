@@ -99,7 +99,7 @@ class Overlapping(Enum):
 
 class Objective(Enum):
     MAKESPAN = 1
-    T_START = 2
+    SUM_T_END = 2
     SUM_T_START_END = 3
     SYNERGY = 4
     SUM_T_END = 5
