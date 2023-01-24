@@ -19,8 +19,6 @@ class TaskPlanner:
     model: gp.Model = field(init=False)
     decision_variables: Dict[str, gp.tupledict] = field(init=False)
 
-    # alpha: float = 0.0
-
     def __post_init__(self):
         if self.problem_definition.consistency_check() is not True:
             raise ValueError("The problem is not consistent. Check it!")
@@ -36,9 +34,12 @@ class TaskPlanner:
                 e.setParam('WLSSECRET', wls_secret)
                 e.setParam('LICENSEID', int(license_id))
         e.start()
-
         # Create the model within the Gurobi environment
-        self.model = gp.Model(self.name, env=e)
+        self.model = gp.Model(self.name, env=e,)
+        # self.model.setParam("PoolSearchMode", 2)
+        # self.model.setParam("PoolSolutions", 10)
+
+
         self.decision_variables = {}
 
     def create_model(self) -> None:
@@ -48,14 +49,12 @@ class TaskPlanner:
         upper_bound = self.problem_definition.get_nominal_upper_bound() * 10
 
         # TODO: Ragionare sulle possibili combination
-        tasks_pairs = itertools.combinations(tasks_list, 2)
         tasks_per_agent = self.problem_definition.get_tasks_per_agent()
 
         couple_of_tasks_per_agent = \
             [list(itertools.product(itertools.combinations(tasks_per_agent[agent], 2), [agent])) for agent in
              tasks_per_agent.keys()]
         couple_of_tasks_per_agent = [item for sublist in couple_of_tasks_per_agent for item in sublist]
-        # print(couple_of_tasks_per_agent)
 
         # Decision variables
         self.decision_variables["assignment"] = self.model.addVars(agent_task_combination,
@@ -77,13 +76,6 @@ class TaskPlanner:
 
         self.add_t_end_constraints(agent_task_combination, cost)
         self.add_assignment_constraints(tasks_list)
-
-        # if self.use_synergy:
-        #     self.decision_variables["overlapping"] = self.model.addVars(tasks_pairs,
-        #                                                                 name="overlapping",
-        #                                                                 vtype=gp.GRB.CONTINUOUS,
-        #                                                                 lb=-gp.GRB.INFINITY,
-        #                                                                 ub=gp.GRB.INFINITY)
 
     def add_assignment_constraints(self, tasks_list):
         # Unique task-agent assignment

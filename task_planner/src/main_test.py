@@ -45,13 +45,14 @@ def main():
         return 0
     problem_to_solve.update_tasks_statistics()
     problem_to_solve.update_tasks_synergy()
-    print("----------------------------------")
-    problem_to_solve.stampa_sinergie()
-    print("----------------------------------")
     rospy.loginfo(f"Consistency Check: {problem_to_solve.consistency_check()}")
-    problem_to_solve.get_tasks_synergies()
     try:
-        tp = TaskPlannerHumanAwareEasier("Task_Planning&Scheduling", problem_to_solve)
+        # tp = TaskPlanner("Task_Planning&Scheduling",
+        #                                  problem_to_solve)
+        tp = TaskPlannerHumanAwareEasier("Task_Planning&Scheduling",
+                                         problem_to_solve,
+                                         behaviour=Behaviour.CONTINUOUS,
+                                         objective=Objective.MAKESPAN)
     except ValueError:
         rospy.logerr(UserMessages.CONSISTENCY_CHECK_FAILED.value)
         return 0
@@ -70,7 +71,7 @@ def main():
     # print(tp.get_solution())
     show_timeline(tp.get_solution())
     show_gantt(tp.get_solution())
-    rospy.loginfo(f"Consistency Check: {problem_to_solve.consistency_check()}")
+    # rospy.loginfo(f"Consistency Check: {problem_to_solve.consistency_check()}")
 
 
 if __name__ == "__main__":

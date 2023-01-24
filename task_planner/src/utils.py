@@ -61,7 +61,7 @@ class UserMessages(Enum):
 def show_timeline(problem_solution: List[TaskSolution]) -> None:
     solution = []
     for task in problem_solution:
-        solution.append(dict(Task=task.get_task().get_type(),
+        solution.append(dict(Task=task.get_task().get_id(),
                              Start=datetime.fromtimestamp(task.get_start_time()).strftime("2020-04-06 %I:%M:%S"),
                              Finish=datetime.fromtimestamp(task.get_end_time()).strftime("2020-04-06 %I:%M:%S"),
                              Agents=task.get_assignment()))
@@ -85,3 +85,21 @@ def show_gantt(problem_solution: List[TaskSolution]) -> None:
     fig = px.timeline(df, x_start="Start", x_end="Finish", y="Task", color="Task", title="Gantt")
     fig.update_layout(xaxis_title="Time")
     fig.show()
+
+
+class Behaviour(Enum):
+    DISCRETE = 1
+    CONTINUOUS = 2
+
+
+class Overlapping(Enum):
+    INSIDE = 1
+    OUTSIDE = 2
+
+
+class Objective(Enum):
+    MAKESPAN = 1
+    T_START = 2
+    SUM_T_START_END = 3
+    SYNERGY = 4
+    SUM_T_END = 5
