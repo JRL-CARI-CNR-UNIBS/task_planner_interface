@@ -97,8 +97,26 @@ class TaskPlannerHumanAware(TaskPlanner):
                                             vtype=gp.GRB.CONTINUOUS,
                                             lb=0,
                                             ub=upper_bound)
-            self.model.addConstr(min_t_end == gp.min_(t_end_i, t_end_j))
-            self.model.addConstr(max_t_start == gp.max_(t_start_i, t_start_j))
+            aux_min_t_end = self.model.addVar(name=f"min_aux({task_i}, {task_j})",
+                                              vtype=gp.GRB.BINARY,
+                                              lb=0,
+                                              ub=1)
+            aux_max_t_start = self.model.addVar(name=f"max_aux({task_i}, {task_j})",
+                                                vtype=gp.GRB.BINARY,
+                                                lb=0,
+                                                ub=1)
+            # self.model.addConstr(min_t_end == gp.min_(t_end_i, t_end_j))
+            # self.model.addConstr(max_t_start == gp.max_(t_start_i, t_start_j))
+            self.model.addConstr(min_t_end <= t_end_i)
+            self.model.addConstr(min_t_end <= t_end_j)
+            self.model.addConstr(min_t_end >= t_end_i - BIG_M * (1 - aux_min_t_end))
+            self.model.addConstr(min_t_end >= t_end_j - BIG_M * aux_min_t_end)
+
+            self.model.addConstr(max_t_start >= t_start_i)
+            self.model.addConstr(max_t_start >= t_start_j)
+            self.model.addConstr(max_t_start <= t_start_i + BIG_M * aux_max_t_start)
+            self.model.addConstr(max_t_start <= t_start_j + BIG_M * (1 - aux_max_t_start))
+
             self.model.addConstr(raw_overlapping == (min_t_end - max_t_start))
 
             check_parallelism = self.model.addVar(name=f"check_parallelism({task_i},{task_j})",
