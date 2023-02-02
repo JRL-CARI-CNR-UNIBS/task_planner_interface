@@ -11,6 +11,9 @@ from task_planner_interface_msgs.srv import TaskResult, TaskResultResponse, Basi
     TaskTypeResponse, PickPlaceSkill, PickPlaceSkillResponse, PauseSkill, PauseSkillResponse, TasksInformation, \
     TasksInformationResponse, TasksStatistics, TasksStatisticsResponse
 
+from task_planner_statistics.msg import TaskSynergy
+from task_planner_statistics.srv import TaskSynergies, TaskSynergiesResponse
+
 import time
 
 from pymongo import MongoClient
@@ -331,6 +334,40 @@ class MongoHandler:
             stats_response.statistics.append(task_stat)
         return stats_response
 
+    def getTaskSynergy(self, request):
+        rospy.loginfo(SERVICE_CALLBACK.format("get_task_synergies"))
+
+        synergies_response = TaskSynergiesResponse()
+        synergies_response.synergies = []
+        try:
+            query_result = self.coll_interaction.find({"agent": request.agent,
+                                                       "agent_skill": request.task_name},
+                                                      {"concurrent_agent": 1,
+                                                       "concurrent_skill": 1,
+                                                       "dynamic_risk": 1,
+                                                       "std_err": 1,
+                                                       "success_rate": 1,
+                                                       "_id": 0})
+            for single_task_synergy in query_result:
+                if not all(synergy_info in single_task_synergy for synergy_info in ["concurrent_skill",
+                                                                                    "concurrent_agent",
+                                                                                    "dynamic_risk",
+                                                                                    "std_err",
+                                                                                    "success_rate"]):
+                    rospy.logerr(RED + "Statistics not present in db" + END)
+                    raise Exception
+                task_synergy = TaskSynergy()
+                task_synergy.task_name = single_task_synergy["concurrent_skill"]
+                task_synergy.agent = single_task_synergy["concurrent_agent"]
+                task_synergy.synergy = single_task_synergy["dynamic_risk"]
+                task_synergy.std_err = single_task_synergy["std_err"]
+                task_synergy.success_rate = single_task_synergy["success_rate"]
+                # TODO: Before append check that is unique
+                synergies_response.synergies.append(task_synergy)
+        except pymongo.errors.AutoReconnect:  # Db connection failed
+            rospy.logerr(CONNECTION_LOST)
+        return synergies_response
+
 
 def main():
     rospy.init_node("mongo_handler")
@@ -379,6 +416,7 @@ def main():
 
     rospy.Service("mongo_handler/get_task_agents", TasksInformation, mongo_handler.getTasksAgents)
     rospy.Service("mongo_handler/get_tasks_statistics", TasksStatistics, mongo_handler.getTasksStatistics)
+    rospy.Service("mongo_statistics/get_task_synergies", TaskSynergies, mongo_handler.getTaskSynergy)
 
     rospy.loginfo(READY)
     rospy.spin()
