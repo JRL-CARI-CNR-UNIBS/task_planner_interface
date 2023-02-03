@@ -34,18 +34,12 @@ class Task:
     def update_synergy(self, agent, parallel_agent, synergies: Dict[str, float]) -> None:
         if agent not in self.agents:
             raise Exception(f"Agent {agent} is not defined for task: {self.id}")
-        # if not any([agent in synergies.keys() for agent in self.agents]):
-        #     raise Exception(f"Synergy dict not defined for all task agents")
+
+        # TODO: Check that contains all tasks
         self.synergy[(agent, parallel_agent)] = synergies
-        # print(self.type)
-        # print(self.synergy)
-        # for synergy_info in synergies:
-        # TODO: Da capire cosa fare qui e cosa fare in problem.
         # Alternative solutions: pass only one synergy as single dict {name:, synergy}
         #                        pass one synergy object
         #                        pass a synergy objects list
-        # self.synergy[agent][] = synergies     #TODO: .COPY() ???
-        # print(self.synergy)
 
     def update_agents(self, agents: List[str]) -> None:
         self.agents = agents
@@ -69,7 +63,7 @@ class Task:
         ...
 
     def get_duration(self, *args):
-        if len(args) == 1 and isinstance(args[0], str):
+        if len(args) == 1 and isinstance(args[0], str):  # Param: specify agent
             agent = args[0]
             assert agent in self.agents
             if agent not in self.exp_duration.keys():
@@ -87,7 +81,7 @@ class Task:
         return None
 
     def get_synergies(self) -> Optional[Dict[Tuple[str, str], Dict[str, float]]]:
-        # TODO : Può essere utile fare l'opzione con agente e agente parallelo
+        # TODO : Can be usefull the option of specify agent and parallel agent
         return self.synergy
 
     def get_id(self) -> str:

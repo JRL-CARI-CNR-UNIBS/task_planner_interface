@@ -2,11 +2,12 @@ from Problem import Problem
 from Task import TaskSolution
 
 from dataclasses import dataclass, field
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple
 
 import gurobipy as gp
 import itertools
 import os
+from utils import Objective
 
 EPS = 1E-6
 BIG_M = 1E7
@@ -17,11 +18,17 @@ class TaskPlanner:
     name: str
     problem_definition: Problem
     model: gp.Model = field(init=False)
+    objective: Objective = field(default=Objective.MAKESPAN)
+    n_solutions: float = field(default=1)
     decision_variables: Dict[str, gp.tupledict] = field(init=False)
 
     def __post_init__(self):
         if self.problem_definition.consistency_check() is not True:
             raise ValueError("The problem is not consistent. Check it!")
+        if self.n_solutions < 1:
+            raise ValueError("Unable to specify a number of solutions less than 1")
+        if not isinstance(self.objective, Objective):
+            raise ValueError("Objective should be an instance of Objective class")
 
     def initialize(self):
         e = gp.Env(empty=True)
@@ -35,10 +42,10 @@ class TaskPlanner:
                 e.setParam('LICENSEID', int(license_id))
         e.start()
         # Create the model within the Gurobi environment
-        self.model = gp.Model(self.name, env=e,)
-        # self.model.setParam("PoolSearchMode", 2)
-        # self.model.setParam("PoolSolutions", 10)
-
+        self.model = gp.Model(self.name, env=e, )
+        # Set the model able to find more than one solution
+        self.model.setParam("PoolSearchMode", 2)
+        self.model.setParam("PoolSolutions", self.n_solutions)
 
         self.decision_variables = {}
 
@@ -77,7 +84,7 @@ class TaskPlanner:
         self.add_t_end_constraints(agent_task_combination, cost)
         self.add_assignment_constraints(tasks_list)
 
-    def add_assignment_constraints(self, tasks_list):
+    def add_assignment_constraints(self, tasks_list: List[str]):
         # Unique task-agent assignment
         self.model.addConstrs(
             (self.decision_variables["assignment"].sum('*', task) == 1 for task in tasks_list),
@@ -90,7 +97,9 @@ class TaskPlanner:
                 self.model.addConstr(self.decision_variables["assignment"][(agent, task)] == 0,
                                      name=f'not_enabled_assignment_{task}')
 
-    def add_t_end_constraints(self, agent_task_combination, cost) -> None:
+    def add_t_end_constraints(self,
+                              agent_task_combination: Dict[Tuple[str, str], float],
+                              cost: Dict[Tuple[str, str], float]) -> None:
         # Tend constraints
         t_end = {}
         print(agent_task_combination)
@@ -133,21 +142,45 @@ class TaskPlanner:
             self.model.addConstr((assigned_both == 1) >> (t_start_j >= t_end_i - BIG_M * delta_ij))
 
     def set_objective(self) -> None:
-        # Makespan
-        makespan = self.model.addVar(name="makespan", vtype=gp.GRB.CONTINUOUS)
+        cost_function = self.model.addVar(name="J", vtype=gp.GRB.CONTINUOUS)
 
-        self.model.addConstr(makespan == gp.max_(self.decision_variables["t_end"]))
+        if self.objective == Objective.SUM_T_START_END:
+            self.model.addConstr(cost_function == gp.quicksum(self.decision_variables["t_end"]) +
+                                 gp.quicksum(self.decision_variables["t_start"]))
+        elif self.objective == Objective.MAKESPAN:
+            self.model.addConstr(cost_function == gp.max_(self.decision_variables["t_end"]))
+        elif self.objective == Objective.SUM_T_START:
+            self.model.addConstr(cost_function == gp.quicksum(self.decision_variables["t_start"]))
+        elif self.objective == Objective.SUM_T_END:
+            self.model.addConstr(cost_function == gp.quicksum(self.decision_variables["t_end"]))
 
         # Objective function
-        self.model.setObjective(makespan, gp.GRB.MINIMIZE)
-        self.model.write('MODEL.lp')
+        self.model.setObjective(cost_function, gp.GRB.MINIMIZE)
 
     def solve(self) -> None:
         # Optimization
         self.model.params.NonConvex = 2
-        self.model.optimize()
+        self.model.optimize(callback)
 
-    def get_solution(self) -> List[TaskSolution]:
+        status = self.model.Status
+        if status in (gp.GRB.INF_OR_UNBD, gp.GRB.INFEASIBLE, gp.GRB.UNBOUNDED):
+            print('The model cannot be solved because it is infeasible or '
+                  'unbounded')
+            return False
+        if status != gp.GRB.OPTIMAL:
+            print('Optimization was stopped with status ' + str(status))
+            return False
+        return True
+
+    def get_solution(self, solution_number: int = 0) -> List[TaskSolution]:
+        if solution_number > self.n_solutions:
+            raise ValueError(f"The solution number must be less than {self.n_solutions}")
+        # Set the solution
+        self.model.setParam(gp.GRB.Param.SolutionNumber, solution_number)
+        for v in self.model.getVars():
+            if "idle" in v.varName:
+                print(v.varName, v.x)
+
         agents = self.problem_definition.get_agents()
         task_lists = self.problem_definition.get_tasks_list()
 
@@ -162,12 +195,15 @@ class TaskPlanner:
                 decision_variable = self.decision_variables["assignment"].select(agent, task)
                 if decision_variable:
                     assert len(decision_variable) == 1
-                    if len(decision_variable) == 1 and decision_variable[
-                        0].X == 1:  # if len(decision_variable) == 1 and decision_variable[0].X == 1:
+                    if len(decision_variable) == 1 and decision_variable[0].X == 1:
+                        # if len(decision_variable) == 1 and decision_variable[0].X == 1:
                         assignment = agent
             try:
                 task_solution = self.problem_definition.add_task_solution(task, t_start, t_end, assignment)
                 print(task_solution)
+            except ValueError:
+                print(f"Error during solution filling")
+                raise Exception(f"{task} has not valid t_start or t_end")
             except Exception:
                 print(f"Error during solution filling")
                 raise Exception(f"{task}, not presence in problem task list")
@@ -177,12 +213,10 @@ class TaskPlanner:
     def add_precedence_constraints(self) -> None:
         for task, precedence_tasks in self.problem_definition.get_precedence_constraints().items():
             for precedence_task in precedence_tasks:
-                # print(self.decision_variables["t_start"])
-                # print(self.decision_variables["t_end"])
                 self.model.addConstr(
                     self.decision_variables["t_start"][task] == self.decision_variables["t_end"][precedence_task])
 
-    def add_problem(self, problem) -> None:
+    def add_problem(self, problem: Problem) -> None:
         # self.problem_definition.append(problem)
         self.problem_definition = problem
 
@@ -190,10 +224,89 @@ class TaskPlanner:
         try:
             self.model.computeIIS()
             if self.model.status == gp.GRB.INFEASIBLE:
-                # print(f"Precedence constraints infeasible")
                 for constraint in self.model.getConstrs():
                     if constraint.IISConstr:
                         print(f"{self.model.getRow(constraint)} {constraint.Sense} {constraint.RHS}")
                 return False
         except gp.GurobiError:
             return True
+
+    def save_model_to_file(self):
+        self.model.write('Model.lp')
+
+
+def callback(model, where):
+    pass
+    # if where == gp.GRB.Callback.POLLING:
+    #     # Ignore polling callback
+    #     pass
+    # elif where == gp.GRB.Callback.PRESOLVE:
+    #     # Presolve callback
+    #     cdels = model.cbGet(gp.GRB.Callback.PRE_COLDEL)
+    #     rdels = model.cbGet(gp.GRB.Callback.PRE_ROWDEL)
+    #     if cdels or rdels:
+    #         print('%d columns and %d rows are removed' % (cdels, rdels))
+    # elif where == gp.GRB.Callback.SIMPLEX:
+    #     # Simplex callback
+    #     itcnt = model.cbGet(gp.GRB.Callback.SPX_ITRCNT)
+    #     if itcnt - model._lastiter >= 100:
+    #         model._lastiter = itcnt
+    #         obj = model.cbGet(gp.GRB.Callback.SPX_OBJVAL)
+    #         ispert = model.cbGet(gp.GRB.Callback.SPX_ISPERT)
+    #         pinf = model.cbGet(gp.GRB.Callback.SPX_PRIMINF)
+    #         dinf = model.cbGet(gp.GRB.Callback.SPX_DUALINF)
+    #         if ispert == 0:
+    #             ch = ' '
+    #         elif ispert == 1:
+    #             ch = 'S'
+    #         else:
+    #             ch = 'P'
+    #         print('%d %g%s %g %g' % (int(itcnt), obj, ch, pinf, dinf))
+    # elif where == gp.GRB.Callback.MIP:
+    #     # General MIP callback
+    #     nodecnt = model.cbGet(gp.GRB.Callback.MIP_NODCNT)
+    #     objbst = model.cbGet(gp.GRB.Callback.MIP_OBJBST)
+    #     objbnd = model.cbGet(gp.GRB.Callback.MIP_OBJBND)
+    #     solcnt = model.cbGet(gp.GRB.Callback.MIP_SOLCNT)
+    #     # if nodecnt - model._lastnode >= 100:
+    #     #     model._lastnode = nodecnt
+    #     #     actnodes = model.cbGet(gp.GRB.Callback.MIP_NODLFT)
+    #     #     itcnt = model.cbGet(gp.GRB.Callback.MIP_ITRCNT)
+    #     #     cutcnt = model.cbGet(gp.GRB.Callback.MIP_CUTCNT)
+    #     #     print('%d %d %d %g %g %d %d' % (nodecnt, actnodes,
+    #     #                                     itcnt, objbst, objbnd, solcnt, cutcnt))
+    #     # if abs(objbst - objbnd) < 0.1 * (1.0 + abs(objbst)):
+    #     #     print('Stop early - 10% gap achieved')
+    #     #     model.terminate()
+    #     # if nodecnt >= 10000 and solcnt:
+    #     #     print('Stop early - 10000 nodes explored')
+    #     #     model.terminate()
+    # elif where == gp.GRB.Callback.MIPSOL:
+    #     # MIP solution callback
+    #     nodecnt = model.cbGet(gp.GRB.Callback.MIPSOL_NODCNT)
+    #     obj = model.cbGet(gp.GRB.Callback.MIPSOL_OBJ)
+    #     solcnt = model.cbGet(gp.GRB.Callback.MIPSOL_SOLCNT)
+    #     x = model.cbGetSolution(model.getVars())
+    #     print('**** New solution at node %d, obj %g, sol %d, '
+    #           'x[0] = %g ****' % (nodecnt, obj, solcnt, x[0]))
+    #     print(model.cbGetSolution(model.getVars()))
+    # 
+    # elif where == gp.GRB.Callback.MIPNODE:
+    #     # MIP node callback
+    #     print('**** New node ****')c
+    #     if model.cbGet(gp.GRB.Callback.MIPNODE_STATUS) == gp.GRB.OPTIMAL:
+    #         x = model.cbGetNodeRel(model._vars)
+    #         model.cbSetSolution(model.getVars(), x)
+    # elif where == gp.GRB.Callback.BARRIER:
+    #     # Barrier callback
+    #     itcnt = model.cbGet(gp.GRB.Callback.BARRIER_ITRCNT)
+    #     primobj = model.cbGet(gp.GRB.Callback.BARRIER_PRIMOBJ)
+    #     dualobj = model.cbGet(gp.GRB.Callback.BARRIER_DUALOBJ)
+    #     priminf = model.cbGet(gp.GRB.Callback.BARRIER_PRIMINF)
+    #     dualinf = model.cbGet(gp.GRB.Callback.BARRIER_DUALINF)
+    #     cmpl = model.cbGet(gp.GRB.Callback.BARRIER_COMPL)
+    #     print('%d %g %g %g %g %g' % (itcnt, primobj, dualobj,
+    #                                  priminf, dualinf, cmpl))
+    # elif where == gp.GRB.Callback.MESSAGE:
+    #     # Message callback
+    #     msg = model.cbGet(gp.GRB.Callback.MSG_STRING)

@@ -48,8 +48,6 @@ class Problem:
                     rospy.logerr(f"The precedence task: {precedence_task}, of task: {task.get_id()}, does not exist.")
                     return False
 
-            # Check if loop constraints : Removed from here and put in Task Planner
-
             # Check if all task type exist
             try:
                 task_check_result = self.task_check_srv(task.get_type())
@@ -75,6 +73,10 @@ class Problem:
         for task_info in tasks_info_srv_result.tasks_info:
             task_agents_correspondence[task_info.name] = task_info.agents
 
+        if not task_agents_correspondence:
+            print(f"Task info empty from service: check DB!")
+            return False
+
         for task in self.task_list:
             if not task.get_agents():  # Empty => Take mongoDB agents
                 task.update_agents(task_agents_correspondence[task.get_type()])
@@ -82,7 +84,7 @@ class Problem:
             # Check if the specified agent (in task goal) can actually perform it
             # if not all(required_agent in task_agents_correspondence[task.get_type()] for required_agent in task.get_agents()):
             for required_agent in task.get_agents_constraint():
-                # Check if that agent exist at Knowledge-Based
+                # Check if that agent exists at Knowledge-Based
                 if required_agent not in self.agents:
                     rospy.loginfo(
                         f"{Color.RED.value}The specified agent: {required_agent}, for task: {task.get_id()},"
@@ -112,7 +114,9 @@ class Problem:
 
             tasks_stasts_dict[tasks_stats.name][tasks_stats.agent] = {"exp_duration": tasks_stats.exp_duration,
                                                                       "duration_std": tasks_stats.duration_std}
-
+        if not tasks_stasts_dict:
+            print(f"Tasks statistics empty from service. Check DB")
+            return False
         for task in self.task_list:
             for agent in task.get_agents():
                 if agent not in tasks_stasts_dict[task.get_type()].keys():
@@ -122,7 +126,6 @@ class Problem:
                 # TODO: In future will be usefull store also duration_std
             # Update also statistics for agents present in Knowledge base but not in task-Goal
             # for agent in set(tasks_stasts_dict[task.get_type()].keys()).difference({*task.get_agents()}):    # Agents in KnowledgeBase but not specified in Task-Goal
-            #     print(agent)
             #     task.update_duration(agent, tasks_stasts_dict[task.get_type()][agent]["exp_duration"])
 
     def update_tasks_synergy(self):
@@ -187,11 +190,10 @@ class Problem:
         not_enabled_agents = {}
         for task in self.task_list:
             not_enabled_agents[task.get_id()] = task.get_not_enabled_agents()
-        print(not_enabled_agents)
         return not_enabled_agents
 
     def add_task_solution(self, task_id: str, t_start: float, t_end: float, assignment: str) -> TaskSolution:
-        # Potrebbe essere inutile avere una soluzione nella classe problem
+        # It can be unusefull have a solution in problem class
         for task in self.task_list:
             if task.get_id() == task_id:
                 try:
@@ -200,8 +202,6 @@ class Problem:
                     raise ValueError
                 self.solution.append(task_solution)
                 return task_solution
-        print(task_id)
-        print(self.task_list)
         raise Exception("Task not present in problem task list")
 
     def remove_task(self, task: Task):
@@ -214,7 +214,7 @@ class Problem:
     #     pass
     # TODO: Finire
 
-    def stampa_sinergie(self):
+    def print_synergies(self):
         for task in self.task_list:
             print(task.get_agents())
             print(task.get_synergies())
@@ -235,8 +235,15 @@ class Problem:
                         tasks_synergies[(task_type, agent, parallel_task, parallel_agent)] = \
                             synergies[(agent, parallel_agent)][parallel_task]
         return tasks_synergies
+
     def get_tasks_type_correspondence(self) -> Dict[str, str]:
         tasks_type_correspondence = {}
         for task in self.task_list:
             tasks_type_correspondence[task.get_id()] = task.get_type()
         return tasks_type_correspondence
+
+    def get_max_overlapping(self) -> float:
+        tasks_durations = []
+        for task in self.task_list:
+            tasks_durations.append(task.get_max_duration())
+        return max(tasks_durations)
