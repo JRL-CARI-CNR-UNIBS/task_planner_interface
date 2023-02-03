@@ -16,8 +16,9 @@ BIG_M = 1E12
 
 @dataclass
 class TaskPlannerHumanAware(TaskPlanner):
-    behaviour: Behaviour
-    objective: Objective
+    behaviour: Behaviour = field(default=Behaviour.CONTINUOUS)
+
+    # objective: Objective
 
     def create_model(self) -> None:
         tasks_list = self.problem_definition.get_tasks_list()
@@ -35,9 +36,17 @@ class TaskPlannerHumanAware(TaskPlanner):
                                                                         name="overlapping",
                                                                         vtype=gp.GRB.CONTINUOUS,
                                                                         lb=0,
-                                                                        ub=upper_bound)
+                                                                        ub=15)
         super().create_model()
         self.add_overlapping_constraints()
+        # self.model.setParam("cutoff",105)
+        # self.model.setParam("branchdir",-1)
+        # self.model.setParam("disconnected",2)
+        # self.model.setParam("NLPHeur", 1)
+        # self.model.setParam("Cuts", 3)
+        # self.model.setParam("MIPFocus", 3)
+
+        # self.model.setParam("heuristics", 0.001)
         # self.model.setParam("MIPGapAbs", 0.28)
 
     def add_t_end_constraints(self, agent_task_combination, cost) -> None:
@@ -69,8 +78,9 @@ class TaskPlannerHumanAware(TaskPlanner):
                                 t_end[task] += overlapping * (synergy - 1) * assignment_main_task * cost[
                                     (main_agent, task)]
             self.model.addConstr(self.decision_variables["t_end"][task] == t_end[task], name=f"t_end({task})")
-            #TODO: Pensare a cosa simile a quella sotto: aggiungere vincolo = t_end MODIFICATO SOLO se parallel task è assegnato alla persona.
-            #Note: Così come commentato non è corretto perchè nel caso non lo fosse dovrebbe essere uguale a t_start + d*a.
+
+            # TODO: Pensare a cosa simile a quella sotto: aggiungere vincolo = t_end MODIFICATO SOLO se parallel task è assegnato alla persona.
+            # Note: Così come commentato non è corretto perchè nel caso non lo fosse dovrebbe essere uguale a t_start + d*a.
             # Bisognerebbe fare vincolo sopra e poi aggiungerlo sotto, ma si riferirà allo stesso vincolo o agigunge un'altro?
             # self.model.addConstr(self.decision_variables["overlapping"][parallel_task] == 1 >>
             #                      (self.decision_variables["t_end"][task] == t_end[task]),
@@ -97,25 +107,28 @@ class TaskPlannerHumanAware(TaskPlanner):
                                             vtype=gp.GRB.CONTINUOUS,
                                             lb=0,
                                             ub=upper_bound)
-            aux_min_t_end = self.model.addVar(name=f"min_aux({task_i}, {task_j})",
-                                              vtype=gp.GRB.BINARY,
-                                              lb=0,
-                                              ub=1)
-            aux_max_t_start = self.model.addVar(name=f"max_aux({task_i}, {task_j})",
-                                                vtype=gp.GRB.BINARY,
-                                                lb=0,
-                                                ub=1)
+
+            # aux_min_t_end = self.model.addVar(name=f"min_aux({task_i}, {task_j})",
+            #                                   vtype=gp.GRB.BINARY,
+            #                                   lb=0,
+            #                                   ub=1)
+            # aux_max_t_start = self.model.addVar(name=f"max_aux({task_i}, {task_j})",
+            #                                     vtype=gp.GRB.BINARY,
+            #                                     lb=0,
+            #                                     ub=1)
             # self.model.addConstr(min_t_end == gp.min_(t_end_i, t_end_j))
             # self.model.addConstr(max_t_start == gp.max_(t_start_i, t_start_j))
-            self.model.addConstr(min_t_end <= t_end_i)
-            self.model.addConstr(min_t_end <= t_end_j)
-            self.model.addConstr(min_t_end >= t_end_i - BIG_M * (1 - aux_min_t_end))
-            self.model.addConstr(min_t_end >= t_end_j - BIG_M * aux_min_t_end)
-
-            self.model.addConstr(max_t_start >= t_start_i)
-            self.model.addConstr(max_t_start >= t_start_j)
-            self.model.addConstr(max_t_start <= t_start_i + BIG_M * aux_max_t_start)
-            self.model.addConstr(max_t_start <= t_start_j + BIG_M * (1 - aux_max_t_start))
+            # self.model.addConstr(min_t_end <= t_end_i)
+            # self.model.addConstr(min_t_end <= t_end_j)
+            # self.model.addConstr(min_t_end >= t_end_i - BIG_M * (1 - aux_min_t_end))
+            # self.model.addConstr(min_t_end >= t_end_j - BIG_M * aux_min_t_end)
+            #
+            # self.model.addConstr(max_t_start >= t_start_i)
+            # self.model.addConstr(max_t_start >= t_start_j)
+            # self.model.addConstr(max_t_start <= t_start_i + BIG_M * aux_max_t_start)
+            # self.model.addConstr(max_t_start <= t_start_j + BIG_M * (1 - aux_max_t_start))
+            self.model.addGenConstrMin(min_t_end, [t_end_i, t_end_j])
+            self.model.addGenConstrMax(max_t_start, [t_start_i, t_start_j])
 
             self.model.addConstr(raw_overlapping == (min_t_end - max_t_start))
 
@@ -133,7 +146,7 @@ class TaskPlannerHumanAware(TaskPlanner):
 
     def get_solution(self) -> List[TaskSolution]:
         for v in self.model.getVars():
-            if "overlapping" in v.varName:
+            if "idle" in v.varName or "min_tend" in v.varName or "duration" in v.varName or "tStart" in v.varName or "assignment" in v.varName or "tot" in v.varName or "t_end_robot" in v.varName or "t_end_human" in v.varName or "t_end" in v.varName or "t_start" in v.varName:
                 print(v.varName, v.x)
 
         agents = self.problem_definition.get_agents()
@@ -173,11 +186,118 @@ class TaskPlannerHumanAware(TaskPlanner):
             self.model.addConstr(cost_function == gp.quicksum(self.decision_variables["t_end"]) +
                                  gp.quicksum(self.decision_variables["t_start"]))
         elif self.objective == Objective.MAKESPAN:
-            self.model.addConstr(cost_function == gp.max_(self.decision_variables["t_end"]))
+            # task_list = [task for task in self.decision_variables["t_start"].keys()]
+            # upper_bound = self.problem_definition.get_nominal_upper_bound()
+            # aux_obj_max = self.model.addVars(self.decision_variables["t_start"].keys(),
+            #                                  name="aux_obj_max",
+            #                                  vtype=gp.GRB.CONTINUOUS,
+            #                                  lb=0,
+            #                                  ub=upper_bound)
+            # for task in task_list:
+            #     self.model.addConstr(cost_function >= self.decision_variables["t_end"][task])
+            #     self.model.addConstr(cost_function <= self.decision_variables["t_end"][task] + (1-aux_obj_max[task])* BIG_M)
+            # self.model.addConstr(gp.quicksum(aux_obj_max) == 1)
+            #     #
+            # self.model.addConstr(cost_function == gp.max_(self.decision_variables["t_end"]))
+            self.model.addGenConstrMax(cost_function, self.decision_variables["t_end"])
         elif self.objective == Objective.SUM_T_START:
             self.model.addConstr(cost_function == gp.quicksum(self.decision_variables["t_start"]))
         elif self.objective == Objective.SUM_T_END:
             self.model.addConstr(cost_function == gp.quicksum(self.decision_variables["t_end"]))
+        elif self.objective == Objective.SYNERGY:
+            upper_bound = self.problem_definition.get_nominal_upper_bound()
+            parallel_agent = "human_right_arm"
+            main_agent = "ur5_on_guide"
+            t_start_robot = self.model.addVars(list(self.decision_variables["t_start"].keys()), lb=0, ub=upper_bound,
+                                               name="t_start_robot", vtype=gp.GRB.CONTINUOUS)
+            t_start_human = self.model.addVars(list(self.decision_variables["t_start"].keys()), lb=0, ub=upper_bound,
+                                               name="t_start_human", vtype=gp.GRB.CONTINUOUS)
+            t_end_robot = self.model.addVars(list(self.decision_variables["t_end"].keys()), lb=0, ub=upper_bound,
+                                             name="t_end_robot", vtype=gp.GRB.CONTINUOUS)
+            t_end_human = self.model.addVars(list(self.decision_variables["t_end"].keys()), lb=0, ub=upper_bound,
+                                             name="t_end_human", vtype=gp.GRB.CONTINUOUS)
+            duration_human = self.model.addVar(lb=0, ub=upper_bound*10, name="duration_human", vtype=gp.GRB.CONTINUOUS)
+            duration_robot = self.model.addVar(lb=0, ub=upper_bound*10, name="duration_human", vtype=gp.GRB.CONTINUOUS)
+
+            for task in self.decision_variables["t_start"].keys():
+                print(task)
+                if (main_agent, task) in self.decision_variables["assignment"].keys():
+                    print(main_agent, task)
+                    self.model.addConstr(t_start_robot[task] == self.decision_variables["assignment"][(main_agent, task)] * self.decision_variables["t_start"][task])
+                    self.model.addConstr(t_end_robot[task] == self.decision_variables["assignment"][(main_agent, task)] * self.decision_variables["t_end"][task])
+                else:
+                    self.model.addConstr(t_start_robot[task] == 0)
+                    self.model.addConstr(t_end_robot[task] == 0)
+                if (parallel_agent, task) in self.decision_variables["assignment"].keys():
+                    print(parallel_agent, task)
+                    self.model.addConstr(
+                        t_start_human[task] == self.decision_variables["assignment"][(parallel_agent, task)] * self.decision_variables["t_start"][task])
+                    self.model.addConstr(t_end_human[task] == self.decision_variables["assignment"][(parallel_agent, task)] * self.decision_variables["t_end"][task])
+                else:
+                    self.model.addConstr(t_start_human[task] == 0)
+                    self.model.addConstr(t_end_human[task] == 0)
+            print(t_start_human.keys())
+            print(t_end_human.keys())
+            print(t_start_robot.keys())
+            print(t_end_robot.keys())
+            self.model.addConstr(duration_robot == gp.max_(t_end_robot))
+            self.model.addConstr(duration_human == gp.max_(t_end_human))
+
+            tasks_type_correspondence = self.problem_definition.get_tasks_type_correspondence()
+            tasks_synergies = self.problem_definition.get_tasks_synergies()
+
+            sigma_val = 0.0
+            sigma_tot = 0.0
+            _, cost = gp.multidict(self.problem_definition.get_combinations())
+            for task in self.decision_variables["t_start"].keys():
+                for task_pair in self.decision_variables["overlapping"].keys():
+                    if task in task_pair:
+                        parallel_task = set(task_pair).difference({task}).pop()
+                        task_type = tasks_type_correspondence[task]
+                        parallel_task_type = tasks_type_correspondence[parallel_task]
+                        overlapping = self.decision_variables["overlapping"][task_pair]
+                        if (main_agent, task) in self.decision_variables["assignment"].keys() and \
+                                (parallel_agent, parallel_task) in self.decision_variables["assignment"].keys():
+                            assignment_main = self.decision_variables["assignment"][(main_agent, task)]
+                            if (task_type, main_agent, parallel_task_type, parallel_agent) in tasks_synergies:
+                                synergy = tasks_synergies[(task_type, main_agent, parallel_task_type, parallel_agent)]
+                                if self.behaviour == Behaviour.CONTINUOUS:
+                                    sigma_val += overlapping * (synergy - 1) * assignment_main
+                                elif self.behaviour == Behaviour.DISCRETE:
+                                    sigma_val += overlapping * (synergy - 1) * assignment_main * cost[
+                                        (main_agent, task)]
+                                # sigma_tot += synergy
+            # duration = self.model.addVar(lb=0,
+            #                              ub=self.problem_definition.get_nominal_upper_bound()*5,
+            #                              name="duration",
+            #                              vtype=gp.GRB.CONTINUOUS)
+            idle_human = self.model.addVar(name="idle_human",lb=0,ub=self.problem_definition.get_nominal_upper_bound()*5,vtype=gp.GRB.CONTINUOUS)
+            idle_robot = self.model.addVar(name="idle_robot",lb=0,ub=self.problem_definition.get_nominal_upper_bound()*5,vtype=gp.GRB.CONTINUOUS)
+
+            # self.model.addConstr(duration == gp.max_(self.decision_variables["t_end"]))
+            # self.model.addConstr(cost_function >= (-3 +
+            #                                        sigma_val + duration + duration - gp.quicksum(
+            #             self.decision_variables["t_end"]) + gp.quicksum(
+            #             self.decision_variables["t_start"])))
+            # self.model.addConstr(cost_function <= (3 +
+            #                                        sigma_val + duration + duration - gp.quicksum(
+            #             self.decision_variables["t_end"]) + gp.quicksum(
+            #             self.decision_variables["t_start"])))
+            # self.model.addConstr(cost_function == (duration_robot + duration_human +
+            #                                        sigma_val - gp.quicksum(t_end_robot) - gp.quicksum(t_end_human)
+            #                                        + gp.quicksum(t_start_robot) + gp.quicksum(t_start_human)))
+            self.model.addConstr(idle_robot == duration_robot - gp.quicksum(t_end_robot) + gp.quicksum(t_start_robot))
+            self.model.addConstr(idle_human == duration_human - gp.quicksum(t_end_human) + gp.quicksum(t_start_human))
+            self.model.addConstr(cost_function == sigma_val + idle_human + idle_robot)
+
+            # self.model.addConstr(duration == gp.max_(self.decision_variables["t_end"]))
+
+            # self.model.addConstr(duration <= 95)
 
         # Objective function
         self.model.setObjective(cost_function, gp.GRB.MINIMIZE)
+
+        self.model.write("Model.lp")
+        # self.model.tune()
+
+
