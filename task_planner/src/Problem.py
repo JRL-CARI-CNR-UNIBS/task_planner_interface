@@ -247,3 +247,9 @@ class Problem:
         for task in self.task_list:
             tasks_durations.append(task.get_max_duration())
         return max(tasks_durations)
+
+    def __repr__(self):
+        str = ""
+        for task in self.task_list:
+            str += task.__repr__()
+        return str

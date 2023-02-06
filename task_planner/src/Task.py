@@ -119,6 +119,8 @@ class Task:
     def __hash__(self):
         return hash(self.id)
 
+    def __repr__(self):
+        return f"{self.id}, {self.exp_duration}"
 
 @dataclass
 class TaskSolution:
