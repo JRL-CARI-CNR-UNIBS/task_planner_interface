@@ -120,7 +120,14 @@ class Task:
         return hash(self.id)
 
     def __repr__(self):
-        return f"{self.id}, {self.exp_duration}"
+        if self.exp_duration:
+            return f"{self.id}, {self.exp_duration}"
+        else:
+            return f"{self.id}"
+    def toString(self):
+        return str(self.id) + ", " + str(self.exp_duration)
+        # return f"{self.id}, {self.exp_duration}"
+
 
 @dataclass
 class TaskSolution:

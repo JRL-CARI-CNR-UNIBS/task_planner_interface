@@ -43,6 +43,7 @@ class UserMessages(Enum):
     NOT_SUCCESSFUL = "Not Successfully executed"
     READY = Color.GREEN.value + "Ready" + Color.END.value
     CHECK_OK = Color.GREEN.value + "Check performed correctly" + Color.END.value
+    IMPOSSIBLE_TO_GO_ON = Color.RED.value + "--- Impossible to continue ---" + Color.END.value
 
     ### Database Messages ###
     CONNECTION_OK = Color.GREEN.value + "Connection to db executed" + Color.END.value
@@ -52,16 +53,29 @@ class UserMessages(Enum):
     UPDATE_OK = Color.GREEN.value + "Update performed correctly" + Color.END.value
 
     ### Task planning info ###
-    TASK_DUPLICATION = Color.RED.value + "Task: {}, is duplicated" + Color.RED.value
-    CONSISTENCY_CHECK_FAILED = Color.RED.value + "Consistency Check of the problem failed" + Color.RED.value
-    PROBLEM_NOT_FEASIBLE = Color.RED.value + "The problem is infeasible: check the constraints!" + Color.RED.value
-    PROBLEM_NOT_FEASIBLE_DATA = Color.RED.value + "The problem is infeasible (data reasoning)!" + Color.RED.value
+    TASK_DUPLICATION = Color.RED.value + "Task: {}, is duplicated" + Color.END.value
+    CONSISTENCY_CHECK_FAILED = Color.RED.value + "Consistency Check of the problem failed" + Color.END.value
+    PROBLEM_NOT_FEASIBLE = Color.RED.value + "The problem is infeasible: check the constraints!" + Color.END.value
+    PROBLEM_NOT_FEASIBLE_DATA = Color.RED.value + "The problem is infeasible (data reasoning)!" + Color.END.value
+    PLAN_FAILED = Color.RED.value + "The plan is failed" + Color.END.value
+    # DISPATCH_TASK_MSG = Color.CYAN.value + "Published Task: {}, Agent: {}, T_start: {} T_end: {}" + Color.END.value
+    DISPATCH_TASK_MSG = Color.CYAN.value + "Published Task: {}, Agent: {}" + Color.END.value
+    FEEDBACK_TASK_MSG = Color.DARKCYAN.value + "Received feedback: {}, Agent: {}" + Color.END.value
+    FEEDBACK_TASK_EMPTY_LIST_MSG = Color.YELLOW.value + "Receive a feedback of empty tasks" + Color.END.value
+    FEEDBACK_WITHOUT_DISPATCH = Color.YELLOW.value + "Receive a feedback without have dispatched any task" + Color.END.value
+    TIMEOUT = Color.RED.value + "------- Timeout, waiting feedback of: {}  -------" + Color.END.value
 
+    ### Custom colored messages
+    CUSTOM_RED = Color.RED.value + "{}" + Color.END.value
+    CUSTOM_YELLOW = Color.YELLOW.value + "{}" + Color.END.value
+    CUSTOM_GREEN = Color.GREEN.value + "{}" + Color.END.value
+    CUSTOM_CYAN = Color.CYAN.value + "{}" + Color.END.value
+    CUSTOM_DARKCYAN = Color.DARKCYAN.value + "{}" + Color.END.value
 
 def show_timeline(problem_solution: List[TaskSolution]) -> None:
     solution = []
     for task in problem_solution:
-        solution.append(dict(Task=task.get_task().get_id(),
+        solution.append(dict(Task=task.get_task().get_type(),
                              Start=datetime.fromtimestamp(task.get_start_time()).strftime("2020-04-06 %I:%M:%S"),
                              Finish=datetime.fromtimestamp(task.get_end_time()).strftime("2020-04-06 %I:%M:%S"),
                              Agents=task.get_assignment()))
@@ -103,3 +117,4 @@ class Objective(Enum):
     SUM_T_START_END = 3
     SYNERGY = 4
     SUM_T_END = 5
+    OTHER = 6

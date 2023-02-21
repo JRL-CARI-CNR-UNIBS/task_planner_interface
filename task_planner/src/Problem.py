@@ -249,7 +249,13 @@ class Problem:
         return max(tasks_durations)
 
     def __repr__(self):
-        str = ""
-        for task in self.task_list:
-            str += task.__repr__()
-        return str
+        if self.task_list:
+            str = ""
+            for task in self.task_list:
+
+                print(task.__repr__())
+                str += "\n"
+                str += task.__repr__()
+            return str
+        else:
+            return "Empty Task List in Problem Definition"

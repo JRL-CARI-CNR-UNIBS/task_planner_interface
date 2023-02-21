@@ -7,17 +7,54 @@ from TaskPlanner import TaskPlanner
 from TaskPlannerHumanAware import TaskPlannerHumanAware
 from TaskPlannerHumanAwareEasier import TaskPlannerHumanAwareEasier
 
+from TaskPlannerSynergistic import TaskPlannerSynergistic
+from TaskPlannerSynergisticBand import TaskPlannerSynergisticBand
+from TaskDispatcher import TaskDispatcher
+from std_srvs.srv import Trigger
+import copy
+
+def params_exist(parameters: List[str]) -> bool:
+    params_exist_check = True
+    for param_name in parameters:
+        if not rospy.has_param(param_name):
+            rospy.logerr(UserMessages.PARAM_NOT_DEFINED_ERROR.value.format(param_name))
+            params_exist_check = False
+    return params_exist_check
+
 
 def main():
     rospy.init_node("task_planner")
+    parameters = ["~goal", "/agents", "/agents_group_names", "~optimization/n_recipe", "~execution/repetitions",
+                  "~execution/n_recipe"]
 
-    try:
-        task_goal = rospy.get_param("/goal")
-    except KeyError:
-        rospy.logerr(UserMessages.PARAM_NOT_DEFINED_ERROR.value.format("goal"))
+    if not params_exist(parameters):
         return 0
 
-    problem_to_solve = Problem(["human_right_arm", "ur5_on_guide"])
+    task_goal = rospy.get_param("~goal")
+    agents_name = rospy.get_param("/agents")
+    agents_group_name_param = rospy.get_param("/agents_group_names")
+
+    n_recipe_to_compute = rospy.get_param("~optimization/n_recipe")
+    n_repetitions = rospy.get_param("~execution/repetitions")
+    n_recipe_to_execute = rospy.get_param("~execution/n_recipe")
+
+    rospy.wait_for_service('/reload_scene')
+
+    reload_scene_srv_client = rospy.ServiceProxy('/reload_scene', Trigger)
+
+    agents_group_name = []
+    for agent_type in agents_name.values():
+        for agent in agent_type:
+
+            if agent not in list(agents_group_name_param.keys()):
+                rospy.logerr(UserMessages.CUSTOM_RED.value.format(
+                    "Param: agents_group_names, does not contain group name of agent: " + str(agent)))
+                return 0
+            agents_group_name.append(agents_group_name_param[agent])
+    # print(agents_group_name)
+    # agents_group_name = ["human_right_arm", "ur5_on_guide"]
+
+    problem_to_solve = Problem(agents_group_name)
 
     for task in task_goal:
         assert len(task.keys()) == 1
@@ -45,17 +82,39 @@ def main():
         return 0
     problem_to_solve.update_tasks_statistics()
     problem_to_solve.update_tasks_synergy()
+    print(problem_to_solve)
     rospy.loginfo(f"Consistency Check: {problem_to_solve.consistency_check()}")
     try:
-        # tp = TaskPlanner("Task_Planning&Scheduling",
-        #                                  problem_to_solve)
-        tp = TaskPlannerHumanAwareEasier("Task_Planning&Scheduling",
-                                         problem_to_solve,
-                                         behaviour=Behaviour.CONTINUOUS,
-                                         objective=Objective.MAKESPAN)
+        tp = TaskPlanner("tp",
+                         problem_to_solve,
+                         objective=Objective.MAKESPAN,
+                         n_solutions=n_recipe_to_compute)
+        # tp = TaskPlannerHumanAware("tp",
+        #                            problem_to_solve,
+        #                            behaviour=Behaviour.CONTINUOUS,
+        #                            objective=Objective.SYNERGY)
+        # tp = TaskPlannerSynergistic("Task_Planning&Scheduling",
+        #                             problem_to_solve,
+        #                             behaviour=Behaviour.CONTINUOUS,
+        #                             objective=Objective.SYNERGY)
+        # tp = TaskPlannerSynergisticBand("tp",
+        #                                 problem_to_solve,
+        #                                 behaviour=Behaviour.CONTINUOUS,
+        #                                 objective=Objective.SYNERGY,
+        #                                 epsilon = 0.2,
+        #                                 relaxed = True)
+        # tp = TaskPlannerHumanAware("Task_Planning&Scheduling",
+        #                  problem_to_solve,
+        #                    behaviour=Behaviour.CONTINUOUS,
+        #                  objective=Objective.MAKESPAN)
+        # tp = TaskPlannerHumanAwareEasier("Task_Planning&Scheduling",
+        #                                  problem_to_solve,
+        #                                  behaviour=Behaviour.CONTINUOUS,
+        #                                  objective=Objective.OTHER)
     except ValueError:
         rospy.logerr(UserMessages.CONSISTENCY_CHECK_FAILED.value)
         return 0
+
     tp.initialize()
     tp.create_model()
     tp.add_precedence_constraints()
@@ -67,10 +126,49 @@ def main():
     if not tp.check_feasibility():
         rospy.logerr(UserMessages.PROBLEM_NOT_FEASIBLE_DATA.value.format())
         return 0
+
     tp.solve()
-    # print(tp.get_solution())
-    show_timeline(tp.get_solution())
-    show_gantt(tp.get_solution())
+    # for k in range(10):
+    #     try:
+    #         show_timeline(tp.get_solution(k))
+    #     except Exception:
+    #         pass
+
+    td = TaskDispatcher(agents_group_name, agents_group_name_param, "Task_Allocation_Scheduling")
+
+    for n_rep in range(1, n_repetitions + 1):
+        td.dispatch_solution(copy.deepcopy(tp.get_solution(1)))
+        while not rospy.is_shutdown():
+
+            executed_task = td.get_performed_task()
+            if executed_task is not None:
+                problem_to_solve.remove_task(executed_task.get_task())
+
+            if td.is_failed():
+                print("The plan is failed")
+                break
+            if td.is_finished():
+                td.send_recipe_end()
+                print("The plan is finished")
+                break
+            rospy.sleep(1)
+        try:
+            reload_scene_response = reload_scene_srv_client()
+            rospy.loginfo(UserMessages.SERVICE_CALLBACK.value.format("reload_scene"))
+        except rospy.ServiceException as e:
+            rospy.loginfo(UserMessages.SERVICE_FAILED.value.format("reload_scene"))
+
+    #     for agent in agents:
+    #         task_exec =td.get_performed_task
+    #     rospy.sleep(1)
+    # threads.append(threading.Thread(target=td.dispatch_solution(tp.get_solution(1)), args=tp.get_solution(1)))
+    #     print("prova")
+    # print("ora")
+    # for thread in threads:
+    #     print("dentro")
+    #     thread.start()
+    # td.dispatch_solution(tp.get_solution(1))
+    # show_gantt(tp.get_solution())
     # rospy.loginfo(f"Consistency Check: {problem_to_solve.consistency_check()}")
 
 
