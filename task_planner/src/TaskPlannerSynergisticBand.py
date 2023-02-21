@@ -34,6 +34,12 @@ class TaskPlannerSynergisticBand(TaskPlanner):
                                                                     vtype=gp.GRB.CONTINUOUS,
                                                                     lb=0,
                                                                     ub=self.problem_definition.get_nominal_upper_bound())
+        self.decision_variables["d_i_h_tilde"] = self.model.addVars(tasks_list,
+                                                                    name="d_i_h_tilde",
+                                                                    vtype=gp.GRB.CONTINUOUS,
+                                                                    lb=0,
+                                                                    ub=self.problem_definition.get_nominal_upper_bound())
+
         if self.behaviour == Behaviour.DISCRETE:
             self.decision_variables["overlapping"] = self.model.addVars(tasks_pairs,
                                                                         name="overlapping",
@@ -60,10 +66,14 @@ class TaskPlannerSynergisticBand(TaskPlanner):
 
             if (agent_h, task_i) not in self.decision_variables["assignment"].keys():
                 duration_i_h = 0
+                self.model.addConstr(self.decision_variables["d_i_h_tilde"][task_i] == 0)
+
             else:
                 a_i_h = self.decision_variables["assignment"][(agent_h, task_i)]
                 d_i_h_hat = cost[(agent_h, task_i)]
                 duration_i_h = a_i_h * d_i_h_hat
+                self.model.addConstr(self.decision_variables["d_i_h_tilde"][task_i] >= duration_i_h * 0.5)
+                self.model.addConstr(self.decision_variables["d_i_h_tilde"][task_i] <= duration_i_h * 1.5)
 
             if (agent_r, task_i) not in self.decision_variables["assignment"].keys():
                 duration_i_r = 0
@@ -90,7 +100,7 @@ class TaskPlannerSynergisticBand(TaskPlanner):
                     (agent_r, task_i)]
             d_i = self.decision_variables["duration"][task_i]
 
-            self.model.addConstr(d_i == duration_i_h + duration_i_r)
+            self.model.addConstr(d_i == self.decision_variables["d_i_h_tilde"][task_i] + duration_i_r)
 
     def add_overlapping_constraints(self, upper_bound=None):
 

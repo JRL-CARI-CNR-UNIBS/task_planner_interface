@@ -84,11 +84,13 @@ class TaskPlannerSynergistic(TaskPlanner):
                                 d_i_r_tilde[task_i] += overlapping * (synergy - 1) * a_k_h
                 self.model.addConstr(self.decision_variables["d_i_r_tilde"][task_i] == d_i_r_tilde[task_i])
                 self.model.addConstr(self.decision_variables["d_i_r_tilde"][task_i] >= 0.7 * cost[(agent_r, task_i)])
+
                 duration_i_r = self.decision_variables["d_i_r_tilde"][task_i] * self.decision_variables["assignment"][
                     (agent_r, task_i)]
             d_i = self.decision_variables["duration"][task_i]
 
             self.model.addConstr(d_i == duration_i_h + duration_i_r)
+            self.model.addConstr(self.decision_variables["duration"][task_i] == self.decision_variables["t_end"][task_i] - self.decision_variables["t_start"][task_i])
 
 
     def add_overlapping_constraints(self, upper_bound=None):
@@ -96,8 +98,8 @@ class TaskPlannerSynergistic(TaskPlanner):
         for task_i, task_k in self.decision_variables["overlapping"].keys():
             d_i = self.decision_variables["t_end"][task_i] - self.decision_variables["t_start"][task_i]
             d_k = self.decision_variables["t_end"][task_k] - self.decision_variables["t_start"][task_k]
-            self.model.addConstr(self.decision_variables["duration"][task_i] == d_i)
-            self.model.addConstr(self.decision_variables["duration"][task_k] == d_k)
+            # self.model.addConstr(self.decision_variables["duration"][task_i] == d_i)
+            # self.model.addConstr(self.decision_variables["duration"][task_k] == d_k)
 
             t_i_start = self.decision_variables["t_start"][task_i]
             t_i_end = self.decision_variables["t_end"][task_i]
@@ -153,7 +155,7 @@ class TaskPlannerSynergistic(TaskPlanner):
 
     def get_solution(self) -> List[TaskSolution]:
         for v in self.model.getVars():
-            if "idle" in v.varName or "min_tend" in v.varName or "duration" in v.varName or "tStart" in v.varName or "assignment" in v.varName or "tot" in v.varName or "t_end_robot" in v.varName or "t_end_human" in v.varName or "t_end" in v.varName or "t_start" in v.varName:
+            if "idle" in v.varName or "min_tend" in v.varName or "duration" in v.varName or "tStart" in v.varName or "assignment" in v.varName or "tot" in v.varName or "t_end_robot" in v.varName or "t_end_human" in v.varName or "t_end" in v.varName or "t_start" in v.varName or "overlapping" in v.varName:
                 print(v.varName, v.x)
 
         agents = self.problem_definition.get_agents()

@@ -46,7 +46,7 @@ class TaskPlanner:
         # Set the model able to find more than one solution
         self.model.setParam("PoolSearchMode", 2)
         self.model.setParam("PoolSolutions", self.n_solutions)
-
+        # self.model.
         self.decision_variables = {}
 
     def create_model(self) -> None:
@@ -186,8 +186,8 @@ class TaskPlanner:
 
         problem_solution = []
         for task in task_lists:
-            t_start = self.decision_variables["t_start"][task].X
-            t_end = self.decision_variables["t_end"][task].X
+            t_start = self.decision_variables["t_start"][task].Xn
+            t_end = self.decision_variables["t_end"][task].Xn
             # assignments = self.decision_variables["assignment"].select("*", task)
 
             assignment = None
@@ -195,7 +195,7 @@ class TaskPlanner:
                 decision_variable = self.decision_variables["assignment"].select(agent, task)
                 if decision_variable:
                     assert len(decision_variable) == 1
-                    if len(decision_variable) == 1 and decision_variable[0].X == 1:
+                    if len(decision_variable) == 1 and decision_variable[0].Xn == 1:
                         # if len(decision_variable) == 1 and decision_variable[0].X == 1:
                         assignment = agent
             try:

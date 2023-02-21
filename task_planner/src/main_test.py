@@ -6,6 +6,8 @@ from Problem import Problem
 from TaskPlanner import TaskPlanner
 from TaskPlannerHumanAware import TaskPlannerHumanAware
 from TaskPlannerHumanAwareEasier import TaskPlannerHumanAwareEasier
+from TaskPlannerSynergistic import TaskPlannerSynergistic
+from TaskPlannerSynergisticBand import TaskPlannerSynergisticBand
 
 
 def main():
@@ -47,12 +49,22 @@ def main():
     problem_to_solve.update_tasks_synergy()
     rospy.loginfo(f"Consistency Check: {problem_to_solve.consistency_check()}")
     try:
-        # tp = TaskPlanner("Task_Planning&Scheduling",
-        #                                  problem_to_solve)
-        tp = TaskPlannerHumanAwareEasier("Task_Planning&Scheduling",
+        tp = TaskPlanner("Task_Planning&Scheduling",
                                          problem_to_solve,
-                                         behaviour=Behaviour.CONTINUOUS,
-                                         objective=Objective.MAKESPAN)
+                         n_solutions=10)
+        # tp = TaskPlannerHumanAware("Task_Planning&Scheduling",
+        #                                  problem_to_solve,
+        #                                  behaviour=Behaviour.CONTINUOUS,
+        #                                  objective=Objective.SYNERGY)
+        # tp = TaskPlannerSynergisticBand("Task_Planning&Scheduling",
+        #                                  problem_to_solve,
+        #                                  behaviour=Behaviour.CONTINUOUS,
+        #                                  objective=Objective.MAKESPAN)
+        # tp = TaskPlannerSynergistic("Task_Planning&Scheduling",
+        #                             problem_to_solve,
+        #                             behaviour=Behaviour.CONTINUOUS,
+        #                             objective=Objective.SYNERGY)
+
     except ValueError:
         rospy.logerr(UserMessages.CONSISTENCY_CHECK_FAILED.value)
         return 0
@@ -69,8 +81,9 @@ def main():
         return 0
     tp.solve()
     # print(tp.get_solution())
-    show_timeline(tp.get_solution())
-    show_gantt(tp.get_solution())
+    for k in range(10):
+        show_timeline(tp.get_solution(k))
+    # show_gantt(tp.get_solution())
     # rospy.loginfo(f"Consistency Check: {problem_to_solve.consistency_check()}")
 
 

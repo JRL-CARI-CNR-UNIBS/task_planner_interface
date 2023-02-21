@@ -61,7 +61,7 @@ class UserMessages(Enum):
 def show_timeline(problem_solution: List[TaskSolution]) -> None:
     solution = []
     for task in problem_solution:
-        solution.append(dict(Task=task.get_task().get_id(),
+        solution.append(dict(Task=task.get_task().get_type(),
                              Start=datetime.fromtimestamp(task.get_start_time()).strftime("2020-04-06 %I:%M:%S"),
                              Finish=datetime.fromtimestamp(task.get_end_time()).strftime("2020-04-06 %I:%M:%S"),
                              Agents=task.get_assignment()))

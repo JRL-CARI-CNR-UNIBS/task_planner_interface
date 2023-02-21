@@ -141,8 +141,11 @@ class TaskPlannerHumanAware(TaskPlanner):
             if self.behaviour == Behaviour.DISCRETE:
                 self.model.addConstr((self.decision_variables["overlapping"][(task_i, task_j)] == check_parallelism))
             elif self.behaviour == Behaviour.CONTINUOUS:
-                self.model.addConstr((self.decision_variables["overlapping"][(task_i, task_j)] == (
-                        min_t_end - max_t_start) * check_parallelism))
+                self.model.addConstr((check_parallelism ==0) >> (self.decision_variables["overlapping"][(task_i, task_j)] == 0))
+                self.model.addConstr((check_parallelism ==1) >> (self.decision_variables["overlapping"][(task_i, task_j)] == ( min_t_end - max_t_start)))
+
+                # self.model.addConstr((self.decision_variables["overlapping"][(task_i, task_j)] == (
+                #         min_t_end - max_t_start) * check_parallelism))
 
     def get_solution(self) -> List[TaskSolution]:
         for v in self.model.getVars():
