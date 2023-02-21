@@ -64,6 +64,9 @@ class MongoHandler:
             rospy.logerr(RED + CONNECTION_FAILED + END)
             raise
         pass
+        if db_name not in client.list_database_names():
+            rospy.loginfo(RED + "The specified db does not exist. A db with empty collections will be created. " + END)
+
         self.db = client[db_name]
         self.coll_skills = self.db[coll_properties_name]
         self.coll_results = self.db[coll_results_name]
@@ -130,7 +133,10 @@ class MongoHandler:
             "recipe": task_result_msg.recipe,
             "agent": task_result_msg.agent,
             "t_start": task_result_msg.t_start.to_sec(),
-            "t_end": task_result_msg.t_end.to_sec()
+            "t_end": task_result_msg.t_end.to_sec(),
+            "t_start_planned": task_result_msg.t_start_planned,  # Added for milp
+            "t_end_planned": task_result_msg.t_end_planned,
+
         }
 
         try:
@@ -166,7 +172,7 @@ class MongoHandler:
             skill_response.error = True
             return skill_response
 
-        if query_result == None:  # Task properties not found
+        if query_result is None:  # Task properties not found
             rospy.logerr(TASK_NO_PRESENT)
             skill_response.error = True
         else:
@@ -207,7 +213,7 @@ class MongoHandler:
             skill_response.error = True
             return skill_response
 
-        if query_result == None:  # Task properties not found
+        if query_result is None:  # Task properties not found
             rospy.logerr(TASK_NO_PRESENT)
             skill_response.error = True
         else:
@@ -249,7 +255,7 @@ class MongoHandler:
             skill_response.error = True
             return skill_response
 
-        if query_result == None:  # Task properties not found
+        if query_result is None:  # Task properties not found
             rospy.logerr(TASK_NO_PRESENT)
             skill_response.error = True
         else:
@@ -276,7 +282,7 @@ class MongoHandler:
             skill_response.error = True
             return skill_response
 
-        if query_result == None:  # Task properties not found
+        if query_result is None:  # Task properties not found
             rospy.logerr(TASK_NO_PRESENT)
             skill_response.error = True
         else:

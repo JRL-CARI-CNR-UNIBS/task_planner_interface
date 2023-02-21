@@ -9,6 +9,10 @@ float64 path_length
 string recipe
 time t_start
 time t_end
+
+float64 t_start_planned
+float64 t_end_planned
+
 ---
 bool success
 string message

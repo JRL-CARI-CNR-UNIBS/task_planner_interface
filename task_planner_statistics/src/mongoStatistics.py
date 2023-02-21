@@ -91,7 +91,10 @@ class MongoStatistics:
             rospy.logerr(RED + CONNECTION_FAILED + END)
             raise
 
+        if db_name not in client.list_database_names():
+            rospy.loginfo(RED + "The specified db does not exist. A db with empty collections will be created. " + END)
         self.db = client[db_name]
+
         self.coll_skills = self.db[coll_properties_name]
         self.coll_results = self.db[coll_results_name]
         self.coll_interaction = self.db[coll_risk_name]
@@ -100,7 +103,7 @@ class MongoStatistics:
         self.coll_durations_name = coll_duration_name
         self.coll_results_name = coll_results_name
 
-        self.utils_results_name = "utils_results_2"
+        self.utils_results_name = "utils_task_results"
 
         self.coll_utils_results = self.db[self.utils_results_name]
 
@@ -1874,7 +1877,7 @@ class MongoStatistics:
                 task_synergy.synergy = single_task_synergy["dynamic_risk"]
                 task_synergy.std_err = single_task_synergy["std_err"]
                 task_synergy.success_rate = single_task_synergy["success_rate"]
-                #TODO: Before append check that is unique
+                # TODO: Before append check that is unique
                 synergies_response.synergies.append(task_synergy)
         except pymongo.errors.AutoReconnect:  # Db connection failed
             rospy.logerr(CONNECTION_LOST)
@@ -1884,39 +1887,46 @@ class MongoStatistics:
 def main():
     rospy.init_node("mongo_statistics")
 
-    # try:
-    #     db_name=rospy.get_param("~mongo_database")   
-    # except KeyError:   
-    #     rospy.logerr(RED + PARAM_NOT_DEFINED_ERROR.format("mongo_database") + END)
-    #     return 0
-    # try:
-    #     coll_properties_name=rospy.get_param("~mongo_collection_tasks")   
-    # except KeyError:   
-    #     rospy.logerr(RED + PARAM_NOT_DEFINEtask
-    # try:
-    #     coll_duration_name=rospy.get_param("~coll_duration_name")   
-    # except KeyError:
-    #     rospy.logerr(RED + PARAM_NOT_DEFINED_ERROR.format("coll_duration_name") + END)
-    #     return 0
-    # try:
-    #     coll_risk_name=rospy.get_param("~coll_risk_name")   
-    # except KeyError:        
-    #     rospy.logerr(RED + PARAM_NOT_DEFINED_ERROR.format("coll_risk_name") + END)
-    #     return 0    
-    # try:
-    #     fig_folder=rospy.get_param("~fig_folder_path")
-    # except KeyError:
-    #     rospy.logerr(RED + PARAM_NOT_DEFINED_ERROR.format("fig_folder_path") + END)
-    #     fig_folder = "file"
-    #     rospy.logerr("fig_folder set to: " + fig_folder)
+    try:
+        db_name = rospy.get_param("~mongo_database")
+    except KeyError:
+        rospy.logerr(RED + PARAM_NOT_DEFINED_ERROR.format("mongo_database") + END)
+        return 0
+    try:
+        coll_properties_name = rospy.get_param("~mongo_collection_tasks")
+    except KeyError:
+        rospy.logerr(RED + PARAM_NOT_DEFINED_ERROR.format("mongo_collection_tasks") + END)
+    try:
+        coll_results_name = rospy.get_param("~mongo_collection_results")
+    except KeyError:
+        rospy.logerr(RED + PARAM_NOT_DEFINED_ERROR.format("mongo_collection_results") + END)
+        return 0
+    try:
+        coll_duration_name = rospy.get_param("~coll_duration_name")
+    except KeyError:
+        rospy.logerr(RED + PARAM_NOT_DEFINED_ERROR.format("coll_duration_name") + END)
+        return 0
+    try:
+        coll_risk_name = rospy.get_param("~coll_risk_name")
+    except KeyError:
+        rospy.logerr(RED + PARAM_NOT_DEFINED_ERROR.format("coll_risk_name") + END)
+        return 0
+    try:
+        fig_folder = rospy.get_param("~fig_folder_path")
+    except KeyError:
+        rospy.logerr(RED + PARAM_NOT_DEFINED_ERROR.format("fig_folder_path") + END)
+        fig_folder = "file"
+        rospy.logerr("fig_folder set to: " + fig_folder)
 
-    db_name = "agents_synergy"
-    coll_properties_name = "tasks_properties_test"
-    coll_results_name = "sinergy_results_test_long"  # "results_test"
-    coll_duration_name = "durations_long_min"
-    coll_risk_name = "dynamics_long_test_outliers_3"
-
-    fig_folder = "/home/samuele/projects/planning_ws/src/task-planner-interface/task_planner_statistics/file/"
+    # db_name = "agents_synergy"
+    # coll_properties_name = "tasks_properties_test"
+    # coll_results_name = "sinergy_results_test_long"  # "results_test"
+    #
+    # coll_duration_name = "durate"
+    #
+    # # coll_risk_name = "dynamics_long_test_outliers_3"
+    # coll_risk_name = "sinergie"
+    # fig_folder = "/home/samuele/projects/planning_ws/src/task-planner-interface/task_planner_statistics/file/"
 
     try:
         mongo_statistics = MongoStatistics(db_name, coll_properties_name, coll_results_name, coll_duration_name,
