@@ -135,20 +135,22 @@ def main():
     #         pass
 
     td = TaskDispatcher(agents_group_name, agents_group_name_param, "Task_Allocation_Scheduling")
-
+    actual_problem_to_solve = copy.deepcopy(problem_to_solve)
+    show_timeline(tp.get_solution(1))
     for n_rep in range(1, n_repetitions + 1):
         td.dispatch_solution(copy.deepcopy(tp.get_solution(1)))
         while not rospy.is_shutdown():
 
             executed_task = td.get_performed_task()
             if executed_task is not None:
-                problem_to_solve.remove_task(executed_task.get_task())
+                actual_problem_to_solve.remove_task(executed_task.get_task())
 
             if td.is_failed():
                 print("The plan is failed")
                 break
             if td.is_finished():
                 td.send_recipe_end()
+                rospy.sleep(10)
                 print("The plan is finished")
                 break
             rospy.sleep(1)

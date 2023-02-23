@@ -37,12 +37,14 @@ class TaskDispatcher:
     task_number_publisher: Dict[str, rospy.Publisher] = field(default_factory=dict, init=False)
     completion_publisher: Dict[str, rospy.Publisher] = field(default_factory=dict, init=False)
 
-    def __post_init__(self):
+    def reset_agents_info(self):
         self.busy = dict.fromkeys(self.agents, False)
         self.busy_time = dict.fromkeys(self.agents, 0)
         self.task_number = dict.fromkeys(self.agents, 0)
         self.completion_percentage = dict.fromkeys(self.agents, 0)
 
+    def __post_init__(self):
+        self.reset_agents_info()
         if not rospy.has_param("/prefix"):
             rospy.logerr(UserMessages.PARAM_NOT_DEFINED_ERROR.value.format("prefix"))
             raise Exception
@@ -133,6 +135,7 @@ class TaskDispatcher:
             rate.sleep()
 
     def dispatch_solution(self, task_solutions: List[TaskSolution]):
+        self.reset_agents_info()
         # task_solutions: Dict[str, TaskSolution]
         task_solutions.sort(key=lambda task_sol: task_sol.get_start_time())
 
@@ -183,4 +186,3 @@ class TaskDispatcher:
                                                             tasks=[task_request])
             self.request_publishers[agent].publish(request_array)
             self.task_number[agent] += 1
-
