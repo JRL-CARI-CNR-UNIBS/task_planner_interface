@@ -46,12 +46,12 @@ class MongoInterface:
         # self.collection_durations = self.db[self.collection_durations_name]
         # self.collection_synergies = self.db[self.collection_synergies_name]
 
-    def collection_exist(self,collection_name):
+    def collection_exist(self, collection_name: str):
         if collection_name not in self.db.list_collection_names():
             return False
         return True
 
-    def query(self, collection_name, pipeline):
+    def query(self, collection_name: str, pipeline: str):
         if not self.collection_exist(collection_name):
             raise Exception(f"Collection {collection_name} is not in database")
 
