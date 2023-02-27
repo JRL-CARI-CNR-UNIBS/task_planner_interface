@@ -85,7 +85,7 @@ class TaskDispatcher:
         task = task_solution.get_task()
         task_request = MotionTaskExecutionRequest(task_id=task.get_type(),
                                                   task_name=task.get_id(),
-                                                  expected_time=task.get_duration(agent),
+                                                  # expected_time=task.get_duration(agent),
                                                   t_start_planned=task_solution.get_start_time(),
                                                   t_end_planned=task_solution.get_end_time(),
                                                   recipe_name=self.recipe_name)
@@ -107,19 +107,15 @@ class TaskDispatcher:
 
         while not rospy.is_shutdown():
             if all([len(task_list) == 0 for task_list in self.task_solutions.values()]):
+                print("Empty all")
                 break
             for agent in self.agents:
                 t = rospy.Time.now().to_sec() - t0.to_sec()
                 agent_task_solution = self.task_solutions[agent]
                 if not agent_task_solution:
-                    break
+                    # print("finito agente "+ agent)
+                    continue
                 if t >= agent_task_solution[0].get_start_time() and not self.busy[agent]:
-                    # if agent_task_solution[0].get_task().get_id() == "go_home":
-                    #     self.go_home(agent)
-                    #     self.busy[agent] = True
-                    #     self.busy_time[agent] = t
-                    #     continue
-
                     self.publish_task_request(agent, agent_task_solution[0])
                     rospy.loginfo(
                         UserMessages.DISPATCH_TASK_MSG.value.format(agent_task_solution[0].get_task().get_id(), agent))
@@ -127,11 +123,6 @@ class TaskDispatcher:
                     self.busy[agent] = True
                     # self.completion_percentage[agent] = 0
                     self.busy_time[agent] = t
-                # if t <= agent_task_solution[0].get_start_time() - 10 and not self.busy[agent]:  # PORCATA
-                #     print("dentroooo")
-                #     self.go_home(agent)
-                #     self.busy[agent] = True
-                #     self.busy_time[agent] = t
 
                 if self.busy[agent]:
                     self.completion_percentage[agent] = (t - self.busy_time[agent]) / (
@@ -158,6 +149,7 @@ class TaskDispatcher:
 
         for agent in self.agents:
             self.tot_task_number[agent] = len(self.task_solutions[agent])
+            print(f"Total task to perform by agent: {agent} is: {self.tot_task_number[agent]}")
 
         thread = threading.Thread(target=self.publish_request)
         thread.daemon = True
@@ -181,6 +173,7 @@ class TaskDispatcher:
 
     def is_finished(self):
         if all([len(task_list) == 0 for task_list in self.task_solutions.values()]):
+            print("Piano terminatoooooo")
             return True
         return False
 
@@ -200,10 +193,10 @@ class TaskDispatcher:
             self.request_publishers[agent].publish(request_array)
             self.task_number[agent] += 1
 
-    def go_home(self, agent):
-        task_request = MotionTaskExecutionRequest(task_id="go_home",
-                                                  recipe_name=self.recipe_name)
-
-        request_array = MotionTaskExecutionRequestArray(cmd_id=100,
-                                                        tasks=[task_request])
-        self.request_publishers[agent].publish(request_array)
+    # def go_home(self, agent):
+    #     task_request = MotionTaskExecutionRequest(task_id="go_home",
+    #                                               recipe_name=self.recipe_name)
+    #
+    #     request_array = MotionTaskExecutionRequestArray(cmd_id=100,
+    #                                                     tasks=[task_request])
+    #     self.request_publishers[agent].publish(request_array)
