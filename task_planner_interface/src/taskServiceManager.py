@@ -168,6 +168,9 @@ class TaskServiceManager:
 
                         self.recipe_index += 1  # Increment recipe index
 
+                    elif task == "go_home":
+                        self.execute_go_home(task, task_cmd_id)  # Il task name
+                        rospy.loginfo(f"Agent {self.agent} sent in home")
                     elif task_type_msg.type == "pause":  # è = pause and exist in db properties
 
                         pause_properties_msg = self.pause_properties(task)  # task_name non task_type
@@ -315,6 +318,19 @@ class TaskServiceManager:
         self.action_client.wait_for_result()
         rospy.loginfo(GREEN + "End of recipe" + END)
 
+    def execute_go_home(self, task_name, task_cmd_id):
+        """Method for ask execution of task (calling action server)
+
+        Args:
+            task_name (String): Task name
+            task_cmd_id (Int): cmd_id int identifier read by message usefull for feedback
+        """
+        goal = TaskExecuteGoal(task_name)
+        self.action_client.send_goal(goal)
+
+        self.action_client.wait_for_result()
+        self.pub_feedback_task_planner.publish(MotionTaskExecutionFeedback(task_cmd_id, 1))
+        rospy.loginfo(GREEN + "Go home executed" + END)
 
 def main():
     rospy.init_node("task_service_manager")
