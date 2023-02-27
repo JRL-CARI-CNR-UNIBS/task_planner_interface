@@ -13,7 +13,6 @@ import pandas as pd
 class DistanceMonitoring:
     distance_topic_name: str = field(init=True)
     file_path: Path = field(init=True)
-    window_size: int = field(default=5, init=True)
 
     distance_sub: rospy.Subscriber = field(init=False)
     recipe_name: str = field(default=None, init=False)
@@ -28,6 +27,7 @@ class DistanceMonitoring:
     recipe_name_srv: rospy.Service = field(init=False)
 
     acquire: bool = field(default=False, init=False)
+    window_size: int = field(default=5, init=True)
 
     def __post_init__(self):
         self.reset_window_data()
@@ -52,6 +52,7 @@ class DistanceMonitoring:
             return 0
         self.window_data[self.n_received_sample] = msg.data
         self.n_received_sample += 1
+        print(self.n_received_sample)
         if self.n_received_sample == self.window_size:
             self.timeseries_mean = np.append(self.timeseries_mean, self.window_data.mean())
             self.timeseries_std = np.append(self.timeseries_std, self.window_data.std())
