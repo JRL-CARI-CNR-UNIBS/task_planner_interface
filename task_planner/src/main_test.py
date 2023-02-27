@@ -11,7 +11,9 @@ from TaskPlannerSynergistic import TaskPlannerSynergistic
 from TaskPlannerSynergisticBand import TaskPlannerSynergisticBand
 from TaskDispatcher import TaskDispatcher
 from std_srvs.srv import Trigger
+from std_msgs.msg import String
 import copy
+
 
 def params_exist(parameters: List[str]) -> bool:
     params_exist_check = True
@@ -20,6 +22,10 @@ def params_exist(parameters: List[str]) -> bool:
             rospy.logerr(UserMessages.PARAM_NOT_DEFINED_ERROR.value.format(param_name))
             params_exist_check = False
     return params_exist_check
+
+
+def add_end_task_for_gap():
+    pass
 
 
 def main():
@@ -38,9 +44,12 @@ def main():
     n_repetitions = rospy.get_param("~execution/repetitions")
     n_recipe_to_execute = rospy.get_param("~execution/n_recipe")
 
-    rospy.wait_for_service('/reload_scene')
+    # rospy.wait_for_service('/reload_scene')
 
     reload_scene_srv_client = rospy.ServiceProxy('/reload_scene', Trigger)
+
+    pub_recipe_name = rospy.Publisher("set_recipe_name", String)
+    stop_distance_acq_srv_client = rospy.ServiceProxy("stop_distance_acq", Trigger)
 
     agents_group_name = []
     for agent_type in agents_name.values():
@@ -138,7 +147,23 @@ def main():
     actual_problem_to_solve = copy.deepcopy(problem_to_solve)
     show_timeline(tp.get_solution(1))
     for n_rep in range(1, n_repetitions + 1):
-        td.dispatch_solution(copy.deepcopy(tp.get_solution(1)))
+        tp.get_solution(1)
+        tasks_solution = copy.deepcopy(tp.get_solution(1))
+        # td.dispatch_solution(copy.deepcopy(tp.get_solution(1)))
+
+        # Add go to home as last task
+        # for agent in agents_group_name:
+        #     max_t_end = 0
+        #     for task_sol in tasks_solution:
+        #         if task_sol.get_assignment() == agent:
+        #             if task_sol.get_end_time() > max_t_end:
+        #                 max_t_end = task_sol.get_end_time()
+        #
+        #     tasks_solution.append(
+        #         TaskSolution(Task("go_home", "go_home", [agent], []), max_t_end + 0.1, max_t_end + 0.2, agent))
+        print(tasks_solution)
+        pub_recipe_name.publish(String("Task_Allocation_Scheduling" + str(n_rep)))
+        td.dispatch_solution(tasks_solution)
         while not rospy.is_shutdown():
 
             executed_task = td.get_performed_task()
@@ -149,16 +174,25 @@ def main():
                 print("The plan is failed")
                 break
             if td.is_finished():
-                td.send_recipe_end()
-                rospy.sleep(10)
+                try:
+                    reload_scene_srv_resp = reload_scene_srv_client()
+                    rospy.loginfo(UserMessages.SERVICE_CALLBACK.value.format("reload_scene"))
+                except rospy.ServiceException as e:
+                    rospy.loginfo(UserMessages.SERVICE_FAILED.value.format("reload_scene"))
+
                 print("The plan is finished")
+                td.send_recipe_end()
+                print("The plan is finished")
+
+                rospy.sleep(10)
+
                 break
             rospy.sleep(1)
         try:
-            reload_scene_response = reload_scene_srv_client()
-            rospy.loginfo(UserMessages.SERVICE_CALLBACK.value.format("reload_scene"))
+            stop_distance_acq_srv_client()
+            rospy.loginfo(UserMessages.SERVICE_CALLBACK.value.format("stop_distance_acq"))
         except rospy.ServiceException as e:
-            rospy.loginfo(UserMessages.SERVICE_FAILED.value.format("reload_scene"))
+            rospy.loginfo(UserMessages.SERVICE_FAILED.value.format("stop_distance_acq"))
 
     #     for agent in agents:
     #         task_exec =td.get_performed_task
