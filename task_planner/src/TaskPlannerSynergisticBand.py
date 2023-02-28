@@ -17,6 +17,8 @@ BIG_M = 1E12
 @dataclass
 class TaskPlannerSynergisticBand(TaskPlanner):
     behaviour: Behaviour = field(default=Behaviour.CONTINUOUS)
+    epsilon: float = field(default=0.0)
+    relaxed: bool = field(default=False)
 
     # objective: Objective
 
@@ -34,6 +36,12 @@ class TaskPlannerSynergisticBand(TaskPlanner):
                                                                     vtype=gp.GRB.CONTINUOUS,
                                                                     lb=0,
                                                                     ub=self.problem_definition.get_nominal_upper_bound())
+        self.decision_variables["d_i_h_tilde"] = self.model.addVars(tasks_list,
+                                                                    name="d_i_h_tilde",
+                                                                    vtype=gp.GRB.CONTINUOUS,
+                                                                    lb=0,
+                                                                    ub=self.problem_definition.get_nominal_upper_bound())
+
         if self.behaviour == Behaviour.DISCRETE:
             self.decision_variables["overlapping"] = self.model.addVars(tasks_pairs,
                                                                         name="overlapping",
@@ -60,11 +68,16 @@ class TaskPlannerSynergisticBand(TaskPlanner):
 
             if (agent_h, task_i) not in self.decision_variables["assignment"].keys():
                 duration_i_h = 0
+                # self.model.addConstr(self.decision_variables["d_i_h_tilde"][task_i] == 0)
             else:
                 a_i_h = self.decision_variables["assignment"][(agent_h, task_i)]
                 d_i_h_hat = cost[(agent_h, task_i)]
                 duration_i_h = a_i_h * d_i_h_hat
-
+                # self.model.addConstr((a_i_h == 1) >> (self.decision_variables["d_i_h_tilde"][task_i] >= duration_i_h*(1-self.eps)))
+                # self.model.addConstr((a_i_h == 1) >> (self.decision_variables["d_i_h_tilde"][task_i] <= duration_i_h*(1+self.eps)))
+                # self.model.addConstr((a_i_h == 0) >> (self.decision_variables["d_i_h_tilde"][task_i] == 0))
+            self.model.addConstr(self.decision_variables["d_i_h_tilde"][task_i] >= duration_i_h * (1 - self.epsilon))
+            self.model.addConstr(self.decision_variables["d_i_h_tilde"][task_i] <= duration_i_h * (1 + self.epsilon))
             if (agent_r, task_i) not in self.decision_variables["assignment"].keys():
                 duration_i_r = 0
             else:
@@ -82,23 +95,30 @@ class TaskPlannerSynergisticBand(TaskPlanner):
                             if (agent_h, task_k) in self.decision_variables["assignment"]:
                                 a_k_h = self.decision_variables["assignment"][(agent_h, task_k)]
                                 d_i_r_tilde[task_i] += overlapping * (synergy - 1) * a_k_h
-                self.model.addConstr(self.decision_variables["d_i_r_tilde"][task_i] == d_i_r_tilde[task_i])
+                if self.relaxed:
+                    self.model.addConstr(self.decision_variables["d_i_r_tilde"][task_i] >= d_i_r_tilde[task_i])
+                else:
+                    self.model.addConstr(self.decision_variables["d_i_r_tilde"][task_i] == d_i_r_tilde[task_i])
                 self.model.addConstr(self.decision_variables["d_i_r_tilde"][task_i] >= 0.7 * cost[(agent_r, task_i)])
-                self.model.addConstr(self.decision_variables["d_i_r_tilde"][task_i] <= 1.5 * cost[(agent_r, task_i)])
+
+                # self.model.addConstr(self.decision_variables["d_i_h_tilde"][task_i] >= duration_i_h * (1 - self.epsilon))
+                # self.model.addConstr(self.decision_variables["d_i_h_tilde"][task_i] <= duration_i_h * (1 + self.epsilon))
 
                 duration_i_r = self.decision_variables["d_i_r_tilde"][task_i] * self.decision_variables["assignment"][
                     (agent_r, task_i)]
             d_i = self.decision_variables["duration"][task_i]
 
-            self.model.addConstr(d_i == duration_i_h + duration_i_r)
+            self.model.addConstr(d_i == self.decision_variables["d_i_h_tilde"][task_i] + duration_i_r)
+            self.model.addConstr(
+                d_i == self.decision_variables["t_end"][task_i] - self.decision_variables["t_start"][task_i])
 
     def add_overlapping_constraints(self, upper_bound=None):
 
         for task_i, task_k in self.decision_variables["overlapping"].keys():
             d_i = self.decision_variables["t_end"][task_i] - self.decision_variables["t_start"][task_i]
             d_k = self.decision_variables["t_end"][task_k] - self.decision_variables["t_start"][task_k]
-            self.model.addConstr(self.decision_variables["duration"][task_i] == d_i)
-            self.model.addConstr(self.decision_variables["duration"][task_k] == d_k)
+            # self.model.addConstr(self.decision_variables["duration"][task_i] == d_i)
+            # self.model.addConstr(self.decision_variables["duration"][task_k] == d_k)
 
             t_i_start = self.decision_variables["t_start"][task_i]
             t_i_end = self.decision_variables["t_end"][task_i]
@@ -154,7 +174,7 @@ class TaskPlannerSynergisticBand(TaskPlanner):
 
     def get_solution(self) -> List[TaskSolution]:
         for v in self.model.getVars():
-            if "idle" in v.varName or "min_tend" in v.varName or "duration" in v.varName or "tStart" in v.varName or "assignment" in v.varName or "tot" in v.varName or "t_end_robot" in v.varName or "t_end_human" in v.varName or "t_end" in v.varName or "t_start" in v.varName or "overlapping" in v.varName:
+            if "idle" in v.varName or "min_tend" in v.varName or "duration" in v.varName or "tStart" in v.varName or "assignment" in v.varName or "tot" in v.varName or "t_end_robot" in v.varName or "t_end_human" in v.varName or "t_end" in v.varName or "t_start" in v.varName or "overlapping" in v.varName or "d_i_r_tilde" in v.varName or "d_i_h_tilde" in v.varName:
                 print(v.varName, v.x)
 
         agents = self.problem_definition.get_agents()
@@ -296,7 +316,7 @@ class TaskPlannerSynergisticBand(TaskPlanner):
             #                                        + gp.quicksum(t_start_robot) + gp.quicksum(t_start_human)))
             self.model.addConstr(idle_robot == duration_robot - gp.quicksum(t_end_robot) + gp.quicksum(t_start_robot))
             self.model.addConstr(idle_human == duration_human - gp.quicksum(t_end_human) + gp.quicksum(t_start_human))
-            self.model.addConstr(cost_function == sigma_val + idle_human + idle_robot)
+            self.model.addConstr(cost_function == sigma_val )
 
             # self.model.addConstr(duration == gp.max_(self.decision_variables["t_end"]))
 
