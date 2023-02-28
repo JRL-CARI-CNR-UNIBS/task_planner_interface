@@ -1,0 +1,17 @@
+# Solver Selection #
+optimization:
+  # type: base
+  # behaviour: continous
+  # objective: makespan
+  n_recipe: 10
+
+execution:
+  repetitions: 30
+  n_recipe: 1
+
+# Problem Info #
+# agents_name:
+#   - ur5_on_guide
+#   - human_right_arm
+#
+# main_agent: human_right_arm
