@@ -160,7 +160,7 @@ class TaskPlanner:
     def solve(self) -> None:
         # Optimization
         self.model.params.NonConvex = 2
-        self.model.optimize(callback)
+        self.model.optimize()
 
         status = self.model.Status
         if status in (gp.GRB.INF_OR_UNBD, gp.GRB.INFEASIBLE, gp.GRB.UNBOUNDED):
@@ -177,17 +177,14 @@ class TaskPlanner:
             raise ValueError(f"The solution number must be less than {self.n_solutions}")
         # Set the solution
         self.model.setParam(gp.GRB.Param.SolutionNumber, solution_number)
-        for v in self.model.getVars():
-            if "idle" in v.varName:
-                print(v.varName, v.x)
 
         agents = self.problem_definition.get_agents()
         task_lists = self.problem_definition.get_tasks_list()
 
         problem_solution = []
         for task in task_lists:
-            t_start = self.decision_variables["t_start"][task].X
-            t_end = self.decision_variables["t_end"][task].X
+            t_start = self.decision_variables["t_start"][task].Xn
+            t_end = self.decision_variables["t_end"][task].Xn
             # assignments = self.decision_variables["assignment"].select("*", task)
 
             assignment = None
@@ -195,7 +192,7 @@ class TaskPlanner:
                 decision_variable = self.decision_variables["assignment"].select(agent, task)
                 if decision_variable:
                     assert len(decision_variable) == 1
-                    if len(decision_variable) == 1 and decision_variable[0].X == 1:
+                    if len(decision_variable) == 1 and decision_variable[0].Xn == 1:
                         # if len(decision_variable) == 1 and decision_variable[0].X == 1:
                         assignment = agent
             try:

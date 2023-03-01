@@ -117,4 +117,5 @@ class Objective(Enum):
     SUM_T_START_END = 3
     SYNERGY = 4
     SUM_T_END = 5
-    OTHER = 6
+    ACTUAL_MAKESPAN = 6
+    OTHER = 7

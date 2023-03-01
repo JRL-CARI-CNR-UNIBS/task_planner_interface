@@ -79,7 +79,7 @@ class TaskDispatcher:
             self.current_task_publisher[agent_group_name] = rospy.Publisher(f"current_task_{agent_group_name}",
                                                                             String,
                                                                             queue_size=10)
-            rospy.sleep(1)
+            rospy.sleep(5)
 
     def publish_task_request(self, agent: str, task_solution: TaskSolution):
         task = task_solution.get_task()
