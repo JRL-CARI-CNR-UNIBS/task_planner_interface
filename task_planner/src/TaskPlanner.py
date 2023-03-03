@@ -92,7 +92,7 @@ class TaskPlanner:
 
         # Assignments constraints
         for task, not_enabled_agents in self.problem_definition.get_not_enabled_agents_constraints().items():
-            print(task, not_enabled_agents)
+            # print(task, not_enabled_agents)
             for agent in not_enabled_agents:
                 self.model.addConstr(self.decision_variables["assignment"][(agent, task)] == 0,
                                      name=f'not_enabled_assignment_{task}')
@@ -102,7 +102,7 @@ class TaskPlanner:
                               cost: Dict[Tuple[str, str], float]) -> None:
         # Tend constraints
         t_end = {}
-        print(agent_task_combination)
+        # print(agent_task_combination)
         for agent, task in agent_task_combination:
             if task not in t_end:
                 t_end[task] = self.decision_variables["t_start"][task]
@@ -141,6 +141,27 @@ class TaskPlanner:
             self.model.addConstr((assigned_both == 1) >> (t_start_i >= t_end_j - BIG_M * (1 - delta_ij)))
             self.model.addConstr((assigned_both == 1) >> (t_start_j >= t_end_i - BIG_M * delta_ij))
 
+    def add_precedence_constraints(self) -> None:
+        for task, precedence_tasks in self.problem_definition.get_precedence_constraints().items():
+            for precedence_task in precedence_tasks:
+                self.model.addConstr(
+                    self.decision_variables["t_start"][task] == self.decision_variables["t_end"][precedence_task])
+
+    def add_problem(self, problem: Problem) -> None:
+        # self.problem_definition.append(problem)
+        self.problem_definition = problem
+
+    def check_feasibility(self) -> bool:
+        try:
+            self.model.computeIIS()
+            if self.model.status == gp.GRB.INFEASIBLE:
+                for constraint in self.model.getConstrs():
+                    if constraint.IISConstr:
+                        print(f"{self.model.getRow(constraint)} {constraint.Sense} {constraint.RHS}")
+                return False
+        except gp.GurobiError:
+            return True
+
     def set_objective(self) -> None:
         cost_function = self.model.addVar(name="J", vtype=gp.GRB.CONTINUOUS)
 
@@ -153,13 +174,15 @@ class TaskPlanner:
             self.model.addConstr(cost_function == gp.quicksum(self.decision_variables["t_start"]))
         elif self.objective == Objective.SUM_T_END:
             self.model.addConstr(cost_function == gp.quicksum(self.decision_variables["t_end"]))
-
+        else:
+            raise NotImplementedError("Not implemented in base class")
         # Objective function
         self.model.setObjective(cost_function, gp.GRB.MINIMIZE)
 
     def solve(self) -> None:
         # Optimization
         self.model.params.NonConvex = 2
+        # self.model.optimize()
         self.model.optimize(lambda model, where: self.callback(model, where))
 
         status = self.model.Status
@@ -173,6 +196,10 @@ class TaskPlanner:
         return True
 
     def get_solution(self, solution_number: int = 0) -> List[TaskSolution]:
+        # for v in self.model.getVars():
+        #     if "t_end" in v.varName or "t_start" in v.varName:
+        #         print(v.varName, v.x)
+
         if solution_number > self.n_solutions:
             raise ValueError(f"The solution number must be less than {self.n_solutions}")
         # Set the solution
@@ -197,7 +224,7 @@ class TaskPlanner:
                         assignment = agent
             try:
                 task_solution = self.problem_definition.add_task_solution(task, t_start, t_end, assignment)
-                print(task_solution)
+                # print(task_solution)
             except ValueError:
                 print(f"Error during solution filling")
                 raise Exception(f"{task} has not valid t_start or t_end")
@@ -207,30 +234,8 @@ class TaskPlanner:
             problem_solution.append(task_solution)
         return problem_solution
 
-    def add_precedence_constraints(self) -> None:
-        for task, precedence_tasks in self.problem_definition.get_precedence_constraints().items():
-            for precedence_task in precedence_tasks:
-                self.model.addConstr(
-                    self.decision_variables["t_start"][task] == self.decision_variables["t_end"][precedence_task])
-
-    def add_problem(self, problem: Problem) -> None:
-        # self.problem_definition.append(problem)
-        self.problem_definition = problem
-
-    def check_feasibility(self) -> bool:
-        try:
-            self.model.computeIIS()
-            if self.model.status == gp.GRB.INFEASIBLE:
-                for constraint in self.model.getConstrs():
-                    if constraint.IISConstr:
-                        print(f"{self.model.getRow(constraint)} {constraint.Sense} {constraint.RHS}")
-                return False
-        except gp.GurobiError:
-            return True
-
     def save_model_to_file(self):
         self.model.write('Model.lp')
 
     def callback(self, model, where):
         pass
-

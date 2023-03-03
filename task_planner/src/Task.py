@@ -124,9 +124,6 @@ class Task:
             return f"{self.id}, {self.exp_duration}"
         else:
             return f"{self.id}"
-    def toString(self):
-        return str(self.id) + ", " + str(self.exp_duration)
-        # return f"{self.id}, {self.exp_duration}"
 
 
 @dataclass
@@ -138,7 +135,7 @@ class TaskSolution:
 
     def __post_init__(self):
         if self.t_end < 0 or self.t_start < -1e-3 or self.t_end < self.t_start:
-            raise ValueError
+            raise ValueError("Unfeasible t. start or t. end")
 
     # def set_start_time(self, t_start: float) -> None:
     #     self.t_start = t_start

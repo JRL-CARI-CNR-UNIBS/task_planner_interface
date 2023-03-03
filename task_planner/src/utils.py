@@ -59,11 +59,16 @@ class UserMessages(Enum):
     PROBLEM_NOT_FEASIBLE_DATA = Color.RED.value + "The problem is infeasible (data reasoning)!" + Color.END.value
     PLAN_FAILED = Color.RED.value + "The plan is failed" + Color.END.value
     # DISPATCH_TASK_MSG = Color.CYAN.value + "Published Task: {}, Agent: {}, T_start: {} T_end: {}" + Color.END.value
+
+    ### Task "Dispatcher" (main)
     DISPATCH_TASK_MSG = Color.CYAN.value + "Published Task: {}, Agent: {}" + Color.END.value
     FEEDBACK_TASK_MSG = Color.DARKCYAN.value + "Received feedback: {}, Agent: {}" + Color.END.value
     FEEDBACK_TASK_EMPTY_LIST_MSG = Color.YELLOW.value + "Receive a feedback of empty tasks" + Color.END.value
     FEEDBACK_WITHOUT_DISPATCH = Color.YELLOW.value + "Receive a feedback without have dispatched any task" + Color.END.value
     TIMEOUT = Color.RED.value + "------- Timeout, waiting feedback of: {}  -------" + Color.END.value
+
+    PLAN_FINISHED = Color.GREEN.value + "----------- The plan is finished --------------" + Color.GREEN.value
+
 
     ### Custom colored messages
     CUSTOM_RED = Color.RED.value + "{}" + Color.END.value
@@ -75,7 +80,7 @@ class UserMessages(Enum):
 def show_timeline(problem_solution: List[TaskSolution]) -> None:
     solution = []
     for task in problem_solution:
-        solution.append(dict(Task=task.get_task().get_type(),
+        solution.append(dict(Task=task.get_task().get_id(),
                              Start=datetime.fromtimestamp(task.get_start_time()).strftime("2020-04-06 %I:%M:%S"),
                              Finish=datetime.fromtimestamp(task.get_end_time()).strftime("2020-04-06 %I:%M:%S"),
                              Agents=task.get_assignment()))

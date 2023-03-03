@@ -252,7 +252,6 @@ class Problem:
         if self.task_list:
             str = ""
             for task in self.task_list:
-
                 print(task.__repr__())
                 str += "\n"
                 str += task.__repr__()

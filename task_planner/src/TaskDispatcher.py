@@ -173,7 +173,7 @@ class TaskDispatcher:
 
     def is_finished(self):
         if all([len(task_list) == 0 for task_list in self.task_solutions.values()]):
-            print("Piano terminatoooooo")
+            print("Plan finished")
             return True
         return False
 
