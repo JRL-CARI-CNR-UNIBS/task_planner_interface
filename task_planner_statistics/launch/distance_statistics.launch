@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+
+<launch>
+
+
+
+
+  <node name="distance_monitoring_node" pkg="task_planner_statistics" type="recipe_distance_stats.py"  output="screen" >
+    <param name="distance_monitoring_path" value="$(find task_planner_statistics)/file/" />
+  </node>
+
+
+</launch>
