@@ -145,7 +145,7 @@ class TaskServiceManager:
                     rospy.loginfo(TASK_TYPE.format(task_type_msg.type))
                     self.execute_client(task, task_cmd_id, t_start_planned, t_end_planned)
                 else:
-                    if task_type_msg.type in ["pick", "place", "pickplace", "goto"] and task != "end":
+                    if task_type_msg.type in ["pick", "place", "pickplace", "goto"] and task != "end" and task != "go_home":
                         rospy.loginfo(TASK_TYPE.format(task_type_msg.type))
                         # Call method for execute the task
                         self.execute_client(task, task_cmd_id, t_start_planned, t_end_planned)  # Il task name
@@ -363,7 +363,7 @@ def main():
     try:
         start_recipe_index = rospy.get_param("/starting_recipe_number")
     except KeyError:
-        rospy.logerr(RED + PARAM_NOT_DEFINED_ERROR.format("start_recipe_index") + END)
+        rospy.logerr(RED + PARAM_NOT_DEFINED_ERROR.format("starting_recipe_number") + END)
         start_recipe_index = 0
         rospy.logerr(RED + "Set to 0" + END)
 

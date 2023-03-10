@@ -1,11 +1,16 @@
 from enum import Enum
 
-from Task import TaskSolution
+from Task import Task, TaskSolution
+from Problem import Problem
+
 from typing import List
 import pandas as pd
 from datetime import datetime
 import plotly.express as px
 import plotly.express as px
+from pathlib import Path
+
+import ruamel.yaml
 
 
 class Color(Enum):
@@ -69,7 +74,6 @@ class UserMessages(Enum):
 
     PLAN_FINISHED = Color.GREEN.value + "----------- The plan is finished --------------" + Color.GREEN.value
 
-
     ### Custom colored messages
     CUSTOM_RED = Color.RED.value + "{}" + Color.END.value
     CUSTOM_YELLOW = Color.YELLOW.value + "{}" + Color.END.value
@@ -77,10 +81,11 @@ class UserMessages(Enum):
     CUSTOM_CYAN = Color.CYAN.value + "{}" + Color.END.value
     CUSTOM_DARKCYAN = Color.DARKCYAN.value + "{}" + Color.END.value
 
+
 def show_timeline(problem_solution: List[TaskSolution]) -> None:
     solution = []
     for task in problem_solution:
-        solution.append(dict(Task=task.get_task().get_id(),
+        solution.append(dict(Task=task.get_task().get_type(),
                              Start=datetime.fromtimestamp(task.get_start_time()).strftime("2020-04-06 %I:%M:%S"),
                              Finish=datetime.fromtimestamp(task.get_end_time()).strftime("2020-04-06 %I:%M:%S"),
                              Agents=task.get_assignment()))
@@ -104,6 +109,35 @@ def show_gantt(problem_solution: List[TaskSolution]) -> None:
     fig = px.timeline(df, x_start="Start", x_end="Finish", y="Task", color="Task", title="Gantt")
     fig.update_layout(xaxis_title="Time")
     fig.show()
+
+
+def save_planning_solution_to_yaml(solution: List[TaskSolution], path: Path, problem):
+    solution_to_save = dict()
+    for task_sol in solution:
+        task_sol: TaskSolution
+        solution_to_save[task_sol.get_task().get_id()] = {"t_start": task_sol.get_start_time(),
+                                                          "t_end": task_sol.get_end_time(),
+                                                          "agent": task_sol.get_assignment()}
+    yaml = ruamel.yaml.YAML(typ='rt')
+    yaml.preserve_quotes = True
+    with open(path, 'wb') as f:
+        yaml.dump(solution_to_save, f)
+
+
+def load_solution_from_yaml(path: Path, problem_to_solve: Problem):
+    yaml = ruamel.yaml.YAML(typ='rt')
+    yaml.preserve_quotes = True
+    solution = list()
+    problem = problem_to_solve.get_task_list_as_dictionary()
+    for task in solution:
+        if task not in problem:
+            raise Exception
+
+        solution.append(TaskSolution(problem[task],
+                                     solution[task]["t_start"],
+                                     solution[task]["t_emd"],
+                                     solution[task]["agent"]))
+    return solution
 
 
 class Behaviour(Enum):

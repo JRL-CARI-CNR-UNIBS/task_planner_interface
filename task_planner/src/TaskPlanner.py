@@ -46,7 +46,8 @@ class TaskPlanner:
         # Set the model able to find more than one solution
         self.model.setParam("PoolSearchMode", 2)
         self.model.setParam("PoolSolutions", self.n_solutions)
-
+        # self.model.setParam("IntFeasTol", 1e-3)
+        # self.model.setParam("MIPgap", 0.57)
         self.decision_variables = {}
 
     def create_model(self) -> None:
@@ -141,6 +142,7 @@ class TaskPlanner:
             self.model.addConstr((assigned_both == 1) >> (t_start_i >= t_end_j - BIG_M * (1 - delta_ij)))
             self.model.addConstr((assigned_both == 1) >> (t_start_j >= t_end_i - BIG_M * delta_ij))
 
+
     def add_precedence_constraints(self) -> None:
         for task, precedence_tasks in self.problem_definition.get_precedence_constraints().items():
             for precedence_task in precedence_tasks:
@@ -196,9 +198,10 @@ class TaskPlanner:
         return True
 
     def get_solution(self, solution_number: int = 0) -> List[TaskSolution]:
-        # for v in self.model.getVars():
-        #     if "t_end" in v.varName or "t_start" in v.varName:
-        #         print(v.varName, v.x)
+        for v in self.model.getVars():
+            if "sigma_index" in v.varName:
+            # if "t_end" in v.varName or "t_start" in v.varName:
+                print(v.varName, v.x)
 
         if solution_number > self.n_solutions:
             raise ValueError(f"The solution number must be less than {self.n_solutions}")
@@ -239,3 +242,28 @@ class TaskPlanner:
 
     def callback(self, model, where):
         pass
+
+    def compute_synergy_val(self, solution):
+        solution.sort(key=lambda task_sol: task_sol.get_start_time())
+
+        problem_solution_agent = {agent: list(filter(lambda task_solution: task_solution.get_assignment()
+                                                                           == agent, solution)) for agent in
+                                  ["ur5_on_guide", "human_right_arm"]}
+
+        synergy_tot = 0.0
+        for main_agent_task_sol in problem_solution_agent["ur5_on_guide"]:
+            main_agent_task_sol: TaskSolution
+
+            for parallel_agent_task_sol in problem_solution_agent["human_right_arm"]:
+                parallel_agent_task_sol: TaskSolution
+                overlapping = min(parallel_agent_task_sol.get_end_time(), main_agent_task_sol.get_end_time()) - max(
+                    parallel_agent_task_sol.get_start_time(), main_agent_task_sol.get_start_time())
+                if overlapping <= 0:
+                    overlapping = 0
+                synergy = main_agent_task_sol.get_task().get_synergy("ur5_on_guide", "human_right_arm",
+                                                                     parallel_agent_task_sol.get_task().get_type())
+                synergy_index = overlapping * (synergy - 1)
+                synergy_tot += synergy_index
+
+        # print(f"Synergy tot: {synergy_tot}")
+        return synergy_tot

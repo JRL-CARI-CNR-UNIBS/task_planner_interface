@@ -172,43 +172,43 @@ class TaskPlannerSynergisticBand(TaskPlanner):
                 (check_parallelism == 1) >> (2 * ov_ik <= d_i + d_k - abs_sum_delta_ik))
             self.model.addConstr((check_parallelism == 0) >> (ov_ik == 0))
 
-    def get_solution(self) -> List[TaskSolution]:
-        for v in self.model.getVars():
-            if "idle" in v.varName or "min_tend" in v.varName or "duration" in v.varName or "tStart" in v.varName or "assignment" in v.varName or "tot" in v.varName or "t_end_robot" in v.varName or "t_end_human" in v.varName or "t_end" in v.varName or "t_start" in v.varName or "overlapping" in v.varName or "d_i_r_tilde" in v.varName or "d_i_h_tilde" in v.varName:
-                print(v.varName, v.x)
-
-        agents = self.problem_definition.get_agents()
-        task_lists = self.problem_definition.get_tasks_list()
-
-        problem_solution = []
-        for task in task_lists:
-            t_start = self.decision_variables["t_start"][task].X
-            t_end = self.decision_variables["t_end"][task].X
-            # assignments = self.decision_variables["assignment"].select("*", task)
-
-            assignment = None
-            for agent in agents:
-                decision_variable = self.decision_variables["assignment"].select(agent, task)
-                if decision_variable:
-                    assert len(decision_variable) == 1
-                    if len(decision_variable) == 1 and decision_variable[0].X == 1:
-                        assignment = agent
-            print(task, t_start, t_end, assignment)
-            try:
-                task_solution = self.problem_definition.add_task_solution(task, t_start, t_end, assignment)
-                print(task_solution)
-            except ValueError:
-                print(f"Error during solution filling")
-                raise Exception(f"T start of task: {task}, is negative: {t_start}, t_end: {t_end}, by: {assignment}")
-            except Exception:
-                print(f"Error during solution filling")
-                raise Exception(f"{task}, not presence in problem task list")
-            problem_solution.append(task_solution)
-        return problem_solution
+    # def get_solution(self) -> List[TaskSolution]:
+    #     for v in self.model.getVars():
+    #         if "idle" in v.varName or "min_tend" in v.varName or "duration" in v.varName or "tStart" in v.varName or "assignment" in v.varName or "tot" in v.varName or "t_end_robot" in v.varName or "t_end_human" in v.varName or "t_end" in v.varName or "t_start" in v.varName or "overlapping" in v.varName or "d_i_r_tilde" in v.varName or "d_i_h_tilde" in v.varName:
+    #             print(v.varName, v.x)
+    # 
+    #     agents = self.problem_definition.get_agents()
+    #     task_lists = self.problem_definition.get_tasks_list()
+    # 
+    #     problem_solution = []
+    #     for task in task_lists:
+    #         t_start = self.decision_variables["t_start"][task].X
+    #         t_end = self.decision_variables["t_end"][task].X
+    #         # assignments = self.decision_variables["assignment"].select("*", task)
+    # 
+    #         assignment = None
+    #         for agent in agents:
+    #             decision_variable = self.decision_variables["assignment"].select(agent, task)
+    #             if decision_variable:
+    #                 assert len(decision_variable) == 1
+    #                 if len(decision_variable) == 1 and decision_variable[0].X == 1:
+    #                     assignment = agent
+    #         print(task, t_start, t_end, assignment)
+    #         try:
+    #             task_solution = self.problem_definition.add_task_solution(task, t_start, t_end, assignment)
+    #             print(task_solution)
+    #         except ValueError:
+    #             print(f"Error during solution filling")
+    #             raise Exception(f"T start of task: {task}, is negative: {t_start}, t_end: {t_end}, by: {assignment}")
+    #         except Exception:
+    #             print(f"Error during solution filling")
+    #             raise Exception(f"{task}, not presence in problem task list")
+    #         problem_solution.append(task_solution)
+    #     return problem_solution
 
     def set_objective(self) -> None:
         # TODO: Can be put in TaskPlanner Base class.
-        cost_function = self.model.addVar(name="J", vtype=gp.GRB.CONTINUOUS)
+        cost_function = self.model.addVar(name="J", vtype=gp.GRB.CONTINUOUS, lb=-100)
 
         if self.objective == Objective.SUM_T_START_END:
             self.model.addConstr(cost_function == gp.quicksum(self.decision_variables["t_end"]) +
@@ -316,7 +316,7 @@ class TaskPlannerSynergisticBand(TaskPlanner):
             #                                        + gp.quicksum(t_start_robot) + gp.quicksum(t_start_human)))
             self.model.addConstr(idle_robot == duration_robot - gp.quicksum(t_end_robot) + gp.quicksum(t_start_robot))
             self.model.addConstr(idle_human == duration_human - gp.quicksum(t_end_human) + gp.quicksum(t_start_human))
-            self.model.addConstr(cost_function == sigma_val )
+            self.model.addConstr(cost_function == sigma_val + idle_human + idle_robot)
 
             # self.model.addConstr(duration == gp.max_(self.decision_variables["t_end"]))
 

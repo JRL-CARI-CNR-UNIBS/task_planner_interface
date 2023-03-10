@@ -8,7 +8,7 @@ from typing import List, Dict, Optional
 import gurobipy as gp
 import itertools
 
-from utils import Behaviour, Objective
+from utils import Behaviour, Objective, show_timeline
 
 EPS = 1E-12
 BIG_M = 1E12
@@ -90,14 +90,17 @@ class TaskPlannerSynergistic(TaskPlanner):
 
             self.model.addConstr(d_i == duration_i_h + duration_i_r)
 
+            self.model.addConstr(
+                self.decision_variables["duration"][task_i] == self.decision_variables["t_end"][task_i] -
+                self.decision_variables["t_start"][task_i])
 
     def add_overlapping_constraints(self, upper_bound=None):
 
         for task_i, task_k in self.decision_variables["overlapping"].keys():
             d_i = self.decision_variables["t_end"][task_i] - self.decision_variables["t_start"][task_i]
             d_k = self.decision_variables["t_end"][task_k] - self.decision_variables["t_start"][task_k]
-            self.model.addConstr(self.decision_variables["duration"][task_i] == d_i)
-            self.model.addConstr(self.decision_variables["duration"][task_k] == d_k)
+            # self.model.addConstr(self.decision_variables["duration"][task_i] == d_i)
+            # self.model.addConstr(self.decision_variables["duration"][task_k] == d_k)
 
             t_i_start = self.decision_variables["t_start"][task_i]
             t_i_end = self.decision_variables["t_end"][task_i]
@@ -151,44 +154,11 @@ class TaskPlannerSynergistic(TaskPlanner):
                 (check_parallelism == 1) >> (2 * ov_ik <= d_i + d_k - abs_sum_delta_ik))
             self.model.addConstr((check_parallelism == 0) >> (ov_ik == 0))
 
-    def get_solution(self) -> List[TaskSolution]:
-        for v in self.model.getVars():
-            if "idle" in v.varName or "min_tend" in v.varName or "duration" in v.varName or "tStart" in v.varName or "assignment" in v.varName or "tot" in v.varName or "t_end_robot" in v.varName or "t_end_human" in v.varName or "t_end" in v.varName or "t_start" in v.varName:
-                print(v.varName, v.x)
-
-        agents = self.problem_definition.get_agents()
-        task_lists = self.problem_definition.get_tasks_list()
-
-        problem_solution = []
-        for task in task_lists:
-            t_start = self.decision_variables["t_start"][task].X
-            t_end = self.decision_variables["t_end"][task].X
-            # assignments = self.decision_variables["assignment"].select("*", task)
-
-            assignment = None
-            for agent in agents:
-                decision_variable = self.decision_variables["assignment"].select(agent, task)
-                if decision_variable:
-                    assert len(decision_variable) == 1
-                    if len(decision_variable) == 1 and decision_variable[0].X == 1:
-                        assignment = agent
-            print(task, t_start, t_end, assignment)
-            try:
-                task_solution = self.problem_definition.add_task_solution(task, t_start, t_end, assignment)
-                print(task_solution)
-            except ValueError:
-                print(f"Error during solution filling")
-                raise Exception(f"T start of task: {task}, is negative: {t_start}, t_end: {t_end}, by: {assignment}")
-            except Exception:
-                print(f"Error during solution filling")
-                raise Exception(f"{task}, not presence in problem task list")
-            problem_solution.append(task_solution)
-        return problem_solution
-
     def set_objective(self) -> None:
         # TODO: Can be put in TaskPlanner Base class.
-        cost_function = self.model.addVar(name="J", vtype=gp.GRB.CONTINUOUS)
-
+        cost_function = self.model.addVar(name="J", vtype=gp.GRB.CONTINUOUS, lb=-50)
+        #TODO: Remove this
+        self.cost_function_temp = cost_function
         if self.objective == Objective.SUM_T_START_END:
             self.model.addConstr(cost_function == gp.quicksum(self.decision_variables["t_end"]) +
                                  gp.quicksum(self.decision_variables["t_start"]))
@@ -216,9 +186,7 @@ class TaskPlannerSynergistic(TaskPlanner):
                                                vtype=gp.GRB.CONTINUOUS)
 
             for task in self.decision_variables["t_start"].keys():
-                print(task)
                 if (main_agent, task) in self.decision_variables["assignment"].keys():
-                    print(main_agent, task)
                     self.model.addConstr(
                         t_start_robot[task] == self.decision_variables["assignment"][(main_agent, task)] *
                         self.decision_variables["t_start"][task])
@@ -229,7 +197,6 @@ class TaskPlannerSynergistic(TaskPlanner):
                     self.model.addConstr(t_start_robot[task] == 0)
                     self.model.addConstr(t_end_robot[task] == 0)
                 if (parallel_agent, task) in self.decision_variables["assignment"].keys():
-                    print(parallel_agent, task)
                     self.model.addConstr(
                         t_start_human[task] == self.decision_variables["assignment"][(parallel_agent, task)] *
                         self.decision_variables["t_start"][task])
@@ -239,10 +206,7 @@ class TaskPlannerSynergistic(TaskPlanner):
                 else:
                     self.model.addConstr(t_start_human[task] == 0)
                     self.model.addConstr(t_end_human[task] == 0)
-            print(t_start_human.keys())
-            print(t_end_human.keys())
-            print(t_start_robot.keys())
-            print(t_end_robot.keys())
+
             self.model.addConstr(duration_robot == gp.max_(t_end_robot))
             self.model.addConstr(duration_human == gp.max_(t_end_human))
 
@@ -251,6 +215,9 @@ class TaskPlannerSynergistic(TaskPlanner):
 
             sigma_val = 0.0
             sigma_tot = 0.0
+            sigma_var = self.model.addVar(name="sigma_var", vtype=gp.GRB.CONTINUOUS, lb=-50)
+            #TODO: Remove this
+            self.sigma_index = sigma_var
             _, cost = gp.multidict(self.problem_definition.get_combinations())
             for task in self.decision_variables["t_start"].keys():
                 for task_pair in self.decision_variables["overlapping"].keys():
@@ -281,28 +248,69 @@ class TaskPlannerSynergistic(TaskPlanner):
                                            ub=self.problem_definition.get_nominal_upper_bound() * 5,
                                            vtype=gp.GRB.CONTINUOUS)
 
-            # self.model.addConstr(duration == gp.max_(self.decision_variables["t_end"]))
-            # self.model.addConstr(cost_function >= (-3 +
-            #                                        sigma_val + duration + duration - gp.quicksum(
-            #             self.decision_variables["t_end"]) + gp.quicksum(
-            #             self.decision_variables["t_start"])))
-            # self.model.addConstr(cost_function <= (3 +
-            #                                        sigma_val + duration + duration - gp.quicksum(
-            #             self.decision_variables["t_end"]) + gp.quicksum(
-            #             self.decision_variables["t_start"])))
-            # self.model.addConstr(cost_function == (duration_robot + duration_human +
-            #                                        sigma_val - gp.quicksum(t_end_robot) - gp.quicksum(t_end_human)
-            #                                        + gp.quicksum(t_start_robot) + gp.quicksum(t_start_human)))
             self.model.addConstr(idle_robot == duration_robot - gp.quicksum(t_end_robot) + gp.quicksum(t_start_robot))
             self.model.addConstr(idle_human == duration_human - gp.quicksum(t_end_human) + gp.quicksum(t_start_human))
+            self.model.addConstr(sigma_var == sigma_val)
             self.model.addConstr(cost_function == sigma_val + idle_human + idle_robot)
+
+            # self.model.addConstr(cost_function == sigma_val )
+
+            # print(self.model.getVars())
 
             # self.model.addConstr(duration == gp.max_(self.decision_variables["t_end"]))
 
             # self.model.addConstr(duration <= 95)
 
+        else:
+            self.model.addConstr(cost_function == gp.quicksum(self.decision_variables["d_i_r_tilde"]))
+
         # Objective function
         self.model.setObjective(cost_function, gp.GRB.MINIMIZE)
-
-        self.model.write("Model.lp")
+        #
+        # self.model.write("Model.lp")
         # self.model.tune()
+
+    def callback(self, model, where):
+        # print(where)
+        # print(model)
+        if where == gp.GRB.Callback.MIPSOL:
+            # print(f"Sigma index: {model.cbGetSolution(self.sigma_index)}")
+            print(f"Cost function: {model.cbGetSolution(self.cost_function_temp)}")
+
+            agents = self.problem_definition.get_agents()
+            task_lists = self.problem_definition.get_tasks_list()
+
+            problem_solution = []
+            for task in task_lists:
+                # print(self.decision_variables["t_start"][task])
+                t_start = model.cbGetSolution(self.decision_variables["t_start"][task])
+                t_end = model.cbGetSolution(self.decision_variables["t_end"][task])
+                # print(t_start)
+        #         # assignments = self.decision_variables["assignment"].select("*", task)
+        #
+                assignment = None
+                for agent in agents:
+                    # print()
+                    if (agent,task) in self.decision_variables["assignment"].keys():
+                        # print(self.decision_variables["assignment"][(agent, task)])
+                        decision_variable = model.cbGetSolution(self.decision_variables["assignment"][(agent, task)])
+                        if decision_variable == 1:
+                        # if decision_variable:
+                        #     assert len(decision_variable) == 1
+                        #     if len(decision_variable) == 1 and decision_variable[0].X == 1:
+                            assignment = agent
+        #         # print(task, t_start, t_end, assignment)
+                try:
+                    task_solution = self.problem_definition.add_task_solution(task, t_start, t_end, assignment)
+                except ValueError:
+                    print(f"Error during solution filling")
+                    raise Exception(
+                        f"T start of task: {task}, is negative: {t_start}, t_end: {t_end}, by: {assignment}")
+                except Exception:
+                    print(f"Error during solution filling")
+                    raise Exception(f"{task}, not presence in problem task list")
+                problem_solution.append(task_solution)
+            # print(problem_solution)
+            # show_timeline(problem_solution)
+            synergy_val = self.compute_synergy_val(problem_solution)
+            print(f"Total synergy of solution: {synergy_val}")
