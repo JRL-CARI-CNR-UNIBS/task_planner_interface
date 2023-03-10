@@ -264,7 +264,10 @@ def main():
     tp.save_model_to_file()
     tp.solve()
     if save_result:
-        save_planning_solution_to_yaml(tp.get_solution(0), Path(result_file_path), problem_to_solve)
+        for n_sol in range(0,n_recipe_to_compute):
+            save_planning_solution_to_yaml(tp.get_solution(n_sol),
+                                           Path(f"{result_file_path}recipe_solution_{n_sol}.yaml"),
+                                           problem_to_solve)
 
     actual_problem_to_solve = copy.deepcopy(problem_to_solve)
 
@@ -297,23 +300,26 @@ def main():
 
     # Iterate all task planner solution
     for recipe in range(0, n_recipe_to_execute):
-
+        if rospy.is_shutdown():
+            break
         # If Brute force skip if it is not the best one
-
         if best_plan is not None:
             if recipe != best_plan:
                 continue
         # Show solution
         show_timeline(tp.get_solution(recipe))
+
         tasks_solution = add_go_home(copy.deepcopy(tp.get_solution(recipe)), agents_group_name)
-        print(tasks_solution)
+        # print(tasks_solution)
         show_timeline(tasks_solution)
 
         # Iterate over the execution repetitions to do
         for n_rep in range(starting_recipe_number, starting_recipe_number + n_repetitions):
-
+            recipe_name = f"{RECIPE_NAME.get(optimization_type, 'DEFAULT_NAME')}_rec_{recipe}_rep_{n_rep}"
+            # Set recipe name to dispatcher (set param of a task used by service manager)
+            td.set_recipe_name(recipe_name)
             # Publish the recipe name
-            pub_recipe_name.publish(String(RECIPE_NAME.get(optimization_type, "DEFAULT_NAME") + str(n_rep)))
+            pub_recipe_name.publish(String(recipe_name))
 
             # Dispatch the solution
             td.dispatch_solution(tasks_solution)

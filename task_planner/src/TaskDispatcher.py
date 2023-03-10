@@ -193,6 +193,8 @@ class TaskDispatcher:
             self.request_publishers[agent].publish(request_array)
             self.task_number[agent] += 1
 
+    def set_recipe_name(self, recipe_name:str):
+        self.recipe_name = recipe_name
     # def go_home(self, agent):
     #     task_request = MotionTaskExecutionRequest(task_id="go_home",
     #                                               recipe_name=self.recipe_name)
