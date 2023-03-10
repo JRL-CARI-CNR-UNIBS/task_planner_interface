@@ -62,3 +62,7 @@ class MongoInterface:
             raise Exception(CONNECTION_LOST)
         return result
 
+    def get_collection(self, collection_name):
+        if collection_name not in self.db.list_collection_names():
+            raise ValueError("This collection not in db")
+        return self.db[collection_name]

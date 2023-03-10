@@ -35,7 +35,59 @@ def main():
             print("ERROR")
             return 0
         # print(k)
-        if "Task" in recipe_result["recipe_name"]:
+        if not "recipe" in recipe_result["recipe_name"]:
+        #if "Task" in recipe_result["recipe_name"]:
+            print(recipe_result)
+            # if "Synergy" in recipe_result["recipe_name"]:
+            #     recipe_result["recipe_name"] = "Synergy_TP"
+            # if "Task" in recipe_result["recipe_name"] and "optim" not in recipe_result["recipe_name"]:
+            #     recipe_result["recipe_name"] = "Base_TP"
+            # if "opti" in recipe_result["recipe_name"]:
+            #     recipe_result["recipe_name"] = "Optim"
+            # if "bad" in recipe_result["recipe_name"]:
+            #     recipe_result["recipe_name"] = "Bad"
+            # if "BayesianBAD" in recipe_result["recipe_name"]:
+            #     recipe_result["recipe_name"] = "BayesianBAD"
+            #     print(recipe_result)
+            #     results_base_tp.append(recipe_result)
+            #
+            # elif "Baye" in recipe_result["recipe_name"]:
+            #     recipe_result["recipe_name"] = "Bayesian"
+            #     print(recipe_result)
+            #     results_base_tp.append(recipe_result)
+        if "AWARE" in recipe_result["recipe_name"]:
+            recipe_result["recipe_name"] = "Aware Bayesian"
+            print("Aware Bayesian")
+            print(recipe_result)
+            results_base_tp.append(recipe_result)
+        elif "BRUTE_FORCE" in recipe_result["recipe_name"]:
+            recipe_result["recipe_name"] = "Brute Force"
+            print("Brute Force")
+            print(recipe_result)
+            results_base_tp.append(recipe_result)
+        elif "BAD_SYNERGY" in recipe_result["recipe_name"]:
+            recipe_result["recipe_name"] = "BAD_SYNERGY"
+            print("BAD_SYNERGY")
+            print(recipe_result)
+            results_base_tp.append(recipe_result)
+        elif "RANDOM" in recipe_result["recipe_name"] and ("SCALING_RANDOM" not in recipe_result["recipe_name"]):
+            recipe_result["recipe_name"] = "RANDOM"
+            print("RANDOM")
+            print(recipe_result)
+            results_base_tp.append(recipe_result)
+        elif "SCALING_NICE" in recipe_result["recipe_name"]:
+            recipe_result["recipe_name"] = "SCALING_NICE"
+            print("SCALING_NICE")
+            print(recipe_result)
+            results_base_tp.append(recipe_result)
+        elif "SCALING_BAD" in recipe_result["recipe_name"]:
+            recipe_result["recipe_name"] = "SCALING_BAD"
+            print("SCALING_BAD")
+            print(recipe_result)
+            results_base_tp.append(recipe_result)
+        elif "SCALING_RANDOM" in recipe_result["recipe_name"]:
+            recipe_result["recipe_name"] = "SCALING_RANDOM"
+            print("SCALING_RANDOM")
             print(recipe_result)
             results_base_tp.append(recipe_result)
     print(len(results_base_tp))
@@ -45,7 +97,8 @@ def main():
     sns.set_theme()
 
     # sns.displot(result_pd, x="recipe_duration")
-    sns.boxplot(result_pd["recipe_duration"], showfliers = False)
+    # sns.boxplot(data=result_pd, x="recipe_duration", y="recipe_name", showfliers = False )
+    sns.boxplot(data=result_pd, x="recipe_duration", y="recipe_name", showfliers = False )
     plt.show()
 
 

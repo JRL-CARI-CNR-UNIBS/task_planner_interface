@@ -646,6 +646,7 @@ class MongoStatistics:
             print(data_matrix)
 
             def plot_a_graph():
+                print("CHARTTT")
                 plt.figure(index)
                 ax = sns.heatmap(data_matrix, annot=True)
                 # plt.title(plot_title)
@@ -1568,7 +1569,7 @@ class MongoStatistics:
             concurrent_synergy[concurrent_task] = pyro.sample(concurrent_task, dist.LogNormal(0, 0.5))
 
             mean += concurrent_synergy[concurrent_task] * task_data[:, id]
-        sigma = pyro.sample("sigma", dist.Uniform(0., 10.))
+        sigma = pyro.sample("sigma", dist.Uniform(0., 2.))
 
         with pyro.plate("data", len(main_task_duration)):
             pyro.sample("obs", dist.Normal(mean, sigma), obs=main_task_duration)
@@ -1635,7 +1636,8 @@ class MongoStatistics:
         task_index = dict()  # It will be as: {"agent_name":[list with all tasks that it can perform],..}
         for single_task in cursor_task_properties:
             if "name" in single_task.keys() and "agent" in single_task.keys():  # Ensure it has nedded attributes
-                if not single_task["name"] == "end":  # Excule task end (not interesting)
+                # if not single_task["name"] == "end" or not single_task["name"] == "go_home":  # Excule task end (not interesting)
+                if single_task["name"] != "end" and single_task["name"] != "go_home":
                     if single_task["agent"] not in task_index:  # If not exist already that agents
                         task_index[single_task["agent"]] = set()  # A SET for each agent to ensure unique task
                     task_index[single_task["agent"]].add(single_task["name"])
