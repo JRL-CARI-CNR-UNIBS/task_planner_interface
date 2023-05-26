@@ -45,7 +45,9 @@ class TaskPlannerHumanAware(TaskPlanner):
         # self.model.setParam("MIPFocus", 3)
 
         # self.model.setParam("heuristics", 0.001)
-        # self.model.setParam("MIPGapAbs", 0.28)
+
+
+        # self.model.setParam("MIPGap", 0.011)
 
     def add_t_end_constraints(self, agent_task_combination, cost) -> None:
         t_end = {}

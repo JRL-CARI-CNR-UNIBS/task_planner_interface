@@ -23,6 +23,11 @@ class TaskPlanner:
     decision_variables: Dict[str, gp.tupledict] = field(init=False)
 
     def __post_init__(self):
+        """
+        The methos make sure that the TaskPlanner if is correctly defined: consistency check, requested solution >
+        and if is able to solve respect that objective Returns:
+
+        """
         if self.problem_definition.consistency_check() is not True:
             raise ValueError("The problem is not consistent. Check it!")
         if self.n_solutions < 1:
@@ -30,12 +35,20 @@ class TaskPlanner:
         if not isinstance(self.objective, Objective):
             raise ValueError("Objective should be an instance of Objective class")
 
-    def initialize(self):
+    def initialize(self) -> None:
+        """
+        This method initialize the TaskPlanner Object:
+        Retrieve the licence if it exists,
+        create the Model,
+        define the solution number.
+
+        """
         e = gp.Env(empty=True)
         if True:
             wls_access_id = os.getenv('WLSACCESSID')
             wls_secret = os.environ.get('WLSSECRET')
             license_id = os.environ.get('LICENSEID')
+
             if wls_access_id is not None and wls_secret is not None and license_id is not None:
                 e.setParam('WLSACCESSID', wls_access_id)
                 e.setParam('WLSSECRET', wls_secret)
@@ -51,6 +64,12 @@ class TaskPlanner:
         self.decision_variables = {}
 
     def create_model(self) -> None:
+        """
+        This method defines the decision variables and creates the basic model (t_end constraint and assignment constraint).
+
+        Returns: None
+
+        """
         agent_task_combination, cost = gp.multidict(self.problem_definition.get_combinations())
         tasks_list = self.problem_definition.get_tasks_list()
 
@@ -86,6 +105,15 @@ class TaskPlanner:
         self.add_assignment_constraints(tasks_list)
 
     def add_assignment_constraints(self, tasks_list: List[str]):
+        """
+        This method adds assignment constraints to the model.
+
+        Args:
+            tasks_list: List[str] of tasks 
+
+        Returns:
+
+        """
         # Unique task-agent assignment
         self.model.addConstrs(
             (self.decision_variables["assignment"].sum('*', task) == 1 for task in tasks_list),
@@ -141,7 +169,6 @@ class TaskPlanner:
             # Not overlapping Constraints
             self.model.addConstr((assigned_both == 1) >> (t_start_i >= t_end_j - BIG_M * (1 - delta_ij)))
             self.model.addConstr((assigned_both == 1) >> (t_start_j >= t_end_i - BIG_M * delta_ij))
-
 
     def add_precedence_constraints(self) -> None:
         for task, precedence_tasks in self.problem_definition.get_precedence_constraints().items():
@@ -200,7 +227,7 @@ class TaskPlanner:
     def get_solution(self, solution_number: int = 0) -> List[TaskSolution]:
         for v in self.model.getVars():
             if "sigma_index" in v.varName:
-            # if "t_end" in v.varName or "t_start" in v.varName:
+                # if "t_end" in v.varName or "t_start" in v.varName:
                 print(v.varName, v.x)
 
         if solution_number > self.n_solutions:

@@ -1,4 +1,4 @@
-from Task import Task
+from Task import Task, TaskSolution
 from dataclasses import dataclass, field
 from typing import List, Dict, Tuple, Optional
 import rospy
@@ -6,6 +6,7 @@ from task_planner_interface_msgs.srv import TaskType, TaskTypeResponse, TasksInf
     TasksStatistics, TasksStatisticsResponse
 from task_planner_statistics.srv import TaskSynergies, TaskSynergiesRequest, TaskSynergiesResponse
 from utils import *
+import itertools
 
 
 @dataclass
@@ -98,13 +99,16 @@ class Problem:
                     return False
         return True
 
-    def update_tasks_statistics(self):
+    def update_tasks_statistics(self) -> bool:
         try:
             tasks_stats_result = self.get_tasks_stats_srv()
         except rospy.ServiceException as e:
             rospy.logerr(UserMessages.SERVICE_FAILED.value.format("get_tasks_statistics"))
             return False
         # utils: tasks_stasts_dict : {task_name: {agent1: {stats}, agent2: {stats}}}
+        if not tasks_stats_result.statistics:
+            print("Tasks statistics empty from service. Check DB")
+            return False
         tasks_stasts_dict = {}
         for tasks_stats in tasks_stats_result.statistics:
             if tasks_stats.name not in tasks_stasts_dict:
@@ -114,9 +118,7 @@ class Problem:
 
             tasks_stasts_dict[tasks_stats.name][tasks_stats.agent] = {"exp_duration": tasks_stats.exp_duration,
                                                                       "duration_std": tasks_stats.duration_std}
-        if not tasks_stasts_dict:
-            print(f"Tasks statistics empty from service. Check DB")
-            return False
+        # TODO: Pass in Task also the duration std
         for task in self.task_list:
             for agent in task.get_agents():
                 if agent not in tasks_stasts_dict[task.get_type()].keys():
@@ -127,11 +129,19 @@ class Problem:
             # Update also statistics for agents present in Knowledge base but not in task-Goal
             # for agent in set(tasks_stasts_dict[task.get_type()].keys()).difference({*task.get_agents()}):    # Agents in KnowledgeBase but not specified in Task-Goal
             #     task.update_duration(agent, tasks_stasts_dict[task.get_type()][agent]["exp_duration"])
+        return True
 
-    def update_tasks_synergy(self):
+    def update_tasks_synergy(self) -> bool:
+        if not self.task_list:
+            print("Empty task list")
+            return False
         for task in self.task_list:
+            print(task)
             task_type = task.get_type()
             task_agents = task.get_agents()
+            if (not task_type) or (not task_agents):
+                print(f"Task type or agents for task: {task} not present in Problem")
+                return False
             for agent in task_agents:
                 task_synergies_request = TaskSynergiesRequest()
                 task_synergies_request.task_name = task_type
@@ -142,6 +152,9 @@ class Problem:
                     rospy.logerr(UserMessages.SERVICE_FAILED.value.format("get_task_synergies"))
                     return False
                 synergies = task_synergies_result.synergies
+                if not synergies:
+                    print(f"Synergies for task: {task_type}, agent: {agent} empty.")
+                    return False
                 synergies_dict = dict()
                 for task_synergy in synergies:
                     assert task_synergy.agent is not agent
@@ -150,7 +163,7 @@ class Problem:
                     synergies_dict[task_synergy.agent][task_synergy.task_name] = task_synergy.synergy
                 for parallel_agent in synergies_dict:
                     task.update_synergy(agent, parallel_agent, synergies_dict[parallel_agent])
-
+        return True
                 # TODO: Is better to store as an object with all the info. Can i recycle TaskSynergy message? But i cannot add method.
                 # task_synergy.std_err
                 # task_synergy.success_rate
@@ -247,6 +260,37 @@ class Problem:
         for task in self.task_list:
             tasks_durations.append(task.get_max_duration())
         return max(tasks_durations)
+
+    def get_near_tasks(self) -> List[Tuple[str, str]]:
+        """
+        Function that return the near tasks based on a yaml definition of tasks
+
+        Args:
+            neighboring_tasks:
+
+        Returns:
+
+        """
+        # print(rospy.get_param_names())
+
+        if not rospy.has_param("~neighboring_tasks_pairs"):
+            raise ValueError(UserMessages.PARAM_NOT_DEFINED_ERROR.value.format("neighboring_tasks"))
+
+        neighboring_tasks = rospy.get_param("~neighboring_tasks_pairs")
+        print([len(task_pair) for task_pair in neighboring_tasks])
+        if isinstance(neighboring_tasks, list) is not True:
+            raise ValueError("neighboring_tasks must be a list")
+        if all(len(task_pair) == 2 for task_pair in neighboring_tasks) is not True:
+            raise ValueError("All pairs must contains two task")
+        if all(self.task_in_task_list(task_1) and self.task_in_task_list(task_1)
+               for task_1, task_2 in neighboring_tasks) is not True:
+            raise ValueError("All elements in pairs must be in tasks list")
+        neighboring_tasks = [(task_1, task_2) for task_1, task_2 in neighboring_tasks]
+
+        return neighboring_tasks
+
+    def task_in_task_list(self, task_id: str) -> bool:
+        return any(task.get_id() == task_id for task in self.task_list)
 
     def __repr__(self):
         if self.task_list:
