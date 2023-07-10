@@ -1,0 +1,52 @@
+<?xml version="1.0"?>
+<root main_tree_to_execute="BehaviorTree">
+    <!-- ////////// -->
+    <BehaviorTree ID="BehaviorTree">
+        <Sequence>
+            <Action ID="DoubleTaskDispatcher" first_agent_name="robot" first_agent_state="" piece_first_agent_input="" piece_first_agent_output="" piece_second_agent_input="" piece_second_agent_output="" second_agent_name="human" second_agent_state="" task_name_first_agent="pick_white_box" task_name_second_agent="pick_orange_box" wait_first_agent="true" wait_second_agent="true"/>
+        </Sequence>
+    </BehaviorTree>
+    <!-- ////////// -->
+    <TreeNodesModel>
+        <Condition ID="CheckAgentState">
+            <input_port name="agent_name"/>
+        </Condition>
+        <Action ID="DoubleTaskDispatcher">
+            <input_port name="first_agent_name"/>
+            <output_port name="first_agent_state"/>
+            <output_port name="piece_first_agent_input"/>
+            <input_port name="piece_first_agent_output"/>
+            <input_port name="piece_second_agent_input"/>
+            <input_port name="piece_second_agent_output"/>
+            <input_port name="second_agent_name"/>
+            <output_port name="second_agent_state"/>
+            <input_port name="task_name_first_agent"/>
+            <input_port name="task_name_second_agent"/>
+            <input_port name="wait_first_agent"/>
+            <input_port name="wait_second_agent"/>
+        </Action>
+        <Action ID="ResetNewPiece"/>
+        <Action ID="SingleTaskDispatcher">
+            <input_port name="agent_name"/>
+            <input_port name="piece_input"/>
+            <output_port name="piece_output"/>
+            <input_port name="task_name"/>
+        </Action>
+        <Control ID="SwitchDigital">
+            <input_port name="variable"/>
+        </Control>
+        <Condition ID="ThereIsNewPiece">
+            <output_port name="piece_output"/>
+        </Condition>
+        <Condition ID="TriggerNewPiece">
+            <output_port name="piece_output"/>
+        </Condition>
+        <Action ID="WaitAgentFeedback">
+            <input_port name="agent_name"/>
+            <input_port name="piece_input"/>
+            <output_port name="piece_output"/>
+        </Action>
+    </TreeNodesModel>
+    <!-- ////////// -->
+</root>
+

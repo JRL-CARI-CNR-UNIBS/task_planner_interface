@@ -80,6 +80,9 @@ class Problem:
 
         for task in self.task_list:
             if not task.get_agents():  # Empty => Take mongoDB agents
+                if task.get_type() not in task_agents_correspondence:
+                    print(f"Task: {task.get_type()} not present in agents tasks ability from Knowledge Based")
+                    return False
                 task.update_agents(task_agents_correspondence[task.get_type()])
 
             # Check if the specified agent (in task goal) can actually perform it
@@ -223,7 +226,7 @@ class Problem:
 
     # def get_tasks_synergy(self):
     #     for task in self.task_list:
-    #         task.get_synergy()
+    #         task.get_synergies()
     #     pass
     # TODO: Finire
 

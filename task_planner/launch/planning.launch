@@ -3,13 +3,17 @@
 <launch>
 
   <!-- General Parameters -->
+  <arg name="dispatch_plan" default="true" />
 
 
 
-  <node name="task_planner_node" pkg="task_planner" type="main_test.py"  output="screen" >
+
+  <node name="task_planner_node" pkg="task_planner" type="main.py"  output="screen" >
     <rosparam command="load" file="$(find task_planner)/config/task_goal_example.yaml" />
+    <rosparam command="load" file="$(find task_planner)/config/task_planning_optimization.yaml" />
 
-    <!-- <rosparam command="load" file="$(find task_planner)/config/task_planning_optimization.yaml" ns="optimization_parameters/"/> -->
+    <param name="dispatch_plan" value="$(arg dispatch_plan)" />
+
   </node>
 
 </launch>

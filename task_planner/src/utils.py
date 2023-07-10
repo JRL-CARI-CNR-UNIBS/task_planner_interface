@@ -68,6 +68,8 @@ class UserMessages(Enum):
     ### Task "Dispatcher" (main)
     DISPATCH_TASK_MSG = Color.CYAN.value + "Published Task: {}, Agent: {}" + Color.END.value
     FEEDBACK_TASK_MSG = Color.DARKCYAN.value + "Received feedback: {}, Agent: {}" + Color.END.value
+    FEEDBACK_FAILED_TASK_MSG = Color.RED.value + "Received feedback: {}, Agent: {}, outcome: Failed" + Color.END.value
+
     FEEDBACK_TASK_EMPTY_LIST_MSG = Color.YELLOW.value + "Receive a feedback of empty tasks" + Color.END.value
     FEEDBACK_WITHOUT_DISPATCH = Color.YELLOW.value + "Receive a feedback without have dispatched any task" + Color.END.value
     TIMEOUT = Color.RED.value + "------- Timeout, waiting feedback of: {}  -------" + Color.END.value
@@ -90,6 +92,7 @@ def show_timeline(problem_solution: List[TaskSolution]) -> None:
                              Finish=datetime.fromtimestamp(task.get_end_time()).strftime("2020-04-06 %I:%M:%S"),
                              Agents=task.get_assignment()))
     df = pd.DataFrame(solution)
+    print(df)
     fig = px.timeline(df, x_start="Start", x_end="Finish", y="Agents", color="Task", title="TimeLine")
     fig.update_layout(xaxis_title="Time")
     fig.show()
@@ -158,3 +161,5 @@ class Objective(Enum):
     SUM_T_END = 5
     ACTUAL_MAKESPAN = 6
     OTHER = 7
+
+

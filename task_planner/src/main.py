@@ -9,10 +9,14 @@ from TaskPlannerHumanAware import TaskPlannerHumanAware
 from TaskPlannerHumanAwareRelaxed import TaskPlannerHumanAwareRelaxed
 
 from TaskPlannerHumanAwareEasier import TaskPlannerHumanAwareEasier
+from TaskPlannerHumanAwareLast import TaskPlannerHumanAwareLast
+from TaskPlannerTest import TaskPlannerTest
 
 from TaskPlannerSynergistic import TaskPlannerSynergistic
 from TaskPlannerSynergisticEasier import TaskPlannerSynergisticEasier
 from TaskPlannerSynergisticBand import TaskPlannerSynergisticBand
+from TaskPlannerAreas import TaskPlannerAreas
+
 from Prove import Prove
 from TaskDispatcher import TaskDispatcher
 from std_srvs.srv import Trigger
@@ -21,10 +25,19 @@ import copy
 import numpy as np
 from pathlib import Path
 
-RECIPE_NAME = {"base": "SCALING_RANDOM", "human_aware": "AWARE", "human_aware_easier": "SCALING_NICE"}
+RECIPE_NAME = {"base": "SAFETY_AREA_NO_AWARE", "human_aware": "SAFETY_AREA_BOTH_AGENT_HUMAN_AWARE",
+               "human_aware_easier": "TEST0", "areas": "NOT_NEIGHBORING_TASKS"}
 
 
 def params_exist(parameters: List[str]) -> bool:
+    """
+    Check if the parameters passed as argument exist
+    Args:
+        parameters: List of all parameters to check
+
+    Returns: True if all parameters exist and False otherwise.
+
+    """
     params_exist_check = True
     for param_name in parameters:
         if not rospy.has_param(param_name):
@@ -34,27 +47,44 @@ def params_exist(parameters: List[str]) -> bool:
 
 
 def add_go_home(task_solution: List[TaskSolution], agents: List[str]):
+    """
+    Utility function that add the go_home task if two task are too far away from each other.
+    Args:
+        task_solution:List of TaskSolution
+        agents: List of agentrs
+
+    Returns:
+
+    """
     task_solution: TaskSolution
-    task_solution[0].get_start_time()
+    go_home_duration = 1.1
     task_solution.sort(key=lambda task_sol: task_sol.get_start_time())
     task_solutions = {agent: list(filter(lambda task_sol: task_sol.get_assignment()
                                                           == agent, task_solution)) for agent in
                       agents}
     for agent in agents:
         for id, agent_task in enumerate(task_solutions[agent][:-1]):
-            if task_solutions[agent][id + 1].get_start_time() > agent_task.get_end_time() + 10:
+            if task_solutions[agent][id + 1].get_start_time() > agent_task.get_end_time() + 0.5:
                 task_solution.append(
                     TaskSolution(Task("go_home", "go_home", [agent], []),
-                                 agent_task.get_end_time() + 0.1, agent_task.get_end_time() + 1.1, agent))
+                                 agent_task.get_end_time() + 0.1, agent_task.get_end_time() + go_home_duration, agent))
         task_solution.append(
             TaskSolution(Task("go_home", "go_home", [agent], []),
-                         task_solutions[agent][-1].get_end_time() + 0.1, task_solutions[agent][-1].get_end_time() + 1.1,
+                         task_solutions[agent][-1].get_end_time() + 0.1, task_solutions[agent][-1].get_end_time() + go_home_duration,
                          agent))
 
     return task_solution
 
 
-def compute_synergy_val(solution):
+def compute_synergy_val(solution: TaskSolution) -> float:
+    """
+    Utility function that compute the total synergy index of a solution
+    Args:
+        solution: TaskSolution
+
+    Returns: the synergy index of the plan solution
+
+    """
     solution.sort(key=lambda task_sol: task_sol.get_start_time())
 
     problem_solution_agent = {agent: list(filter(lambda task_solution: task_solution.get_assignment()
@@ -80,7 +110,16 @@ def compute_synergy_val(solution):
     return synergy_tot
 
 
-def get_best_plan(n_recipe_to_compute: int, tp: TaskPlanner):
+def get_best_plan(n_recipe_to_compute: int, tp: TaskPlanner) -> int:
+    """
+    Utility function for finding the best plan accordingly to the synergy index
+    Args:
+        n_recipe_to_compute: number of different solution to use to compute synergy cost
+        tp: Task planner Object
+
+    Returns: The best plan id. of solution
+
+    """
     synergy = []
     for recipe in range(0, n_recipe_to_compute):
         solution = tp.get_solution(recipe)
@@ -98,6 +137,17 @@ def get_best_plan(n_recipe_to_compute: int, tp: TaskPlanner):
 def select_planner(optimization_type: str,
                    problem_to_solve: Problem,
                    n_recipe_to_compute: int) -> TaskPlanner:
+    """
+    Utlity function to select the proper planner object
+
+    Args:
+        optimization_type:
+        problem_to_solve:
+        n_recipe_to_compute:
+
+    Returns: The proper TaskPlanner based on input parameters
+
+    """
     if optimization_type == "base":
         tp = TaskPlanner("Task_Allocation_Scheduling",
                          problem_to_solve,
@@ -113,6 +163,10 @@ def select_planner(optimization_type: str,
                                    problem_to_solve,
                                    behaviour=Behaviour.CONTINUOUS,
                                    objective=Objective.MAKESPAN)
+        # tp = TaskPlannerHumanAwareLast("tp",
+        #                            problem_to_solve,
+        #                            behaviour=Behaviour.CONTINUOUS,
+        #                            objective=Objective.MAKESPAN)
     elif optimization_type == "human_aware_easier":
         tp = TaskPlannerHumanAwareEasier("Task_Planning&Scheduling",
                                          problem_to_solve,
@@ -143,6 +197,12 @@ def select_planner(optimization_type: str,
                    problem_to_solve,
                    behaviour=Behaviour.CONTINUOUS,
                    objective=Objective.SYNERGY)
+    elif optimization_type == "areas":
+        tp = TaskPlannerAreas("tp_areas",
+                              problem_to_solve,
+                              objective=Objective.MAKESPAN,
+                              n_solutions=n_recipe_to_compute)
+
         # tp = TaskPlannerHumanAwareSimplified("Task_Allocation_Scheduling_Human_Aware",
         #                                      problem_to_solve,
         #                                      behaviour=Behaviour.CONTINUOUS,
@@ -173,6 +233,7 @@ def main():
 
     n_repetitions = rospy.get_param("~execution/repetitions")
     n_recipe_to_execute = rospy.get_param("~execution/n_recipe")
+    n_recipe_to_execute = rospy.get_param("~execution/n_recipe")
 
     starting_recipe_number = 0
     if not rospy.has_param("starting_recipe_number"):
@@ -185,13 +246,15 @@ def main():
     brute_force = rospy.get_param("~optimization/brute_force")
     save_result = rospy.get_param("~save_result")
     result_file_path = rospy.get_param("~result_file_path")
-    print(result_file_path)
     # rospy.wait_for_service('/reload_scene')
 
     # Services and Publishers
     reload_scene_srv_client = rospy.ServiceProxy('/reload_scene', Trigger)
-    stop_distance_acq_srv_client = rospy.ServiceProxy("stop_distance_acq", Trigger)
     pub_recipe_name = rospy.Publisher("set_recipe_name", String, queue_size=10)
+
+    acquire_distance = rospy.get_param("acquire_distance", False)
+    if acquire_distance:
+        stop_distance_acq_srv_client = rospy.ServiceProxy("stop_distance_acq", Trigger)
 
     # Agents group name ("Agent name")
     agents_group_name = []
@@ -234,10 +297,12 @@ def main():
             return 0
     if not problem_to_solve.fill_task_agents():  # TODO : Manage as exception?
         return 0
-    problem_to_solve.update_tasks_statistics()
-    problem_to_solve.update_tasks_synergy()
+    if not problem_to_solve.update_tasks_statistics():
+        print("ciao")
+        return 0
+    if not problem_to_solve.update_tasks_synergy():
+        return 0
 
-    # print(problem_to_solve)
     rospy.loginfo(f"Consistency Check: {problem_to_solve.consistency_check()}")
 
     # Choose the tp
@@ -264,14 +329,14 @@ def main():
     tp.save_model_to_file()
     tp.solve()
     if save_result:
-        for n_sol in range(0,n_recipe_to_compute):
+        for n_sol in range(0, n_recipe_to_compute):
             save_planning_solution_to_yaml(tp.get_solution(n_sol),
-                                           Path(f"{result_file_path}recipe_solution_{n_sol}.yaml"),
+                                           Path(f"{result_file_path}recipe_solution_{n_sol}_{optimization_type}.yaml"),
                                            problem_to_solve)
 
     actual_problem_to_solve = copy.deepcopy(problem_to_solve)
 
-    # Compute best plan
+    # Compute best plan if request and in brute_force mode (usefull for comparison)
     best_plan = None
     if brute_force and optimization_type == "base":
         best_plan = get_best_plan(n_recipe_to_compute, tp)
@@ -293,7 +358,11 @@ def main():
         if best_plan:
             show_timeline(tp.get_solution(best_plan))
         else:
+            print(tp.get_solution(0))
             show_timeline(tp.get_solution(0))
+            # if n_recipe_to_execute>1:
+            #     for k in range(n_recipe_to_execute):
+            #         show_timeline(tp.get_solution(k))
         return 0
 
     td = TaskDispatcher(agents_group_name, agents_group_name_param, RECIPE_NAME.get(optimization_type, "DEFAULT_NAME"))
@@ -307,12 +376,12 @@ def main():
             if recipe != best_plan:
                 continue
         # Show solution
-        show_timeline(tp.get_solution(recipe))
+        # show_timeline(tp.get_solution(recipe))
 
         tasks_solution = add_go_home(copy.deepcopy(tp.get_solution(recipe)), agents_group_name)
         # print(tasks_solution)
         show_timeline(tasks_solution)
-
+        # show_gantt(tasks_solution)
         # Iterate over the execution repetitions to do
         for n_rep in range(starting_recipe_number, starting_recipe_number + n_repetitions):
             recipe_name = f"{RECIPE_NAME.get(optimization_type, 'DEFAULT_NAME')}_rec_{recipe}_rep_{n_rep}"
@@ -333,27 +402,36 @@ def main():
                     actual_problem_to_solve.remove_task(executed_task.get_task())
 
                 # Check if the plan failed
-                if td.is_failed():
-                    rospy.loginfo(UserMessages.PLAN_FAILED.value)
-                    break
+                # if td.is_failed():
+                #     #TODO: Aspettare la fine dell'altro task (se c'è qualcosa in esecuzione) e poi allora killare
+                #     rospy.loginfo(UserMessages.PLAN_FAILED.value)
+                #     # Stop distance acquisition and Reload scene
+                #     end_recipe_procedure(stop_distance_acq_srv_client, reload_scene_srv_client)
+                #     td.send_recipe_end()
+                #     rospy.sleep(5)
+                #     break
 
                 # Check if the plan is finished
                 if td.is_finished():
                     rospy.loginfo(UserMessages.PLAN_FINISHED.value)
-
-                    # Stop distance acquisition
-                    try:
-                        stop_distance_acq_srv_client()
-                        rospy.loginfo(UserMessages.SERVICE_CALLBACK.value.format("stop_distance_acq"))
-                    except rospy.ServiceException as e:
-                        rospy.loginfo(UserMessages.SERVICE_FAILED.value.format("stop_distance_acq"))
-
-                    # Reload scene
-                    try:
-                        reload_scene_srv_resp = reload_scene_srv_client()
-                        rospy.loginfo(UserMessages.SERVICE_CALLBACK.value.format("reload_scene"))
-                    except rospy.ServiceException as e:
-                        rospy.loginfo(UserMessages.SERVICE_FAILED.value.format("reload_scene"))
+                    # Stop distance acquisition and Reload scene
+                    if acquire_distance:
+                        end_recipe_procedure(stop_distance_acq_srv_client, reload_scene_srv_client)
+                    else:
+                        reload_scene(reload_scene_srv_client)
+                    # # Stop distance acquisition
+                    # try:
+                    #     stop_distance_acq_srv_client()
+                    #     rospy.loginfo(UserMessages.SERVICE_CALLBACK.value.format("stop_distance_acq"))
+                    # except rospy.ServiceException as e:
+                    #     rospy.loginfo(UserMessages.SERVICE_FAILED.value.format("stop_distance_acq"))
+                    #
+                    # # Reload scene
+                    # try:
+                    #     reload_scene_srv_resp = reload_scene_srv_client()
+                    #     rospy.loginfo(UserMessages.SERVICE_CALLBACK.value.format("reload_scene"))
+                    # except rospy.ServiceException as e:
+                    #     rospy.loginfo(UserMessages.SERVICE_FAILED.value.format("reload_scene"))
 
                     td.send_recipe_end()
                     print("Service called and executed")
@@ -375,6 +453,29 @@ def main():
     # td.dispatch_solution(tp.get_solution(1))
     # show_gantt(tp.get_solution())
     # rospy.loginfo(f"Consistency Check: {problem_to_solve.consistency_check()}")
+
+
+def end_recipe_procedure(stop_distance_acq_srv_client, reload_scene_srv_client):
+    stop_acquisition_distance(stop_distance_acq_srv_client)
+    reload_scene(reload_scene_srv_client)
+
+
+def stop_acquisition_distance(stop_distance_acq_srv_client):
+    # Stop distance acquisition
+    try:
+        stop_distance_acq_srv_client()
+        rospy.loginfo(UserMessages.SERVICE_CALLBACK.value.format("stop_distance_acq"))
+    except rospy.ServiceException as e:
+        rospy.loginfo(UserMessages.SERVICE_FAILED.value.format("stop_distance_acq"))
+
+
+def reload_scene(reload_scene_srv_client):
+    # Reload scene
+    try:
+        reload_scene_srv_resp = reload_scene_srv_client()
+        rospy.loginfo(UserMessages.SERVICE_CALLBACK.value.format("reload_scene"))
+    except rospy.ServiceException as e:
+        rospy.loginfo(UserMessages.SERVICE_FAILED.value.format("reload_scene"))
 
 
 if __name__ == "__main__":

@@ -184,7 +184,7 @@ class TaskPlannerHumanAwareEasier(TaskPlannerHumanAware):
     def set_objective(self) -> None:
         cost_function = self.model.addVar(name="J", vtype=gp.GRB.CONTINUOUS)
 
-        sigma_index = self.model.addVar(name="sigma_index", vtype=gp.GRB.CONTINUOUS, lb=-2) # -2)
+        sigma_index = self.model.addVar(name="sigma_index", vtype=gp.GRB.CONTINUOUS, lb=0) # -2)
         print(sigma_index)
         parallel_agent = "human_right_arm"
         main_agent = "ur5_on_guide"

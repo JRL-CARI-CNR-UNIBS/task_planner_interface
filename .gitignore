@@ -52,3 +52,7 @@
  *.pyc
  **/__pycache__
 **/*.pyc
+
+/task_planner_statistics/file/*.png
+*.png
+**/*.png

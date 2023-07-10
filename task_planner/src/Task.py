@@ -13,10 +13,25 @@ class Task:
     synergy: Dict[Tuple[str, str], Dict[str, float]] = field(default_factory=dict, init=False)
 
     def update_duration(self, agent: str, duration: float) -> bool:
+        """
+        Update the expected duration of a task when executed by an agent.
+
+        Args:
+            agent (str): The agent for which the duration is to be updated.
+            duration (float): The new expected duration to be assigned to the task.
+
+        Returns:
+            bool: True if the update was successful, False otherwise.
+
+        Raises:
+            AssertionError: If the list of agents is empty or if the specified agent is not present in the list.
+            ValueError: If the duration is not a positive numeric value.
+        """
         assert self.agents is not None
         if self.agents is None:
             print(f"Empy agents List")
             return False
+
         assert agent in self.agents
         if agent not in self.agents:
             print(f"Task: {self.id} has no agent: {agent}")
@@ -26,14 +41,32 @@ class Task:
         if self.exp_duration is None:
             self.exp_duration = {}
         if duration < 0:
+            # raise ValueError("Expected duration must be not negative")
             return False
 
         self.exp_duration[agent] = duration
         return True
 
     def update_synergy(self, agent, parallel_agent, synergies: Dict[str, float]) -> None:
+        """
+        Update the synergy value between two agents for a current task.
+
+        Args:
+            agent: The primary agent for which the synergy is being updated.
+            parallel_agent: The secondary agent with which the synergy is being updated.
+            synergies (Dict[str, float]): A dictionary containing the synergy values for different tasks.
+
+        Returns:
+            None
+
+        Raises:
+            Exception: If the specified primary agent is not defined for the task.
+        """
+
         if agent not in self.agents:
             raise Exception(f"Agent {agent} is not defined for task: {self.id}")
+        if not all(value >= 0 for value in synergies.values()):
+            raise ValueError("Synergy values must be non-negative.")
 
         # TODO: Check that contains all tasks
         self.synergy[(agent, parallel_agent)] = synergies
@@ -42,9 +75,39 @@ class Task:
         #                        pass a synergy objects list
 
     def update_agents(self, agents: List[str]) -> None:
+        """
+        Update the list of agents associated with the task.
+
+        Args:
+            agents (List[str]): The new list of agents.
+
+        Returns:
+            None
+
+        Raises:
+            ValueError: If the `agents` parameter is not a list or if any item in the list is not a string.
+        """
+        if not (isinstance(agents, list) and all(isinstance(agent, str) for agent in agents)):
+            return ValueError("All items in the agents list must be strings.")
+
         self.agents = agents
 
     def update_agents_constraint(self, agents: List[str]) -> None:
+        """
+        Updates the agents constraint of the task with the provided list of agents.
+
+        Args:
+            agents (List[str]): The list of agents to be set as the new agents constraint.
+
+        Raises:
+            ValueError: If the agents argument is not a list or if any item in the list is not a string.
+
+        Returns:
+            None
+        """
+
+        if not (isinstance(agents, list) and all(isinstance(agent, str) for agent in agents)):
+            return ValueError("All items in the agents list must be strings.")
         self.agents_constraint = agents
 
     def add_agent(self, agent: str) -> None:
@@ -63,6 +126,22 @@ class Task:
         ...
 
     def get_duration(self, *args):
+        """
+        Retrieves the expected duration based on the provided arguments.
+
+        If no arguments are provided, it returns the expected durations for all agents as a dictionary.
+        If a single argument (agent) is provided, it returns the expected duration for that agent as a float.
+
+        Args:
+            *args: Variable-length arguments. If a single argument is provided, it is treated as the agent name.
+
+        Returns:
+            Dict[str, float]: The expected durations based on the provided arguments.
+
+        Raises:
+            NotImplemented: If invalid arguments are provided.
+
+        """
         if len(args) == 1 and isinstance(args[0], str):  # Param: specify agent
             agent = args[0]
             assert agent in self.agents
@@ -76,13 +155,49 @@ class Task:
             raise NotImplemented
 
     def get_synergy(self, agent: str, parallel_agent: str, parallel_task: str) -> Optional[str]:
+        """
+        Retrieves the synergy value based on the provided agent, parallel_agent, and parallel_task.
+
+        :param agent: str, the agent for which to retrieve the synergy value.
+        :param parallel_agent: str, the parallel agent involved in the synergy.
+        :param parallel_task: str, the specific task for which to retrieve the synergy value.
+
+        :return: Optional[str], the synergy value corresponding to the provided parameters.
+                 Returns the synergy value if the combination of agent, parallel_agent, and parallel_task exists
+                 in the synergy dictionary. Otherwise, returns None.
+        """
+
         if (agent, parallel_agent) in self.synergy and parallel_task in self.synergy[(agent, parallel_agent)]:
             return self.synergy[(agent, parallel_agent)][parallel_task]
         return None
 
-    def get_synergies(self) -> Optional[Dict[Tuple[str, str], Dict[str, float]]]:
-        # TODO : Can be usefull the option of specify agent and parallel agent
-        return self.synergy
+    def get_synergies(self,
+                      agent: Optional[str] = None,
+                      parallel_agent: Optional[str] = None) -> Optional[Dict[Tuple[str, str], Dict[str, float]]]:
+        """
+        Retrieves the synergies based on the provided agent(s) and parallel agent.
+
+        :param agent: Optional[str], the agent for which to retrieve the synergies. Default is None.
+        :param parallel_agent: Optional[str], the parallel agent to consider for synergies. Default is None.
+
+        :return: Optional[Dict[Tuple[str, str], Dict[str, float]]], the requested synergies.
+                 Returns the entire synergy dictionary if neither agent nor parallel_agent is provided.
+                 Returns the synergies for the specified agent with all parallel agents if only agent is provided.
+                 Raises a ValueError if only parallel_agent is provided, indicating that agent must also be provided.        """
+
+        if agent is None and parallel_agent is None:
+            return self.synergy
+        elif agent is not None and parallel_agent is None:
+            specified_synergy = \
+                {agent: synergies for involved_agents, synergies in self.synergy.items() if involved_agents[0] == agent}
+            return specified_synergy
+        elif agent is not None and parallel_agent is not None:
+            if (agent, parallel_agent) in self.synergy:
+                return self.synergy[(agent, parallel_agent)]
+            raise KeyError(f"Involved agent: ({agent},{parallel_agent}) not defined in synergy for task: {self.type}")
+
+        else:
+            raise ValueError("You must provide both 'agent' and 'parallel_agent'.")
 
     def get_id(self) -> str:
         return self.id

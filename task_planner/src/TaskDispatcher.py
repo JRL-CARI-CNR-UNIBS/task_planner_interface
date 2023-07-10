@@ -10,7 +10,7 @@ from Task import TaskSolution
 from utils import UserMessages
 from std_msgs.msg import Float32, String
 
-THREASHOLD = 100
+THREASHOLD = 500
 
 
 @dataclass
@@ -116,6 +116,7 @@ class TaskDispatcher:
                     # print("finito agente "+ agent)
                     continue
                 if t >= agent_task_solution[0].get_start_time() and not self.busy[agent]:
+                    print(f"Agente: {agent}, Discrepanza: {t - agent_task_solution[0].get_start_time()}")
                     self.publish_task_request(agent, agent_task_solution[0])
                     rospy.loginfo(
                         UserMessages.DISPATCH_TASK_MSG.value.format(agent_task_solution[0].get_task().get_id(), agent))
@@ -155,11 +156,17 @@ class TaskDispatcher:
         thread.daemon = True
         thread.start()
 
-    def reset_agent(self, msg, agent):
+    def reset_agent(self, msg: MotionTaskExecutionFeedback, agent: str):
         if self.task_solutions[agent]:
             if self.busy[agent]:
                 task = self.task_solutions[agent][0].get_task()
-                rospy.loginfo(UserMessages.FEEDBACK_TASK_MSG.value.format(task.get_type(), agent))
+                msg: MotionTaskExecutionFeedback
+                outcome = msg.result
+                if outcome == 0:
+                    rospy.loginfo(UserMessages.FEEDBACK_FAILED_TASK_MSG.value.format(task.get_type(), agent))
+                    self.failed = True
+                else:
+                    rospy.loginfo(UserMessages.FEEDBACK_TASK_MSG.value.format(task.get_type(), agent))
                 self.performed_tasks.append(self.task_solutions[agent].pop(0))
                 self.completion_publisher[agent].publish(0)
             else:
@@ -202,3 +209,5 @@ class TaskDispatcher:
     #     request_array = MotionTaskExecutionRequestArray(cmd_id=100,
     #                                                     tasks=[task_request])
     #     self.request_publishers[agent].publish(request_array)
+
+

@@ -31,6 +31,8 @@ import torch
 from task_planner_statistics.msg import TaskSynergy
 from task_planner_statistics.srv import TaskSynergies, TaskSynergiesResponse
 
+import multiprocessing
+
 GREEN = '\033[92m'
 YELLOW = '\033[93m'
 RED = '\033[91m'
@@ -237,7 +239,7 @@ class MongoStatistics:
         task_index = dict()  # It will be as: {"agent_name":[list with all tasks that it can perform],..}
         for single_task in cursor_task_properties:
             if "name" in single_task.keys() and "agent" in single_task.keys():  # Ensure it has nedded attributes
-                if not single_task["name"] == "end":  # Excule task end (not interesting)
+                if not single_task["name"] == "end" and not single_task["name"] == "go_home":  # Excule task end (not interesting)
                     if single_task["agent"] not in task_index:  # If not exist already that agents
                         task_index[single_task["agent"]] = set()  # A SET for each agent to ensure unique task
                     task_index[single_task["agent"]].add(single_task["name"])
@@ -591,7 +593,6 @@ class MongoStatistics:
 
             # fig, axs = plt.subplots(1, 2)
         # fig.suptitle('Dynamic Matrix')
-        import multiprocessing
 
         for index, single_agent_dynamic_risk in enumerate(dynamic_risk_list):
             # Retrieve agent name
@@ -994,13 +995,25 @@ class MongoStatistics:
 
             dati = pd.DataFrame(task_results_agent)
             print(dati)
-            sns.set_theme()
-            # sns.catplot(data=dati, x=main_agent, y="duration", hue=concurrent_agent)
-            sns.catplot(data=dati, kind="bar", x=main_agent, y="duration", hue=concurrent_agent)
+            # sns.set_theme()
+            # # sns.catplot(data=dati, x=main_agent, y="duration", hue=concurrent_agent)
+            # sns.catplot(data=dati, kind="bar", x=main_agent, y="duration", hue=concurrent_agent)
 
             # plt.figure()
+            def plot_a_graph():
+                # plt.figure()
 
-        plt.show()
+                sns.set_theme()
+                # sns.catplot(data=dati, x=main_agent, y="duration", hue=concurrent_agent)
+                sns.catplot(data=dati, kind="bar", x=main_agent, y="duration", hue=concurrent_agent)
+                plt.show()
+
+            job_for_another_core = multiprocessing.Process(target=plot_a_graph, args=())
+            job_for_another_core.start()
+
+        # plt.show()
+
+
         return SetBoolResponse(True, SUCCESSFUL)
 
     def getAgents(self):
@@ -1111,7 +1124,7 @@ class MongoStatistics:
         task_index = dict()  # It will be as: {"agent_name":[list with all tasks that it can perform],..}
         for single_task in cursor_task_properties:
             if "name" in single_task.keys() and "agent" in single_task.keys():  # Ensure it has nedded attributes
-                if not single_task["name"] == "end":  # Excule task end (not interesting)
+                if not single_task["name"] == "end" and not single_task["name"] == "go_home":  # Excule task end (not interesting)
                     if single_task["agent"] not in task_index:  # If not exist already that agents
                         task_index[single_task["agent"]] = set()  # A SET for each agent to ensure unique task
                     task_index[single_task["agent"]].add(single_task["name"])
@@ -1220,6 +1233,7 @@ class MongoStatistics:
             rospy.loginfo(YELLOW + "****************" + END)
             input("Verifica")
             # if agent == "human_right_arm":
+            
             clf = IsolationForest(n_estimators=20, warm_start=True)
             estimator = clf.fit(known_vect.reshape(-1, 1))  # fit 10 trees
             check = estimator.decision_function(known_vect.reshape(-1, 1))

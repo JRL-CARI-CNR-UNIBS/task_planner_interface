@@ -1,6 +1,15 @@
 # Solver Selection #
 optimization:
+  # type: human_aware
   # type: base
+  type: human_aware_easier
+  # type: human_aware_complete
+  # type: human_aware_easier
+  # type: human_aware_approx
+  # type: human_aware_approx_band
+  # type: test
+
+
   # behaviour: continous
   # objective: makespan
   n_recipe: 10

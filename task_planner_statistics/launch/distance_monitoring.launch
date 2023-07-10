@@ -1,12 +1,15 @@
 <?xml version="1.0"?>
 
 <launch>
+  <arg name="test_name" default="test"/>
 
 
 
 
   <node name="distance_monitoring_node" pkg="task_planner_statistics" type="distance_monitoring.py"  output="screen" >
-    <param name="distance_monitoring_path" value="$(find task_planner_statistics)/file/" />
+    <param name="distance_monitoring_path" value="$(find task_planner_statistics)/file/" />    
+    <param name="test_name" value="$(arg test_name)" />
+
   </node>
 
 
