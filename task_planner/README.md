@@ -4,6 +4,21 @@
 
 This package provides a task planner implementation based on a formalization as "Mixed Integer Linear Programming".
 
+
+## Basic classes
+
+- Definition of a Task
+- Definition of a TaskSolution
+- Definition of a TaskExecution
+- Definition of a Problem
+- Definition of a Basic TaskPlanner
+
+
+Task Dispatcher
+
+The TaskDispatcher class implements the dispatching algorithm. Specifically given a list of TaskSolutions (t_start,t_end, agent), it publishes on a topic the task execution request. Specifically, the algorithm is as follows:
+
+
 # To run:
 - roslaunch hrc_simulator_configurations simulation.launch
 - roslaunch hrc_mosaic_test skills_agents_synergy_test.launch

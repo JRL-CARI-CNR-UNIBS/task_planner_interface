@@ -49,6 +49,12 @@ class Problem:
                     rospy.logerr(f"The precedence task: {precedence_task}, of task: {task.get_id()}, does not exist.")
                     return False
 
+            for soft_precedence_task in task.get_soft_constraints():
+                # Check if exist all soft precedence constraints among task_ids
+                if soft_precedence_task not in tasks_dict.keys():
+                    rospy.logerr(f"The soft precedence task: {soft_precedence_task}, of task: {task.get_id()}, does not exist.")
+                    return False
+
             # Check if all task type exist
             try:
                 task_check_result = self.task_check_srv(task.get_type())
@@ -192,6 +198,12 @@ class Problem:
         for task in self.task_list:
             precedence_constraints[task.get_id()] = task.get_precedence_constraints()
         return precedence_constraints
+
+    def get_soft_precedence_constraints(self):
+        soft_precedence_constraints = {}
+        for task in self.task_list:
+            soft_precedence_constraints[task.get_id()] = task.get_soft_precedence_constraints()
+        return soft_precedence_constraints
 
     def get_tasks_per_agent(self):
         tasks_per_agent = {}

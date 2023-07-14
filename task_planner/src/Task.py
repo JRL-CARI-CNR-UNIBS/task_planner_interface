@@ -10,6 +10,8 @@ class Task:
     agents: List[str] = field(default=None, init=False)
     agents_constraint: List[str]
     precedence_constraints: List[str]
+    soft_precedence_constraints: List[str]
+
     exp_duration: Dict[str, float] = field(default=None, init=False)
     synergy: Dict[Tuple[str, str], Dict[str, float]] = field(default_factory=dict, init=False)
 
@@ -212,8 +214,12 @@ class Task:
     def get_agents_constraint(self) -> List[str]:
         return self.agents_constraint
 
-    def get_precedence_constraints(self) -> Optional[str]:
+    def get_precedence_constraints(self) -> Optional[List[str]]:
         return self.precedence_constraints
+
+    def get_soft_constraints(self) -> Optional[List[str]]:
+        # TODO: Definire soft precedence constraints
+        return self.soft_precedence_constraints
 
     def check_precedence_constraint(self, task: str) -> bool:
         if task in self.precedence_constraints:

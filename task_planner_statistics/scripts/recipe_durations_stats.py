@@ -14,7 +14,8 @@ RECIPE_NAMES = {"SAFETY_AREA_BOTH_AGENT_HUMAN_AWARE_EASIER": "Safety Areas-HA",
                 "NOT_NEIGHBORING_TASKS": "Safety Areas (Not Neighboring Tasks)",
                 "ONELINE": "aware",
                 "RELAXED_HA_SOLVER": "Safety Areas-HA (Relaxed)",
-                "BASIC_SOLVER": "Basic TP"}
+                "BASIC_SOLVER": "Basic TP",
+                "COMPLETE_SOLVER": "Complete HATP"}
 
 
 def main():

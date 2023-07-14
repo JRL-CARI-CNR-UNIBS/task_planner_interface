@@ -1,9 +1,10 @@
+import os
 from enum import Enum
 
 from Task import Task, TaskSolution
 from Problem import Problem
 
-from typing import List
+from typing import List, Optional
 import pandas as pd
 from datetime import datetime
 import plotly.express as px
@@ -84,7 +85,8 @@ class UserMessages(Enum):
     CUSTOM_DARKCYAN = Color.DARKCYAN.value + "{}" + Color.END.value
 
 
-def show_timeline(problem_solution: List[TaskSolution]) -> None:
+def show_timeline(problem_solution: List[TaskSolution],
+                  solution_name: Optional[str] = "Timeline") -> None:
     solution = []
     for task in problem_solution:
         solution.append(dict(Task=task.get_task().get_type(),
@@ -93,7 +95,7 @@ def show_timeline(problem_solution: List[TaskSolution]) -> None:
                              Agents=task.get_assignment()))
     df = pd.DataFrame(solution)
     print(df)
-    fig = px.timeline(df, x_start="Start", x_end="Finish", y="Agents", color="Task", title="TimeLine")
+    fig = px.timeline(df, x_start="Start", x_end="Finish", y="Agents", color="Task", title=solution_name)
     fig.update_layout(xaxis_title="Time")
     fig.show()
 
@@ -127,20 +129,80 @@ def save_planning_solution_to_yaml(solution: List[TaskSolution], path: Path, pro
         yaml.dump(solution_to_save, f)
 
 
-def load_solution_from_yaml(path: Path, problem_to_solve: Problem):
-    yaml = ruamel.yaml.YAML(typ='rt')
-    yaml.preserve_quotes = True
-    solution = list()
-    problem = problem_to_solve.get_task_list_as_dictionary()
-    for task in solution:
-        if task not in problem:
-            raise Exception
+# def load_solution_from_yaml(path: Path, problem_to_solve: Problem):
+#     yaml = ruamel.yaml.YAML(typ='rt')
+#     yaml.preserve_quotes = True
+#     solution = list()
+#     problem = problem_to_solve.get_task_list_as_dictionary()
+#     for task in solution:
+#         if task not in problem:
+#             raise Exception
+#
+#         solution.append(TaskSolution(problem[task],
+#                                      solution[task]["t_start"],
+#                                      solution[task]["t_emd"],
+#                                      solution[task]["agent"]))
+#     return solution
 
-        solution.append(TaskSolution(problem[task],
-                                     solution[task]["t_start"],
-                                     solution[task]["t_emd"],
-                                     solution[task]["agent"]))
+def show_solution_from_yaml(path: Path,
+                            solution_name: Optional[str] = "Timeline"):
+    solution = load_solution_from_yaml(path, solution_name)
+    show_timeline(solution,solution_name)
+
+
+def load_solution_from_yaml(path: Path,
+                            solution_name: Optional[str] = "Timeline") -> List[TaskSolution]:
+    import yaml
+    if (not path.exists()) or (not path.is_file()):
+        raise ValueError("THe provided file is not a valid, not a file")
+
+    loaded_sol = dict()
+    with open(path, "r") as stream:
+        try:
+            loaded_sol = yaml.safe_load(stream)
+        except yaml.YAMLError as exc:
+            raise yaml.YAMLError("Error Loading yaml")
+
+    task_feature = ["t_start", "t_end", "agent"]
+    solution = list()
+    for task_name, task_solution in loaded_sol.items():
+        if all(feature in task_solution.keys() for feature in task_feature):
+            t_start = task_solution["t_start"]
+            t_end = task_solution["t_end"]
+            agent = task_solution["agent"]
+            task = Task(id=task_name,
+                        type=task_name,
+                        agents_constraint="",
+                        precedence_constraints="",
+                        )
+            task_sol = TaskSolution(task=task,
+                                    t_start=t_start,
+                                    t_end=t_end,
+                                    assignment=agent)
+            solution.append(task_sol)
     return solution
+    # show_timeline(solution,
+    #               solution_name)
+
+    # problem = problem_to_solve.get_task_list_as_dictionary()
+    # for task in solution:
+    #     if task not in problem:
+    #         raise Exception
+    #
+    #     solution.append(TaskSolution(problem[task],
+    #                                  solution[task]["t_start"],
+    #                                  solution[task]["t_emd"],
+    #                                  solution[task]["agent"]))
+    # return solution
+
+
+def show_solutions_from_folder(folder_path: Path):
+    if (not folder_path.exists()) or (not folder_path.is_dir()):
+        raise ValueError("THe provided file is not a valid, not a file")
+    from os import listdir
+    for file_name in listdir(folder_path):
+        file_path = folder_path.joinpath(file_name)
+        show_solution_from_yaml(file_path, file_name)
 
 
 class Behaviour(Enum):
@@ -161,5 +223,3 @@ class Objective(Enum):
     SUM_T_END = 5
     ACTUAL_MAKESPAN = 6
     OTHER = 7
-
-

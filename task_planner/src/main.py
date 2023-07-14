@@ -26,7 +26,8 @@ import numpy as np
 from pathlib import Path
 
 RECIPE_NAME = {"base": "BASIC_SOLVER", "human_aware": "COMPLETE_HA_SOLVER",
-               "human_aware_easier": "RELAXED_HA_SOLVER", "areas": "NOT_NEIGHBORING_TASKS"}
+               "human_aware_easier": "RELAXED_HA_SOLVER", "areas": "NOT_NEIGHBORING_TASKS",
+               "human_aware_complete": "COMPLETE_SOLVER"}
 
 
 def params_exist(parameters: List[str]) -> bool:
@@ -57,19 +58,19 @@ def add_go_home(task_solution: List[TaskSolution], agents: List[str]):
 
     """
     task_solution: TaskSolution
-    go_home_duration = 1.1
+    go_home_duration = 2.9
     task_solution.sort(key=lambda task_sol: task_sol.get_start_time())
     task_solutions = {agent: list(filter(lambda task_sol: task_sol.get_assignment()
                                                           == agent, task_solution)) for agent in
                       agents}
     for agent in agents:
         for id, agent_task in enumerate(task_solutions[agent][:-1]):
-            if task_solutions[agent][id + 1].get_start_time() > agent_task.get_end_time() + 10:
+            if task_solutions[agent][id + 1].get_start_time() > agent_task.get_end_time() + 3:
                 task_solution.append(
-                    TaskSolution(Task("go_home", "go_home", [agent], []),
+                    TaskSolution(Task("go_home", "go_home", [agent], [], []),
                                  agent_task.get_end_time() + 0.1, agent_task.get_end_time() + go_home_duration, agent))
         task_solution.append(
-            TaskSolution(Task("go_home", "go_home", [agent], []),
+            TaskSolution(Task("go_home", "go_home", [agent], [], []),
                          task_solutions[agent][-1].get_end_time() + 0.1,
                          task_solutions[agent][-1].get_end_time() + go_home_duration,
                          agent))
@@ -295,14 +296,18 @@ def main():
 
         task_id = list(task.keys())[0]
         task_properties = task[task_id]
-        if not any(key in task_properties.keys() for key in ["task_name", "required_agents", "precedence_constraints"]):
+        if not any(key in task_properties.keys() for key in ["task_name",
+                                                             "required_agents",
+                                                             "precedence_constraints",
+                                                             "soft_precedence_constraints"]):
             rospy.logerr(UserMessages.PARAM_NOT_WELL_DEFINED.value.format("goal"))
             return 0
 
         task_obj = Task(task_id,
                         task_properties['task_name'],
                         task_properties["required_agents"],
-                        task_properties["precedence_constraints"])
+                        task_properties["precedence_constraints"],
+                        task_properties["soft_precedence_constraints"])
         # print(task_obj)
         try:
             problem_to_solve.add_task(task_obj)
@@ -368,7 +373,7 @@ def main():
     print(f"Makespan: {makespan}")
     print("----------------------------------------")
 
-    # for k in range(0,50):
+    # for k in range(0,n_recipe_to_compute):
     #     show_timeline(tp.get_solution(k))
     # return 0
     # Exit from the loop if does not have to dispatch the plan

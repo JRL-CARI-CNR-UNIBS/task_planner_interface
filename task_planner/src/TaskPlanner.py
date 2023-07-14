@@ -22,6 +22,7 @@ class TaskPlanner:
     n_solutions: float = field(default=1)
     gap: float = field(default=0)
     decision_variables: Dict[str, gp.tupledict] = field(init=False)
+
     def __post_init__(self):
         """
         The methos make sure that the TaskPlanner if is correctly defined: consistency check, requested solution >
@@ -62,12 +63,10 @@ class TaskPlanner:
         else:
             self.model.setParam("PoolSearchMode", 1)
 
-            # self.model.setParam("PoolSearchMode", 2) # Da ripristinare
-
             self.model.setParam("PoolSolutions", self.n_solutions)
         # self.model.setParam("IntFeasTol", 1e-3)
         # self.model.setParam("MIPgap", 0.57)
-        if self.gap>0:
+        if self.gap > 0:
             self.model.setParam("MIPGap", self.gap)
         self.decision_variables = {}
 
@@ -183,6 +182,12 @@ class TaskPlanner:
             for precedence_task in precedence_tasks:
                 self.model.addConstr(
                     self.decision_variables["t_start"][task] == self.decision_variables["t_end"][precedence_task])
+
+    def add_soft_precedence_constraints(self) -> None:
+        for task, soft_precedence_tasks in self.problem_definition.get_soft_precedence_constraints().items():
+            for precedence_task in soft_precedence_tasks:
+                self.model.addConstr(
+                    self.decision_variables["t_start"][task] >= self.decision_variables["t_end"][precedence_task])
 
     def add_problem(self, problem: Problem) -> None:
         # self.problem_definition.append(problem)

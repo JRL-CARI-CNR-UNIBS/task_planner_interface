@@ -134,9 +134,17 @@ class TaskDispatcher:
                     self.busy_time[agent] = t
 
                 if self.busy[agent]:
-                    self.completion_percentage[agent] = (t - self.busy_time[agent]) / (
-                            agent_task_solution[0].get_end_time() -
-                            agent_task_solution[0].get_start_time()) * 100
+                    if (agent_task_solution[0].get_end_time() - agent_task_solution[0].get_start_time()) > 0:
+
+                        self.completion_percentage[agent] = (t - self.busy_time[agent]) / (
+                                agent_task_solution[0].get_end_time() -
+                                agent_task_solution[0].get_start_time()) * 100
+                    else:
+                        print("-------------------ERROREEEEEE ---------------")
+                        print(agent_task_solution[0].get_task().get_id())
+                        print(agent_task_solution[0].get_end_time())
+                        print(agent_task_solution[0].get_start_time())
+                        print(agent_task_solution[0])
                     self.completion_publisher[agent].publish(self.completion_percentage[agent])
                 else:
                     self.completion_percentage[agent] = 0
