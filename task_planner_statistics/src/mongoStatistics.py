@@ -33,6 +33,9 @@ from task_planner_statistics.srv import TaskSynergies, TaskSynergiesResponse
 
 import multiprocessing
 
+import yaml
+import pickle
+
 GREEN = '\033[92m'
 YELLOW = '\033[93m'
 RED = '\033[91m'
@@ -67,6 +70,16 @@ OUTER = "outer_task"
 
 paper = True
 
+
+AGENT_NAME_FOR_CHART = {"ur5_on_guide": "Robot", "human_right_arm": "Human"}
+TASK_NAME_FOR_CHART = {"pick_orange_box":"Pick orange box",
+                       "place_orange_box":"Place orange box",
+                       "pick_blue_box":"Pick blue Box",
+                       "place_blue_box_ur5_on_guide":"Place blue box (R)",
+                       "pick_white_box":"Pick white box",
+                       "place_white_box":"Place white box",
+                       "place_blue_box_human_right_arm":"Place blue box (H)"
+                       }
 
 class MongoStatistics:
 
@@ -174,6 +187,8 @@ class MongoStatistics:
         Returns:
             _type_: _description_
         """
+        if task_name not in self.concurrent_task_counters:
+            return 0, 1
         return self.concurrent_task_counters[task_name]["counter"], self.concurrent_task_counters[task_name][
                                                                         "success_counter"] / \
                                                                     self.concurrent_task_counters[task_name]["counter"]
@@ -239,7 +254,8 @@ class MongoStatistics:
         task_index = dict()  # It will be as: {"agent_name":[list with all tasks that it can perform],..}
         for single_task in cursor_task_properties:
             if "name" in single_task.keys() and "agent" in single_task.keys():  # Ensure it has nedded attributes
-                if not single_task["name"] == "end" and not single_task["name"] == "go_home":  # Excule task end (not interesting)
+                if not single_task["name"] == "end" and not single_task[
+                                                                "name"] == "go_home":  # Excule task end (not interesting)
                     if single_task["agent"] not in task_index:  # If not exist already that agents
                         task_index[single_task["agent"]] = set()  # A SET for each agent to ensure unique task
                     task_index[single_task["agent"]].add(single_task["name"])
@@ -649,16 +665,20 @@ class MongoStatistics:
             def plot_a_graph():
                 print("CHARTTT")
                 plt.figure(index)
+                sns.set_theme()
                 ax = sns.heatmap(data_matrix, annot=True)
                 # plt.title(plot_title)
                 ax.set_title(plot_title, pad=20)
 
                 plt.xticks(rotation=45, ha="right")
+                plt.savefig(self.results_folder_path + "3dynamic_risk_agent_" + main_agent + ".png",
+                            bbox_inches='tight')
+                plt.savefig(self.results_folder_path + "test" + "3dynamic_risk_agent_" + main_agent + ".pdf",
+                            bbox_inches='tight')
+
                 plt.show()
                 print(multiprocessing.current_process().name)
 
-            # plt.savefig(self.results_folder_path + "2dynamic_risk_agent_" + main_agent +".png",bbox_inches='tight')
-            # plt.savefig(self.results_folder_path+"test"+"2dynamic_risk_agent_"+".pdf",bbox_inches='tight')
             job_for_another_core = multiprocessing.Process(target=plot_a_graph, args=())
             job_for_another_core.start()
 
@@ -995,6 +1015,7 @@ class MongoStatistics:
 
             dati = pd.DataFrame(task_results_agent)
             print(dati)
+
             # sns.set_theme()
             # # sns.catplot(data=dati, x=main_agent, y="duration", hue=concurrent_agent)
             # sns.catplot(data=dati, kind="bar", x=main_agent, y="duration", hue=concurrent_agent)
@@ -1012,7 +1033,6 @@ class MongoStatistics:
             job_for_another_core.start()
 
         # plt.show()
-
 
         return SetBoolResponse(True, SUCCESSFUL)
 
@@ -1124,7 +1144,8 @@ class MongoStatistics:
         task_index = dict()  # It will be as: {"agent_name":[list with all tasks that it can perform],..}
         for single_task in cursor_task_properties:
             if "name" in single_task.keys() and "agent" in single_task.keys():  # Ensure it has nedded attributes
-                if not single_task["name"] == "end" and not single_task["name"] == "go_home":  # Excule task end (not interesting)
+                if not single_task["name"] == "end" and not single_task[
+                                                                "name"] == "go_home":  # Excule task end (not interesting)
                     if single_task["agent"] not in task_index:  # If not exist already that agents
                         task_index[single_task["agent"]] = set()  # A SET for each agent to ensure unique task
                     task_index[single_task["agent"]].add(single_task["name"])
@@ -1233,7 +1254,7 @@ class MongoStatistics:
             rospy.loginfo(YELLOW + "****************" + END)
             input("Verifica")
             # if agent == "human_right_arm":
-            
+
             clf = IsolationForest(n_estimators=20, warm_start=True)
             estimator = clf.fit(known_vect.reshape(-1, 1))  # fit 10 trees
             check = estimator.decision_function(known_vect.reshape(-1, 1))
@@ -1477,35 +1498,41 @@ class MongoStatistics:
                 task_results["agent_name"].append(agent_name)
                 task_results["duration"].append(duration)
 
-        task_results_data = pd.DataFrame(task_results, dtype=object)
+        task_results_data = pd.DataFrame(task_results)
+        def plot_a_graph():
+            sns.set_theme()
+            sns.set(rc={'figure.figsize': (17, 7)})
 
-        sns.set_theme()
-        sns.set(rc={'figure.figsize': (17, 7)})
-        ax = sns.boxplot(data=task_results_data, x="task_name", y="duration", hue="agent_name",
-                         showmeans=True,
-                         meanprops={"marker": "o",
-                                    "markerfacecolor": "white",
-                                    "markeredgecolor": "black",
-                                    "markersize": "8"},
-                         linewidth=1,
-                         showfliers=False)  # ,
-        # palette="tab10")
+            #ax = sns.violinplot(data=task_results_data, x="task_name", y="duration", hue="agent_name")
 
-        ax.set_ylabel("Duration (s)", fontsize=24, labelpad=15)
-        ax.set_xlabel("Task name", fontsize=24, labelpad=15)
-        plt.xticks(fontsize=20, rotation=20)
-        plt.yticks(fontsize=21, rotation=0)
+            ax = sns.boxplot(data=task_results_data, x="task_name", y="duration", hue="agent_name",
+                             showmeans=True,
+                             meanprops={"marker": "o",
+                                        "markerfacecolor": "white",
+                                        "markeredgecolor": "black",
+                                        "markersize": "8"},
+                             linewidth=1,
+                             showfliers=False)  # ,
+            # palette="tab10")
 
-        ax.set_title("Task Durations", fontsize=20)
-        legend = plt.legend(title='Agent Name', loc='upper left', fontsize=20)
-        legend.get_title().set_fontsize('22')
+            ax.set_ylabel("Duration (s)", fontsize=24, labelpad=15)
+            ax.set_xlabel("Task name", fontsize=24, labelpad=15)
+            plt.xticks(fontsize=20, rotation=20)
+            plt.yticks(fontsize=21, rotation=0)
 
-        ax.figure.set_size_inches(17, 8)
+            ax.set_title("Task Durations", fontsize=20)
+            legend = plt.legend(title='Agent Name', loc='upper left', fontsize=20)
+            legend.get_title().set_fontsize('22')
 
-        plt.savefig(self.results_folder_path + "task_durations.png", bbox_inches='tight')
+            ax.figure.set_size_inches(17, 8)
 
-        # plt.figure()
-        plt.show()
+            plt.savefig(self.results_folder_path + "task_durations.png", bbox_inches='tight')
+
+            # plt.figure()
+            plt.show()
+
+        job_for_another_core = multiprocessing.Process(target=plot_a_graph, args=())
+        job_for_another_core.start()
 
         return SetBoolResponse(True, "ok")
 
@@ -1685,7 +1712,7 @@ class MongoStatistics:
             return SetBoolResponse(False, NOT_SUCCESSFUL)
 
         rospy.loginfo(GREEN + "Agents: {}".format(agents) + END)
-
+        sns.set_theme()
         for task_group in results:  # A task_group contains vector of all (task_j, agent_i) same task computed by same agent
             # input("New task group...")    #usefull for debug
 
@@ -1812,27 +1839,54 @@ class MongoStatistics:
             mcmc.run(task_data, main_task_duration, concurrent_task_name)
             hmc_samples = {k: v.detach().cpu().numpy() for k, v in mcmc.get_samples().items()}
 
+
+            print(task_group)
             fig, axs = plt.subplots(nrows=2, ncols=2, figsize=(12, 10))
+
+            chart_title = TASK_NAME_FOR_CHART[task_group["_id"][0]]
+
+            chart_agent_name = AGENT_NAME_FOR_CHART[agent]
             fig.suptitle(
-                "Marginal Posterior density - Regression Coefficients. Main agent: {}, Main Task: {}".format(agent,
-                                                                                                             task_group[
-                                                                                                                 "_id"][
-                                                                                                                 0]),
+                "Marginal Posterior density - Regression Coefficients. \n Main agent: {}, Main Task: {}".format(chart_agent_name,
+                                                                                                             chart_title),
                 fontsize=16)
+
+            with open(self.results_folder_path + f"synergy_estimation_{chart_agent_name}.yaml", 'w') as outfile:
+                yaml.dump(hmc_samples, outfile, default_flow_style=False)
+            with open(self.results_folder_path + f"synergy_estimation_{chart_agent_name}.pkl", 'wb') as fp:
+                pickle.dump(hmc_samples, fp)
+
+            np.save(self.results_folder_path + f"synergy_estimation_{chart_agent_name}.npy", hmc_samples)
+            sns.set_theme()
+
             for i, ax in enumerate(axs.reshape(-1)):
                 site = concurrent_task_name[i]
+
                 # sns.distplot(svi_samples[site], ax=ax, label="SVI (DiagNormal)")
+                sns.set_theme()
                 sns.distplot(hmc_samples[site], ax=ax, label="HMC")
-                ax.set_title(site)
+                ax_title = TASK_NAME_FOR_CHART[site]
+                ax.set_title(ax_title)
+                ax.set_xlabel("Synergy value")
             handles, labels = ax.get_legend_handles_labels()
             fig.legend(handles, labels, loc='upper right');
+            fig.tight_layout()
             # plt.show()
-            plt.savefig(self.results_folder_path + "2Bayesian_Gamma_dynamic_risk_agent_" + concurrent_agent + "_" +
+            sns.set_theme()
+            plt.savefig(self.results_folder_path + "3Bayesian_Gamma_dynamic_risk_agent_" + concurrent_agent + "_" +
                         task_group["_id"][0] + ".png", bbox_inches='tight')
+            plt.savefig(self.results_folder_path + "3Bayesian_Gamma_dynamic_risk_agent_" + concurrent_agent + "_" +
+                        task_group["_id"][0] + ".pdf", bbox_inches='tight')
 
             reg_model = smf.ols(formula="duration ~ " + formula_string + " -1 ", data=dataF)
             reg_result = reg_model.fit()
             print(reg_result.summary())
+
+            print("QUIIIII")
+            print(task_index[concurrent_agent])
+
+            print("QUaaaaaa")
+            print(self.concurrent_task_counters)
 
             # #Here agent and concurrent_agent change role for dynamic risk
             for index, task in enumerate(task_index[concurrent_agent]):

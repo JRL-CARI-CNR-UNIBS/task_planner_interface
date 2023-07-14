@@ -8,13 +8,13 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 import copy
+import sys
+
 
 RECIPE_NAMES = {"SAFETY_AREA_BOTH_AGENT_HUMAN_AWARE_EASIER": "Safety Areas-HA",
-                "SAFETY_AREA_NO_AWARE": "Safety Areas-Random",
-                "NOT_NEIGHBORING_TASKS": "Safety Areas (Not Neighboring Tasks)",
-                "ONELINE": "aware",
-                "RELAXED_HA_SOLVER": "Safety Areas-HA (Relaxed)",
-                "BASIC_SOLVER": "Basic TP"}
+                 "SAFETY_AREA_NO_AWARE": "Safety Areas-Random",
+                 "NOT_NEIGHBORING_TASKS":"Safety Areas (Not Neigboring Tasks)",
+                 "TEST0": "TEST"}
 
 
 def main():
@@ -36,10 +36,9 @@ def main():
     # results_collection_name = "task_results_ha"
 
     # results_collection_name = "task_results_experiments"
-    results_collection_name = "task_results_learning_phase"
-
-    database_name = "new_safety_areas"  # "milp_task_planner"
-    results_collection_name = "task_results_online"
+    results_collection_name = "task_results_online_phase"
+    RECIPE_NAMES = {sys.argv[1] : "test"}
+    print(RECIPE_NAMES)
 
     mongo_interface = MongoInterface(database_name)
 
@@ -111,10 +110,10 @@ def main():
     # sns.displot(result_pd, x="recipe_duration")
     # sns.boxplot(data=result_pd, x="recipe_duration", y="recipe_name", showfliers = False )
     result_pd.rename(columns={'recipe_duration': 'Recipe Duration (s)', 'recipe_name': 'Recipe Name'}, inplace=True)
+    
 
-    sns.boxplot(data=result_pd, x="Recipe Duration (s)", y="Recipe Name", showfliers=False).set(
-        title='Recipe Duration Comparison')
-    # sns.relplot(data=result_pd["Recipe Duration (s)"])
+    # sns.boxplot(data=result_pd, x="Recipe Duration (s)", y="Recipe Name", showfliers=False).set(title='Recipe Duration Comparison')
+    sns.relplot(data=result_pd["Recipe Duration (s)"])
     plt.show()
 
 

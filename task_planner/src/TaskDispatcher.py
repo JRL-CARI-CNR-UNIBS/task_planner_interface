@@ -6,7 +6,7 @@ import threading
 from task_planner_interface_msgs.msg import MotionTaskExecutionRequest, \
     MotionTaskExecutionRequestArray, \
     MotionTaskExecutionFeedback
-from Task import TaskSolution
+from Task import TaskSolution, TaskExecution
 from utils import UserMessages
 from std_msgs.msg import Float32, String
 
@@ -28,6 +28,9 @@ class TaskDispatcher:
 
     task_solutions: Dict[str, List[TaskSolution]] = field(default_factory=dict, init=False)
     performed_tasks: List[TaskSolution] = field(default_factory=list, init=False)  # TODO: TASK EXECUTION
+    executed_tasks: List[TaskExecution] = field(default_factory=list, init=False)  #
+    # t0: float = field(default_factory=0.0, init=False)  #
+
     task_number: Dict[str, int] = field(default_factory=dict, init=False)
     tot_task_number: Dict[str, int] = field(default_factory=dict, init=False)
 
@@ -43,6 +46,7 @@ class TaskDispatcher:
         self.busy_time = dict.fromkeys(self.agents, 0)
         self.task_number = dict.fromkeys(self.agents, 0)
         self.completion_percentage = dict.fromkeys(self.agents, 0)
+
 
     def __post_init__(self):
         self.reset_agents_info()
@@ -103,6 +107,7 @@ class TaskDispatcher:
         dt = 0.1
         rate = rospy.Rate(1.0 / dt)
         t0 = rospy.Time.now()
+        self.t0 = t0.to_sec()
         self.busy_time = dict.fromkeys(self.agents, t0.to_sec())
 
         while not rospy.is_shutdown():
@@ -110,17 +115,20 @@ class TaskDispatcher:
                 print("Empty all")
                 break
             for agent in self.agents:
-                t = rospy.Time.now().to_sec() - t0.to_sec()
+                t = rospy.Time.now().to_sec() - self.t0
                 agent_task_solution = self.task_solutions[agent]
                 if not agent_task_solution:
                     # print("finito agente "+ agent)
                     continue
                 if t >= agent_task_solution[0].get_start_time() and not self.busy[agent]:
+                    self.executed_tasks.append(TaskExecution(task=agent_task_solution[0].get_task(),
+                                                             t_start=t,
+                                                             assignment=agent))
+
                     print(f"Agente: {agent}, Discrepanza: {t - agent_task_solution[0].get_start_time()}")
                     self.publish_task_request(agent, agent_task_solution[0])
                     rospy.loginfo(
                         UserMessages.DISPATCH_TASK_MSG.value.format(agent_task_solution[0].get_task().get_id(), agent))
-
                     self.busy[agent] = True
                     # self.completion_percentage[agent] = 0
                     self.busy_time[agent] = t
@@ -167,7 +175,19 @@ class TaskDispatcher:
                     self.failed = True
                 else:
                     rospy.loginfo(UserMessages.FEEDBACK_TASK_MSG.value.format(task.get_type(), agent))
-                self.performed_tasks.append(self.task_solutions[agent].pop(0))
+                finished_task = self.task_solutions[agent].pop(0)
+                self.performed_tasks.append(finished_task)
+                finished_task: TaskSolution
+                tnow = rospy.Time.now()
+                for task in self.executed_tasks:
+                    if task.get_task().get_id() == finished_task.get_task().get_id():
+                        pass
+                        # print(task.get_task().get_id())
+                        # print(finished_task.get_task().get_id())
+
+                        # print("Stesso task")
+                        # task.set_as_completed(rospy.Time.now().to_sec() - self.t0)
+                print(rospy.Time.now().to_sec()-tnow.to_sec())
                 self.completion_publisher[agent].publish(0)
             else:
                 rospy.loginfo(UserMessages.FEEDBACK_WITHOUT_DISPATCH.value)
@@ -181,6 +201,7 @@ class TaskDispatcher:
     def is_finished(self):
         if all([len(task_list) == 0 for task_list in self.task_solutions.values()]):
             print("Plan finished")
+            # print(self.executed_tasks)
             return True
         return False
 
@@ -200,7 +221,7 @@ class TaskDispatcher:
             self.request_publishers[agent].publish(request_array)
             self.task_number[agent] += 1
 
-    def set_recipe_name(self, recipe_name:str):
+    def set_recipe_name(self, recipe_name: str):
         self.recipe_name = recipe_name
     # def go_home(self, agent):
     #     task_request = MotionTaskExecutionRequest(task_id="go_home",
@@ -209,5 +230,3 @@ class TaskDispatcher:
     #     request_array = MotionTaskExecutionRequestArray(cmd_id=100,
     #                                                     tasks=[task_request])
     #     self.request_publishers[agent].publish(request_array)
-
-

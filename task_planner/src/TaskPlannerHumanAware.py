@@ -10,8 +10,8 @@ import itertools
 
 from utils import Behaviour, Objective
 
-EPS = 1E-12
-BIG_M = 1E12
+EPS = 1E-6
+BIG_M = 1E6
 
 
 @dataclass
@@ -45,8 +45,8 @@ class TaskPlannerHumanAware(TaskPlanner):
         # self.model.setParam("MIPFocus", 3)
 
         # self.model.setParam("heuristics", 0.001)
-
-        # self.model.setParam("MIPGap", 0.0124)
+        self.model.setParam("PoolSearchMode", 0)
+        # self.model.setParam("MIPGap", 0.001)
 
     def add_t_end_constraints(self, agent_task_combination, cost) -> None:
         t_end = {}
@@ -60,8 +60,8 @@ class TaskPlannerHumanAware(TaskPlanner):
         parallel_agent = "human_right_arm"
         main_agent = "ur5_on_guide"
         # TODO: define agents in "init"
+        # t_end_add = {}
         for task in self.decision_variables["t_start"].keys():
-
             for task_pair in self.decision_variables["overlapping"].keys():
                 if task in task_pair:
                     parallel_task = set(task_pair).difference({task}).pop()
@@ -74,6 +74,12 @@ class TaskPlannerHumanAware(TaskPlanner):
                             synergy = tasks_synergies[(task_type, main_agent, parallel_task_type, parallel_agent)]
                             if self.behaviour == Behaviour.CONTINUOUS:
                                 t_end[task] += overlapping * (synergy - 1) * assignment_main_task
+                                # if task not in t_end_add:
+                                #     t_end_add[task] = overlapping * (synergy - 1)
+                                # else:
+                                #     t_end_add[task] += overlapping * (synergy - 1)
+
+                                # No
                                 # S_ij = self.model.addVar(name=f"S_ij({task_pair})",
                                 #                          vtype=gp.GRB.CONTINUOUS,
                                 #                          lb=-5,
@@ -81,18 +87,17 @@ class TaskPlannerHumanAware(TaskPlanner):
                                 # self.model.addConstr((assignment_main_task == 1) >> (S_ij == overlapping * (synergy - 1)))
                                 # self.model.addConstr((assignment_main_task == 0) >> (S_ij == 0))
                                 # t_end[task] += S_ij
+                                # No
 
                             elif self.behaviour == Behaviour.DISCRETE:  # Add cost (Measurement: time)
                                 t_end[task] += overlapping * (synergy - 1) * assignment_main_task * cost[
                                     (main_agent, task)]
+                    # else:
+                    #     t_end_add[task] = 0
             self.model.addConstr(self.decision_variables["t_end"][task] == t_end[task], name=f"t_end({task})")
-
-            # TODO: Pensare a cosa simile a quella sotto: aggiungere vincolo = t_end MODIFICATO SOLO se parallel task è assegnato alla persona.
-            # Note: Così come commentato non è corretto perchè nel caso non lo fosse dovrebbe essere uguale a t_start + d*a.
-            # Bisognerebbe fare vincolo sopra e poi aggiungerlo sotto, ma si riferirà allo stesso vincolo o agigunge un'altro?
-            # self.model.addConstr(self.decision_variables["overlapping"][parallel_task] == 1 >>
-            #                      (self.decision_variables["t_end"][task] == t_end[task]),
-            #                      name=f"t_end({task})")
+            # self.model.addConstr((assignment_main_task == 0) >> (self.decision_variables["t_end"][task] == t_end[task]))
+            # self.model.addConstr((assignment_main_task == 1) >> (
+            #             self.decision_variables["t_end"][task] == t_end[task] + t_end_add[task]))
 
     def add_overlapping_constraints(self, upper_bound=None):
 
@@ -139,18 +144,18 @@ class TaskPlannerHumanAware(TaskPlanner):
             self.model.addGenConstrMax(max_t_start, [t_start_i, t_start_j])
 
             self.model.addConstr(raw_overlapping == (min_t_end - max_t_start))
-
-            check_parallelism = self.model.addVar(name=f"check_parallelism({task_i},{task_j})",
-                                                  vtype=gp.GRB.BINARY, lb=0, ub=1)
-
-            self.model.addConstr(raw_overlapping >= -BIG_M * (1 - check_parallelism))
-            self.model.addConstr(raw_overlapping <= BIG_M * check_parallelism - EPS)
-
-            if self.behaviour == Behaviour.DISCRETE:
-                self.model.addConstr((self.decision_variables["overlapping"][(task_i, task_j)] == check_parallelism))
-            elif self.behaviour == Behaviour.CONTINUOUS:
-                self.model.addConstr((self.decision_variables["overlapping"][(task_i, task_j)] == (
-                        min_t_end - max_t_start) * check_parallelism))
+            self.model.addGenConstrMax(self.decision_variables["overlapping"][(task_i, task_j)], [raw_overlapping, 0])
+            # check_parallelism = self.model.addVar(name=f"check_parallelism({task_i},{task_j})",
+            #                                       vtype=gp.GRB.BINARY, lb=0, ub=1)
+            #
+            # self.model.addConstr(raw_overlapping >= -BIG_M * (1 - check_parallelism))
+            # self.model.addConstr(raw_overlapping <= BIG_M * check_parallelism - EPS)
+            #
+            # if self.behaviour == Behaviour.DISCRETE:
+            #     self.model.addConstr((self.decision_variables["overlapping"][(task_i, task_j)] == check_parallelism))
+            # elif self.behaviour == Behaviour.CONTINUOUS:
+            #     self.model.addConstr((self.decision_variables["overlapping"][(task_i, task_j)] == (
+            #             min_t_end - max_t_start) * check_parallelism))
 
     def set_objective(self) -> None:
         # TODO: Can be put in TaskPlanner Base class.
@@ -284,20 +289,20 @@ class TaskPlannerHumanAware(TaskPlanner):
                 t_start = model.cbGetSolution(self.decision_variables["t_start"][task])
                 t_end = model.cbGetSolution(self.decision_variables["t_end"][task])
                 # print(t_start)
-        #         # assignments = self.decision_variables["assignment"].select("*", task)
-        #
+                #         # assignments = self.decision_variables["assignment"].select("*", task)
+                #
                 assignment = None
                 for agent in agents:
                     # print()
-                    if (agent,task) in self.decision_variables["assignment"].keys():
+                    if (agent, task) in self.decision_variables["assignment"].keys():
                         # print(self.decision_variables["assignment"][(agent, task)])
                         decision_variable = model.cbGetSolution(self.decision_variables["assignment"][(agent, task)])
                         if decision_variable == 1:
-                        # if decision_variable:
-                        #     assert len(decision_variable) == 1
-                        #     if len(decision_variable) == 1 and decision_variable[0].X == 1:
+                            # if decision_variable:
+                            #     assert len(decision_variable) == 1
+                            #     if len(decision_variable) == 1 and decision_variable[0].X == 1:
                             assignment = agent
-        #         # print(task, t_start, t_end, assignment)
+                #         # print(task, t_start, t_end, assignment)
                 try:
                     task_solution = self.problem_definition.add_task_solution(task, t_start, t_end, assignment)
                 except ValueError:

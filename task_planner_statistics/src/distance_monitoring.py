@@ -133,8 +133,8 @@ def main():
         rospy.loginfo("Param: test_name not defined")
         return 0
     test_name = rospy.get_param("~test_name")
-    file_path_distance = Path(rospy.get_param("~distance_monitoring_path") + f"distance_monitoring_{test_name}.csv")
-    file_path_ovr = Path(rospy.get_param("~distance_monitoring_path") + f"ovr_monitoring_{test_name}.csv")
+    file_path_distance = Path(rospy.get_param("~distance_monitoring_path") + f"/distance_monitoring_{test_name}.csv")
+    file_path_ovr = Path(rospy.get_param("~distance_monitoring_path") + f"/ovr_monitoring_{test_name}.csv")
 
     # if not rospy.has_param("distance_topic_name"):
     #     rospy.loginfo("Param: distance_topic_name not defined")

@@ -25,8 +25,8 @@ import copy
 import numpy as np
 from pathlib import Path
 
-RECIPE_NAME = {"base": "SAFETY_AREA_NO_AWARE", "human_aware": "SAFETY_AREA_BOTH_AGENT_HUMAN_AWARE",
-               "human_aware_easier": "TEST0", "areas": "NOT_NEIGHBORING_TASKS"}
+RECIPE_NAME = {"base": "BASIC_SOLVER", "human_aware": "COMPLETE_HA_SOLVER",
+               "human_aware_easier": "RELAXED_HA_SOLVER", "areas": "NOT_NEIGHBORING_TASKS"}
 
 
 def params_exist(parameters: List[str]) -> bool:
@@ -64,13 +64,14 @@ def add_go_home(task_solution: List[TaskSolution], agents: List[str]):
                       agents}
     for agent in agents:
         for id, agent_task in enumerate(task_solutions[agent][:-1]):
-            if task_solutions[agent][id + 1].get_start_time() > agent_task.get_end_time() + 0.5:
+            if task_solutions[agent][id + 1].get_start_time() > agent_task.get_end_time() + 10:
                 task_solution.append(
                     TaskSolution(Task("go_home", "go_home", [agent], []),
                                  agent_task.get_end_time() + 0.1, agent_task.get_end_time() + go_home_duration, agent))
         task_solution.append(
             TaskSolution(Task("go_home", "go_home", [agent], []),
-                         task_solutions[agent][-1].get_end_time() + 0.1, task_solutions[agent][-1].get_end_time() + go_home_duration,
+                         task_solutions[agent][-1].get_end_time() + 0.1,
+                         task_solutions[agent][-1].get_end_time() + go_home_duration,
                          agent))
 
     return task_solution
@@ -123,12 +124,15 @@ def get_best_plan(n_recipe_to_compute: int, tp: TaskPlanner) -> int:
     synergy = []
     for recipe in range(0, n_recipe_to_compute):
         solution = tp.get_solution(recipe)
+
         makespan = max([task_sol.get_end_time() for task_sol in solution])
         synergy.append(compute_synergy_val(tp.get_solution(recipe)))
+        show_timeline(tp.get_solution(recipe))
         print(f"Recipe number: {recipe}")
         print(f"Recipe synerdy index: {synergy[recipe]}")
         print(f"Makespan: {makespan}")
         print("----------------------------------------")
+        # rospy.sleep(10)
 
     best_plan = np.argmin(synergy)
     return best_plan
@@ -136,11 +140,13 @@ def get_best_plan(n_recipe_to_compute: int, tp: TaskPlanner) -> int:
 
 def select_planner(optimization_type: str,
                    problem_to_solve: Problem,
-                   n_recipe_to_compute: int) -> TaskPlanner:
+                   n_recipe_to_compute: int,
+                   mip_gap: float) -> TaskPlanner:
     """
     Utlity function to select the proper planner object
 
     Args:
+        mip_gap:
         optimization_type:
         problem_to_solve:
         n_recipe_to_compute:
@@ -152,7 +158,8 @@ def select_planner(optimization_type: str,
         tp = TaskPlanner("Task_Allocation_Scheduling",
                          problem_to_solve,
                          objective=Objective.MAKESPAN,
-                         n_solutions=n_recipe_to_compute)
+                         n_solutions=n_recipe_to_compute,
+                         gap=mip_gap)
 
     elif optimization_type == "human_aware_complete":
         # tp = TaskPlannerHumanAwareRelaxed("tp",
@@ -162,7 +169,8 @@ def select_planner(optimization_type: str,
         tp = TaskPlannerHumanAware("tp",
                                    problem_to_solve,
                                    behaviour=Behaviour.CONTINUOUS,
-                                   objective=Objective.MAKESPAN)
+                                   objective=Objective.MAKESPAN,
+                                   gap=mip_gap)
         # tp = TaskPlannerHumanAwareLast("tp",
         #                            problem_to_solve,
         #                            behaviour=Behaviour.CONTINUOUS,
@@ -172,19 +180,22 @@ def select_planner(optimization_type: str,
                                          problem_to_solve,
                                          behaviour=Behaviour.CONTINUOUS,
                                          objective=Objective.MAKESPAN,
-                                         n_solutions=n_recipe_to_compute)
+                                         n_solutions=n_recipe_to_compute,
+                                         gap=mip_gap)
     elif optimization_type == "human_aware_easier_abs":
 
         tp = TaskPlannerSynergisticEasier("Task_Planning&Scheduling",
                                           problem_to_solve,
                                           behaviour=Behaviour.CONTINUOUS,
                                           objective=Objective.MAKESPAN,
-                                          n_solutions=n_recipe_to_compute)
+                                          n_solutions=n_recipe_to_compute,
+                                          gap=mip_gap)
     elif optimization_type == "human_aware_approx":
         tp = TaskPlannerSynergistic("Task_Allocation_Scheduling_Human_Aware",
                                     problem_to_solve,
                                     behaviour=Behaviour.CONTINUOUS,
-                                    objective=Objective.SYNERGY)
+                                    objective=Objective.SYNERGY,
+                                    gap=mip_gap)
     elif optimization_type == "human_aware_approx_band":
         tp = TaskPlannerSynergisticBand("tp",
                                         problem_to_solve,
@@ -218,7 +229,7 @@ def select_planner(optimization_type: str,
 def main():
     rospy.init_node("task_planner")
     parameters = ["~goal", "/agents", "/agents_group_names", "~dispatch_plan",
-                  "~optimization/type", "~optimization/n_recipe", "~optimization/brute_force",
+                  "~optimization/type", "~optimization/n_recipe", "~optimization/brute_force", "~optimization/mip_gap",
                   "~execution/repetitions", "~execution/n_recipe", "~save_result", "~result_file_path"]
 
     if not params_exist(parameters):
@@ -230,9 +241,11 @@ def main():
 
     n_recipe_to_compute = rospy.get_param("~optimization/n_recipe")
     optimization_type = rospy.get_param("~optimization/type")
+    mip_gap = rospy.get_param("~optimization/mip_gap")
+    if mip_gap <= 0:
+        mip_gap = 0
 
     n_repetitions = rospy.get_param("~execution/repetitions")
-    n_recipe_to_execute = rospy.get_param("~execution/n_recipe")
     n_recipe_to_execute = rospy.get_param("~execution/n_recipe")
 
     starting_recipe_number = 0
@@ -246,6 +259,7 @@ def main():
     brute_force = rospy.get_param("~optimization/brute_force")
     save_result = rospy.get_param("~save_result")
     result_file_path = rospy.get_param("~result_file_path")
+
     # rospy.wait_for_service('/reload_scene')
 
     # Services and Publishers
@@ -298,9 +312,9 @@ def main():
     if not problem_to_solve.fill_task_agents():  # TODO : Manage as exception?
         return 0
     if not problem_to_solve.update_tasks_statistics():
-        print("ciao")
+        print("Unable to update tasks statistics")
         return 0
-    if not problem_to_solve.update_tasks_synergy():
+    if not problem_to_solve.update_tasks_synergy() and "aware" in optimization_type:
         return 0
 
     rospy.loginfo(f"Consistency Check: {problem_to_solve.consistency_check()}")
@@ -309,7 +323,8 @@ def main():
     try:
         tp = select_planner(optimization_type,
                             problem_to_solve,
-                            n_recipe_to_compute)
+                            n_recipe_to_compute,
+                            mip_gap)
 
     except ValueError:
         rospy.logerr(UserMessages.CONSISTENCY_CHECK_FAILED.value)
@@ -331,7 +346,8 @@ def main():
     if save_result:
         for n_sol in range(0, n_recipe_to_compute):
             save_planning_solution_to_yaml(tp.get_solution(n_sol),
-                                           Path(f"{result_file_path}recipe_solution_{n_sol}_{optimization_type}.yaml"),
+                                           Path(
+                                               f"{result_file_path}recipe_solution_{n_sol}_{optimization_type}_online_phase.yaml"),
                                            problem_to_solve)
 
     actual_problem_to_solve = copy.deepcopy(problem_to_solve)
@@ -340,9 +356,9 @@ def main():
     best_plan = None
     if brute_force and optimization_type == "base":
         best_plan = get_best_plan(n_recipe_to_compute, tp)
-        # show_timeline(tp.get_solution(best_plan))
+        show_timeline(tp.get_solution(best_plan))
         print(f"Best plan is the number {best_plan}")
-
+    # show_timeline(tp.get_solution(0))
     # Evaluate solution
     makespan = max([task_sol.get_end_time() for task_sol in tp.get_solution(0)])
     synergy_index = compute_synergy_val(tp.get_solution(0))
@@ -352,6 +368,9 @@ def main():
     print(f"Makespan: {makespan}")
     print("----------------------------------------")
 
+    # for k in range(0,50):
+    #     show_timeline(tp.get_solution(k))
+    # return 0
     # Exit from the loop if does not have to dispatch the plan
     if not dispatch_plan:
         # for k in range(0,n_recipe_to_compute):

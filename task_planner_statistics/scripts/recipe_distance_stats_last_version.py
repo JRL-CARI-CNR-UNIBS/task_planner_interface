@@ -22,9 +22,14 @@ def main():
     #     rospy.loginfo("Param: distance_topic_name not defined")
     #     return 0
     # recipes_to_compare = rospy.get_param("~recipes_to_compare")
-    recipes_to_compare = ["TEST", "SAFETY_AREA_NO_AWARE", "NOT_NEIGHBORING_TASKS"]
+    recipes_to_compare = ["RELAXED_HA_SOLVER", "NOT_NEIGHBORING_TASKS", "BASIC_SOLVER"]
     recipes_to_compare = recipes_to_compare[0:]
-    RENAME = {"TEST": "Safety Areas - HA", "SAFETY_AREA_NO_AWARE": "Safety Areas - Random", "NOT_NEIGHBORING_TASKS": "Safety Areas - Not Neighboring Tasks", "TEST_WITH_GOHOME":"test"}
+    RENAME = {"TEST": "Safety Areas - HA",
+              "SAFETY_AREA_NO_AWARE": "Safety Areas - Random",
+              "NOT_NEIGHBORING_TASKS": "Safety Areas - Not Neighboring Tasks",
+              "TEST_WITH_GOHOME":"test", "ONELINE":"AWARE",
+              "RELAXED_HA_SOLVER": "Safety Areas - HA",
+              "BASIC_SOLVER": "Basic TP"}
     RECIPE_NAME_COLUMN = "Recipe Name"
     RECIPE_TYPE_COLUMN = "Recipe Type"
     RECIPE_PERCENTAGE_COLUMN = "Percentage Under Safety Distance"
@@ -41,6 +46,7 @@ def main():
     # file_path = "/home/samuele/projects/cells_ws/src/hrc_simulator/hrc_simulator/hrc_mosaic_task_planning/hrc_mosaic_task_planning_interface/statistics/distance_monitoring_safety_areas_experiments.csv"
 
     file_path = "/home/samuele/projects/cells_ws/src/hrc_simulator/hrc_simulator/hrc_mosaic_task_planning/hrc_mosaic_task_planning_interface/statistics/distance_monitoring_test_old_scaling.csv"
+    file_path = "/home/samuele/projects/cells_ws/src/hrc_simulator/hrc_simulator/hrc_mosaic_task_planning/hrc_mosaic_task_planning_interface/statistics/new_safety_areas/distance_monitoring_new_areas_online_phase.csv"
 
     distance_dataset = pd.read_csv(file_path)
     fig, ax = plt.subplots(figsize=(16, 8))

@@ -20,8 +20,8 @@ class TaskPlanner:
     model: gp.Model = field(init=False)
     objective: Objective = field(default=Objective.MAKESPAN)
     n_solutions: float = field(default=1)
+    gap: float = field(default=0)
     decision_variables: Dict[str, gp.tupledict] = field(init=False)
-
     def __post_init__(self):
         """
         The methos make sure that the TaskPlanner if is correctly defined: consistency check, requested solution >
@@ -57,10 +57,18 @@ class TaskPlanner:
         # Create the model within the Gurobi environment
         self.model = gp.Model(self.name, env=e, )
         # Set the model able to find more than one solution
-        self.model.setParam("PoolSearchMode", 2)
-        self.model.setParam("PoolSolutions", self.n_solutions)
+        if self.n_solutions == 1:
+            self.model.setParam("PoolSearchMode", 0)
+        else:
+            self.model.setParam("PoolSearchMode", 1)
+
+            # self.model.setParam("PoolSearchMode", 2) # Da ripristinare
+
+            self.model.setParam("PoolSolutions", self.n_solutions)
         # self.model.setParam("IntFeasTol", 1e-3)
         # self.model.setParam("MIPgap", 0.57)
+        if self.gap>0:
+            self.model.setParam("MIPGap", self.gap)
         self.decision_variables = {}
 
     def create_model(self) -> None:
@@ -210,8 +218,17 @@ class TaskPlanner:
 
     def solve(self) -> None:
         # Optimization
-        self.model.params.NonConvex = 2
+        # self.model.params.NonConvex = 2
         # self.model.optimize()
+        # self.model.setParam("TuneTimeLimit", 320)
+        # self.model.tune()
+        # print(" ------------------ TUNING RESULT -----------------------")
+        #
+        # for i in range(self.model.tuneResultCount):
+        #     self.model.getTuneResult(i)
+        #     print(self.model.getTuneResult(i))
+        #     self.model.write('tune' + str(i) + '.prm')
+
         self.model.optimize(lambda model, where: self.callback(model, where))
 
         status = self.model.Status

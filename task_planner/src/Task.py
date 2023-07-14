@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional, overload, Tuple
+from enum import Enum
 
 
 @dataclass
@@ -275,3 +276,33 @@ class TaskSolution:
 
     def __repr__(self):
         return f"{self.task.get_id()}, t_start: {self.t_start}, t_end: {self.t_end}, by: {self.assignment}"
+
+
+class Status(Enum):
+    COMPLETED = "COMPLETED"
+    NOT_COMPLETED = "NOT_COMPLETED"
+
+@dataclass
+class TaskExecution:
+    task: Task
+    t_start: float
+    assignment: str
+    status: Status = field(default=Status.NOT_COMPLETED, init=False)
+    t_end: Optional[float] = None
+
+    def __post_init__(self):
+        if self.t_start < -1e-3:
+            raise ValueError("Unfeasible t. start or t. end")
+        if self.t_end is not None:
+            if self.t_end < self.t_start or self.t_end < -1e-3:
+                raise ValueError(f"Tend must be feasible, task: {self.task.get_id()}")
+            self.status = Status.COMPLETED
+
+    def set_as_completed(self, t_end: float):
+        if t_end < self.t_start or t_end < -1e-3:
+            raise ValueError(f"Tend must be feasible, task: {self.task.get_id()}")
+        self.t_end = t_end
+        self.status = Status.COMPLETED
+
+    def get_task(self) -> Task:
+        return self.task
