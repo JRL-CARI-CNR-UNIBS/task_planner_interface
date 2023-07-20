@@ -27,6 +27,7 @@ add_service_files(
   PauseSkill.srv
   TasksInformation.srv
   TasksStatistics.srv
+  DeleteRecipe.srv
 )
 add_action_files(
   DIRECTORY action

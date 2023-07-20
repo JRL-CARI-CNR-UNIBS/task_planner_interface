@@ -16,6 +16,7 @@ from TaskPlannerSynergistic import TaskPlannerSynergistic
 from TaskPlannerSynergisticEasier import TaskPlannerSynergisticEasier
 from TaskPlannerSynergisticBand import TaskPlannerSynergisticBand
 from TaskPlannerAreas import TaskPlannerAreas
+from task_planner_interface_msgs.srv import DeleteRecipe, DeleteRecipeRequest,DeleteRecipeResponse
 
 from Prove import Prove
 from TaskDispatcher import TaskDispatcher
@@ -27,7 +28,8 @@ from pathlib import Path
 
 RECIPE_NAME = {"base": "BASIC_SOLVER", "human_aware": "COMPLETE_HA_SOLVER",
                "human_aware_easier": "RELAXED_HA_SOLVER", "areas": "NOT_NEIGHBORING_TASKS",
-               "human_aware_complete": "COMPLETE_SOLVER"}
+               "human_aware_complete": "COMPLETE_SOLVER2"}
+DATE_FORMAT = "%Y_%m_%d_%H:%M"
 
 
 def params_exist(parameters: List[str]) -> bool:
@@ -58,14 +60,18 @@ def add_go_home(task_solution: List[TaskSolution], agents: List[str]):
 
     """
     task_solution: TaskSolution
-    go_home_duration = 2.9
+    # 3 per il human aware
+    # 1.4 per il caso base e aree
+    # go_home_duration = 3 #era 1.4 qui e 1.5 sotto
+    go_home_duration = 1
+    go_home_duration_expanded = go_home_duration + 0.1
     task_solution.sort(key=lambda task_sol: task_sol.get_start_time())
     task_solutions = {agent: list(filter(lambda task_sol: task_sol.get_assignment()
                                                           == agent, task_solution)) for agent in
                       agents}
     for agent in agents:
         for id, agent_task in enumerate(task_solutions[agent][:-1]):
-            if task_solutions[agent][id + 1].get_start_time() > agent_task.get_end_time() + 3:
+            if task_solutions[agent][id + 1].get_start_time() > agent_task.get_end_time() + go_home_duration_expanded:
                 task_solution.append(
                     TaskSolution(Task("go_home", "go_home", [agent], [], []),
                                  agent_task.get_end_time() + 0.1, agent_task.get_end_time() + go_home_duration, agent))
@@ -270,6 +276,7 @@ def main():
     acquire_distance = rospy.get_param("acquire_distance", False)
     if acquire_distance:
         stop_distance_acq_srv_client = rospy.ServiceProxy("stop_distance_acq", Trigger)
+        reset_distance_acq_srv_client = rospy.ServiceProxy("reset_distance_acq", Trigger)
 
     # Agents group name ("Agent name")
     agents_group_name = []
@@ -308,16 +315,19 @@ def main():
                         task_properties["required_agents"],
                         task_properties["precedence_constraints"],
                         task_properties["soft_precedence_constraints"])
-        # print(task_obj)
+
         try:
             problem_to_solve.add_task(task_obj)
         except Exception:  # TODO: Specify Excpetion
             rospy.logerr(UserMessages.TASK_DUPLICATION.value.format(task_id))
             return 0
     if not problem_to_solve.fill_task_agents():  # TODO : Manage as exception?
+        rospy.loginfo(UserMessages.UNABLE_CAPABILITIES.value)
+        rospy.logerr(UserMessages.UNABLE_GO_ON.value)
         return 0
     if not problem_to_solve.update_tasks_statistics():
-        print("Unable to update tasks statistics")
+        rospy.loginfo(UserMessages.UNABLE_STATS.value)
+        rospy.logerr(UserMessages.UNABLE_GO_ON.value)
         return 0
     if not problem_to_solve.update_tasks_synergy() and "aware" in optimization_type:
         return 0
@@ -348,12 +358,21 @@ def main():
     #     return 0
     tp.save_model_to_file()
     tp.solve()
+    data = datetime.today().strftime(DATE_FORMAT)
+
     if save_result:
         for n_sol in range(0, n_recipe_to_compute):
             save_planning_solution_to_yaml(tp.get_solution(n_sol),
                                            Path(
-                                               f"{result_file_path}recipe_solution_{n_sol}_{optimization_type}_online_phase.yaml"),
+                                               f"{result_file_path}recipe_solution_{n_sol}_{optimization_type}_online_phase_{data}.yaml"),
                                            problem_to_solve)
+    # makespan = max([task_sol.get_end_time() for task_sol in tp.get_solution(n_sol)])
+    # synergy_index = compute_synergy_val(tp.get_solution(n_sol))
+    # print("----------------------------------------")
+    # print(f"Recipe number: {0}")
+    # print(f"Recipe synerdy index: {synergy_index}")
+    # print(f"Makespan: {makespan}")
+    # print("----------------------------------------")
 
     actual_problem_to_solve = copy.deepcopy(problem_to_solve)
 
@@ -378,6 +397,9 @@ def main():
     # return 0
     # Exit from the loop if does not have to dispatch the plan
     if not dispatch_plan:
+        if not save_result:
+            for k in range(0, n_recipe_to_compute):
+                show_timeline(tp.get_solution(k))
         # for k in range(0,n_recipe_to_compute):
         if best_plan:
             show_timeline(tp.get_solution(best_plan))
@@ -389,10 +411,13 @@ def main():
             #         show_timeline(tp.get_solution(k))
         return 0
 
-    td = TaskDispatcher(agents_group_name, agents_group_name_param, RECIPE_NAME.get(optimization_type, "DEFAULT_NAME"))
+    td = TaskDispatcher(agents_group_name,
+                        agents_group_name_param,
+                        RECIPE_NAME.get(optimization_type, "DEFAULT_NAME"))
 
     # Iterate all task planner solution
     for recipe in range(0, n_recipe_to_execute):
+        print(recipe)
         if rospy.is_shutdown():
             break
         # If Brute force skip if it is not the best one
@@ -402,69 +427,76 @@ def main():
         # Show solution
         # show_timeline(tp.get_solution(recipe))
 
+        makespan = max([task_sol.get_end_time() for task_sol in tp.get_solution(recipe)])
+        synergy_index = compute_synergy_val(tp.get_solution(recipe))
+        print("----------------------------------------")
+        print(f"Recipe number: {recipe}")
+        print(f"Recipe synerdy index: {synergy_index}")
+        print(f"Makespan: {makespan}")
+        print("----------------------------------------")
+
         tasks_solution = add_go_home(copy.deepcopy(tp.get_solution(recipe)), agents_group_name)
         # print(tasks_solution)
         show_timeline(tasks_solution)
         # show_gantt(tasks_solution)
         # Iterate over the execution repetitions to do
         for n_rep in range(starting_recipe_number, starting_recipe_number + n_repetitions):
-            recipe_name = f"{RECIPE_NAME.get(optimization_type, 'DEFAULT_NAME')}_rec_{recipe}_rep_{n_rep}"
-            # Set recipe name to dispatcher (set param of a task used by service manager)
-            td.set_recipe_name(recipe_name)
-            # Publish the recipe name
-            pub_recipe_name.publish(String(recipe_name))
+            print(n_rep)
+            error_occurred_during_execution = True
+            trials = 0
+            while error_occurred_during_execution and trials <= 2:
+                recipe_name = f"{RECIPE_NAME.get(optimization_type, 'DEFAULT_NAME')}_rec_{recipe}_rep_{n_rep}_{data}"
+                # Set recipe name to dispatcher (set param of a task used by service manager)
+                td.set_recipe_name(recipe_name)
+                # Publish the recipe name
+                pub_recipe_name.publish(String(recipe_name))
 
-            # Dispatch the solution
-            td.dispatch_solution(tasks_solution)
+                # Dispatch the solution
+                if not rospy.is_shutdown():
+                    td.dispatch_solution(tasks_solution)
+                    trials += 1
+                # Execution loop
+                while not rospy.is_shutdown():
+                    executed_task = td.get_performed_task()
 
-            # Execution loop
-            while not rospy.is_shutdown():
-                executed_task = td.get_performed_task()
+                    # Remove from problem performed task
+                    if executed_task is not None:
+                        actual_problem_to_solve.remove_task(executed_task.get_task())
 
-                # Remove from problem performed task
-                if executed_task is not None:
-                    actual_problem_to_solve.remove_task(executed_task.get_task())
+                    # Check if the plan failed
+                    if td.is_failed_and_not_in_execution() or td.is_timeout():
+                        error_occurred_during_execution = True
+                        rospy.loginfo(UserMessages.PLAN_FAILED.value)
+                        # Stop distance acquisition and Reload scene
+                        if acquire_distance:
+                            end_recipe_procedure_failure_case(recipe_name,
+                                                              reset_distance_acq_srv_client,
+                                                              reload_scene_srv_client)
+                        else:
+                            end_recipe_procedure_failure_case(recipe_name,
+                                                              None,
+                                                              reload_scene_srv_client)
+                        td.send_recipe_end()
+                        rospy.sleep(5)
+                        break
 
-                # Check if the plan failed
-                # if td.is_failed():
-                #     #TODO: Aspettare la fine dell'altro task (se c'è qualcosa in esecuzione) e poi allora killare
-                #     rospy.loginfo(UserMessages.PLAN_FAILED.value)
-                #     # Stop distance acquisition and Reload scene
-                #     end_recipe_procedure(stop_distance_acq_srv_client, reload_scene_srv_client)
-                #     td.send_recipe_end()
-                #     rospy.sleep(5)
-                #     break
+                    # Check if the plan is finished
+                    if td.is_finished():
+                        error_occurred_during_execution = False
+                        rospy.loginfo(UserMessages.PLAN_FINISHED.value)
+                        # Stop distance acquisition and Reload scene
+                        if acquire_distance:
+                            end_recipe_procedure(stop_distance_acq_srv_client, reload_scene_srv_client)
+                        else:
+                            reload_scene(reload_scene_srv_client)
 
-                # Check if the plan is finished
-                if td.is_finished():
-                    rospy.loginfo(UserMessages.PLAN_FINISHED.value)
-                    # Stop distance acquisition and Reload scene
-                    if acquire_distance:
-                        end_recipe_procedure(stop_distance_acq_srv_client, reload_scene_srv_client)
-                    else:
-                        reload_scene(reload_scene_srv_client)
-                    # # Stop distance acquisition
-                    # try:
-                    #     stop_distance_acq_srv_client()
-                    #     rospy.loginfo(UserMessages.SERVICE_CALLBACK.value.format("stop_distance_acq"))
-                    # except rospy.ServiceException as e:
-                    #     rospy.loginfo(UserMessages.SERVICE_FAILED.value.format("stop_distance_acq"))
-                    #
-                    # # Reload scene
-                    # try:
-                    #     reload_scene_srv_resp = reload_scene_srv_client()
-                    #     rospy.loginfo(UserMessages.SERVICE_CALLBACK.value.format("reload_scene"))
-                    # except rospy.ServiceException as e:
-                    #     rospy.loginfo(UserMessages.SERVICE_FAILED.value.format("reload_scene"))
+                        td.send_recipe_end()
+                        print("Service called and executed")
 
-                    td.send_recipe_end()
-                    print("Service called and executed")
+                        rospy.sleep(5)
 
-                    rospy.sleep(5)
-
-                    break
-                rospy.sleep(1)
-
+                        break
+                    rospy.sleep(1)
     #     for agent in agents:
     #         task_exec =td.get_performed_task
     #     rospy.sleep(1)
@@ -479,7 +511,31 @@ def main():
     # rospy.loginfo(f"Consistency Check: {problem_to_solve.consistency_check()}")
 
 
-def end_recipe_procedure(stop_distance_acq_srv_client, reload_scene_srv_client):
+def end_recipe_procedure_failure_case(recipe_name,
+                                      reset_distance_acq_srv_client,
+                                      reload_scene_srv_client):
+    delete_recipe_clnt = rospy.ServiceProxy("mongo_handler/delete_recipe", DeleteRecipe)
+    recipe = DeleteRecipeRequest()
+    recipe.name = recipe_name
+    try:
+        delete_recipe_clnt(recipe)
+        rospy.loginfo(UserMessages.SERVICE_CALLBACK.value.format("recipe"))
+        print("ok")
+    except rospy.ServiceException as e:
+        rospy.loginfo(UserMessages.SERVICE_FAILED.value.format("recipe"))
+
+    if reset_distance_acq_srv_client:
+        try:
+            reset_distance_acq_srv_client()
+            rospy.loginfo(UserMessages.SERVICE_CALLBACK.value.format("reset_distance_acq_srv"))
+            print("ok")
+        except rospy.ServiceException as e:
+            rospy.loginfo(UserMessages.SERVICE_FAILED.value.format("reset_distance_acq_srv"))
+
+    reload_scene(reload_scene_srv_client)
+
+def end_recipe_procedure(stop_distance_acq_srv_client,
+                         reload_scene_srv_client):
     stop_acquisition_distance(stop_distance_acq_srv_client)
     reload_scene(reload_scene_srv_client)
 

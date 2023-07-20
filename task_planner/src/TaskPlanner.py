@@ -255,13 +255,16 @@ class TaskPlanner:
         if solution_number > self.n_solutions:
             raise ValueError(f"The solution number must be less than {self.n_solutions}")
         # Set the solution
+        # print(solution_number)
+        if solution_number >= self.model.getAttr("SolCount"):
+            raise ValueError(f"Solver found: {self.model.getAttr('SolCount')} solution")
         self.model.setParam(gp.GRB.Param.SolutionNumber, solution_number)
 
         agents = self.problem_definition.get_agents()
         task_lists = self.problem_definition.get_tasks_list()
-
         problem_solution = []
         for task in task_lists:
+
             t_start = self.decision_variables["t_start"][task].Xn
             t_end = self.decision_variables["t_end"][task].Xn
             # assignments = self.decision_variables["assignment"].select("*", task)

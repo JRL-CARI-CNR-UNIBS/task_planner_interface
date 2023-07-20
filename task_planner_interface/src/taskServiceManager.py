@@ -7,13 +7,13 @@ from actionlib_msgs.msg import GoalID
 
 from datetime import datetime
 
-from std_srvs.srv import SetBool, SetBoolResponse
+from std_srvs.srv import SetBool, SetBoolResponse, Trigger
 from std_msgs.msg import String, Duration, Float64
 
 from task_planner_interface_msgs.msg import MotionTaskExecutionRequest, MotionTaskExecutionRequestArray, \
     MotionTaskExecutionFeedback
 from task_planner_interface_msgs.srv import TaskResult, TaskResultRequest, TaskResultResponse, BasicSkill, \
-    BasicSkillResponse, TaskType, TaskTypeResponse, PauseSkill, PauseSkillResponse
+    BasicSkillResponse, TaskType, TaskTypeResponse, PauseSkill, PauseSkillResponse, DeleteRecipe, DeleteRecipeResponse
 from task_planner_interface_msgs.msg import TaskExecuteAction, TaskExecuteGoal
 
 import time
@@ -43,6 +43,7 @@ END_MESSAGE = GREEN + "Recipe number: {} successfully performed, cycle time: {}"
 DATABASE_DISCONNECTED = RED + "Disconnected from database" + END
 
 RECIPE_NAME_FORMAT = "{}_{}_{}"
+RECIPE_NAME_SHORT_FORMAT = "{}_{}"
 
 # Topics and Services
 UPLOAD_RESULT_SERVICE = "mongo_handler/task_result"
@@ -109,8 +110,14 @@ class TaskServiceManager:
         self.cancel_pub = rospy.Publisher(prefix_topic_name + self.agent + ACTION_NAME_SEQ + "/cancel", GoalID,
                                           queue_size=1)
 
-        rospy.loginfo(YELLOW + "Services and action server ready" + END)
+        reset_agent_state_srv_name = prefix_topic_name + self.agent + "/reset_agent_state"
+        # print("Waiting: "+ reset_agent_state_srv_name)
+        rospy.wait_for_service(reset_agent_state_srv_name)
 
+        self.reset_agent_state_srv_client = rospy.ServiceProxy(reset_agent_state_srv_name, Trigger)
+
+        rospy.loginfo(YELLOW + "Services and action server ready" + END)
+        # print(prefix_topic_name + agent)
         # Subscriber
         rospy.Subscriber(prefix_topic_name + agent, MotionTaskExecutionRequestArray, self.subscribeTask)  # Subscriber
 
@@ -165,6 +172,11 @@ class TaskServiceManager:
                         self.cycle_initialized = False
 
                         rospy.loginfo(END_MESSAGE.format(self.recipe_index, t_cycle.to_sec()))
+
+                        try:
+                            _ = self.reset_agent_state_srv_client()
+                        except rospy.ServiceException as e:
+                            print(f"Service call failed: {e}")
 
                         self.recipe_index += 1  # Increment recipe index
 
@@ -237,6 +249,7 @@ class TaskServiceManager:
 
             # Define recipe name
             task_result.recipe = RECIPE_NAME_FORMAT.format(self.recipe_name, self.data, self.recipe_index)
+            task_result.recipe = RECIPE_NAME_SHORT_FORMAT.format(self.recipe_name, self.recipe_index)
 
             rospy.loginfo(task_result)
 
@@ -382,7 +395,6 @@ def main():
                 agent_task_manager.append(
                     TaskServiceManager(agent, agent_type, data, recipe_name, prefix_topic_name, False,
                                        start_recipe_index))
-
     rospy.spin()
 
 

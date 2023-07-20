@@ -10,7 +10,7 @@ from Task import TaskSolution, TaskExecution
 from utils import UserMessages
 from std_msgs.msg import Float32, String
 
-THREASHOLD = 500
+THREASHOLD = 150
 
 
 @dataclass
@@ -35,6 +35,7 @@ class TaskDispatcher:
     tot_task_number: Dict[str, int] = field(default_factory=dict, init=False)
 
     failed: bool = field(default=False, init=False)
+    timeout: bool = field(default=False, init=False)
 
     completion_percentage: Dict[str, float] = field(default_factory=dict, init=False)
     task_number_publisher: Dict[str, rospy.Publisher] = field(default_factory=dict, init=False)
@@ -46,7 +47,8 @@ class TaskDispatcher:
         self.busy_time = dict.fromkeys(self.agents, 0)
         self.task_number = dict.fromkeys(self.agents, 0)
         self.completion_percentage = dict.fromkeys(self.agents, 0)
-
+        self.failed = False
+        self.timeout = False
 
     def __post_init__(self):
         self.reset_agents_info()
@@ -120,7 +122,7 @@ class TaskDispatcher:
                 if not agent_task_solution:
                     # print("finito agente "+ agent)
                     continue
-                if t >= agent_task_solution[0].get_start_time() and not self.busy[agent]:
+                if t >= agent_task_solution[0].get_start_time() and not self.busy[agent]: # and (not self.failed):
                     self.executed_tasks.append(TaskExecution(task=agent_task_solution[0].get_task(),
                                                              t_start=t,
                                                              assignment=agent))
@@ -150,6 +152,9 @@ class TaskDispatcher:
                     self.completion_percentage[agent] = 0
                 # Check if the feedback hasn't come in for a long time
                 if t - self.busy_time[agent] > THREASHOLD:
+                    self.timeout = True
+                    # TODO: Da gestire non va bene gestirlo con failed perche' lista non vuota!
+                    self.task_solutions[agent] = []
                     self.failed = True
                     rospy.loginfo(UserMessages.TIMEOUT.value.format(agent))
                     break
@@ -168,9 +173,9 @@ class TaskDispatcher:
             self.tot_task_number[agent] = len(self.task_solutions[agent])
             print(f"Total task to perform by agent: {agent} is: {self.tot_task_number[agent]}")
 
-        thread = threading.Thread(target=self.publish_request)
-        thread.daemon = True
-        thread.start()
+        self.thread = threading.Thread(target=self.publish_request)
+        self.thread.daemon = True
+        self.thread.start()
 
     def reset_agent(self, msg: MotionTaskExecutionFeedback, agent: str):
         if self.task_solutions[agent]:
@@ -195,7 +200,7 @@ class TaskDispatcher:
 
                         # print("Stesso task")
                         # task.set_as_completed(rospy.Time.now().to_sec() - self.t0)
-                print(rospy.Time.now().to_sec()-tnow.to_sec())
+                print(rospy.Time.now().to_sec() - tnow.to_sec())
                 self.completion_publisher[agent].publish(0)
             else:
                 rospy.loginfo(UserMessages.FEEDBACK_WITHOUT_DISPATCH.value)
@@ -206,11 +211,29 @@ class TaskDispatcher:
     def is_failed(self):
         return self.failed
 
+    def is_timeout(self):
+        return self.timeout
+
+    def is_failed_and_not_in_execution(self):
+        print(f"Task da completare: {len(self.task_solutions)}, agenti impegnati: {self.busy}")
+        # print([agent_busy for agent_busy in self.busy.items()])
+        if all([len(task_list) == 0 for task_list in self.task_solutions.values()]):
+            if self.is_failed() and all([not agent_busy for agent_busy in self.busy.values()]):
+                return True
+            else:
+                return False
+        else:
+            return False
+
     def is_finished(self):
         if all([len(task_list) == 0 for task_list in self.task_solutions.values()]):
-            print("Plan finished")
-            # print(self.executed_tasks)
-            return True
+            # print([agent_busy for agent_busy in self.busy.items()])
+            print([not (agent_busy) for agent_busy in self.busy.values()])
+
+            if all([not agent_busy for agent_busy in self.busy.values()]):
+                print("Plan finished")
+                # print(self.executed_tasks)
+                return True
         return False
 
     def get_performed_task(self):

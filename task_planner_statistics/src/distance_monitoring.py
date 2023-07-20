@@ -54,6 +54,25 @@ class DistanceMonitoring:
 
         # self.start_distance_acq_srv = rospy.Service("start_distance_acq", Trigger, self.start_distance_acq_srv)
         self.stop_distance_acq_srv = rospy.Service("stop_distance_acq", Trigger, self.stop_distance_acq_srv)
+        self.reset_distance_acq_srv = rospy.Service("reset_distance_acq", Trigger, self.reset_distance_acq)
+
+    def reset_distance_acq(self, _):
+        print(f"Data distance of recipe: {self.recipe_name} erased!")
+        self.reset_stats()
+        response = TriggerResponse()
+        response.success = True
+        return response
+
+    def reset_stats(self):
+        self.acquire = False
+        self.reset_window_data()
+
+        self.timeseries_mean = np.empty(0)
+        self.timeseries_std = np.empty(0)
+        self.timeseries_ovr = np.empty(0)
+
+        self.timestamp_distance = np.empty(0)
+        self.timestamp_ovr = np.empty(0)
 
     def reset_window_data(self):
         self.n_received_sample = 0
@@ -91,12 +110,13 @@ class DistanceMonitoring:
 
     def stop_distance_acq_srv(self, req):
         print("Stop acquisition")
+
         n_data_distance = self.timeseries_mean.shape[0]
         timeseries_distance = pd.DataFrame({"Timestamp": self.timestamp_distance,
                                             "Mean": self.timeseries_mean,
                                             "Std": self.timeseries_std,
                                             "Recipe": [self.recipe_name] * n_data_distance})
-        print(timeseries_distance.head())
+        # print(timeseries_distance.head())
         if self.file_path.is_file():
             timeseries_distance.to_csv(self.file_path, mode='a', header=False)
         else:
@@ -106,11 +126,14 @@ class DistanceMonitoring:
                                        "Recipe": [self.recipe_name] * n_data_ovr,
                                        "Safe_Ovr": self.timeseries_ovr})
 
-        print(timeseries_ovr.head())
+        # print(timeseries_ovr.head())
         if self.file_path_ovr.is_file():
             timeseries_ovr.to_csv(self.file_path_ovr, mode='a', header=False)
         else:
             timeseries_ovr.to_csv(self.file_path_ovr)
+
+        print(f"Data distance of recipe: {self.recipe_name} saved!")
+
         self.acquire = False
         self.reset_window_data()
 

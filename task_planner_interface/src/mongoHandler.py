@@ -9,7 +9,7 @@ from task_planner_interface_msgs.msg import MotionTaskExecutionRequest, MotionTa
     MotionTaskExecutionFeedback, TaskAgents, TaskStatistics
 from task_planner_interface_msgs.srv import TaskResult, TaskResultResponse, BasicSkill, BasicSkillResponse, TaskType, \
     TaskTypeResponse, PickPlaceSkill, PickPlaceSkillResponse, PauseSkill, PauseSkillResponse, TasksInformation, \
-    TasksInformationResponse, TasksStatistics, TasksStatisticsResponse
+    TasksInformationResponse, TasksStatistics, TasksStatisticsResponse, DeleteRecipe, DeleteRecipeResponse
 
 from task_planner_statistics.msg import TaskSynergy
 from task_planner_statistics.srv import TaskSynergies, TaskSynergiesResponse
@@ -374,6 +374,31 @@ class MongoHandler:
             rospy.logerr(CONNECTION_LOST)
         return synergies_response
 
+    def delete_recipe(self, request):
+        print(request)
+        recipe_name = request.name
+        response = DeleteRecipeResponse()
+        print(f"Received request to delete recipe: {recipe_name}")
+
+        try:
+            occurrences_count = self.coll_results.count_documents({"recipe":
+                                                                       {"$regex": recipe_name}})
+            if occurrences_count <= 0:
+                print("Zero document contain the specified recipe")
+                response.success = True
+                response.message = "Zero document contain the specified recipe"
+                return response
+            else:
+                self.coll_results.delete_many({"recipe":
+                                                   {"$regex": recipe_name}})
+                response.success = True
+                response.message = f"{occurrences_count} document contain the specified recipe"
+        except pymongo.errors.AutoReconnect:  # Db connection failed
+            rospy.logerr(CONNECTION_LOST)
+            response.success = False
+            response.message = "MongoDB disconnected"
+        return response
+
 
 def main():
     rospy.init_node("mongo_handler")
@@ -423,6 +448,7 @@ def main():
     rospy.Service("mongo_handler/get_task_agents", TasksInformation, mongo_handler.getTasksAgents)
     rospy.Service("mongo_handler/get_tasks_statistics", TasksStatistics, mongo_handler.getTasksStatistics)
     rospy.Service("mongo_statistics/get_task_synergies", TaskSynergies, mongo_handler.getTaskSynergy)
+    rospy.Service("mongo_handler/delete_recipe", DeleteRecipe, mongo_handler.delete_recipe)
 
     rospy.loginfo(READY)
     rospy.spin()

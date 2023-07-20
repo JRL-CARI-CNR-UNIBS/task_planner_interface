@@ -2,12 +2,11 @@ import os
 from enum import Enum
 
 from Task import Task, TaskSolution
-from Problem import Problem
+# from Problem import Problem
 
 from typing import List, Optional
 import pandas as pd
 from datetime import datetime
-import plotly.express as px
 import plotly.express as px
 from pathlib import Path
 
@@ -84,7 +83,10 @@ class UserMessages(Enum):
     CUSTOM_CYAN = Color.CYAN.value + "{}" + Color.END.value
     CUSTOM_DARKCYAN = Color.DARKCYAN.value + "{}" + Color.END.value
 
-
+    RECIPE_NAME_FORMAT = "{}_{}_{}"
+    UNABLE_GO_ON = " ---------------- Unable to go on! -------------------- "
+    UNABLE_CAPABILITIES = "Unable to get agents capabilities (task properties)"
+    UNABLE_STATS = "Unable to get tasks statistics"
 def show_timeline(problem_solution: List[TaskSolution],
                   solution_name: Optional[str] = "Timeline") -> None:
     solution = []
@@ -166,6 +168,8 @@ def load_solution_from_yaml(path: Path,
     task_feature = ["t_start", "t_end", "agent"]
     solution = list()
     for task_name, task_solution in loaded_sol.items():
+        # TODO: Sistemare name in type
+        task_name=task_name[:-2]
         if all(feature in task_solution.keys() for feature in task_feature):
             t_start = task_solution["t_start"]
             t_end = task_solution["t_end"]
@@ -174,6 +178,7 @@ def load_solution_from_yaml(path: Path,
                         type=task_name,
                         agents_constraint="",
                         precedence_constraints="",
+                        soft_precedence_constraints=""
                         )
             task_sol = TaskSolution(task=task,
                                     t_start=t_start,
@@ -197,8 +202,10 @@ def load_solution_from_yaml(path: Path,
 
 
 def show_solutions_from_folder(folder_path: Path):
+    if not isinstance(folder_path, Path) and isinstance(folder_path,str):
+        folder_path = Path(folder_path)
     if (not folder_path.exists()) or (not folder_path.is_dir()):
-        raise ValueError("THe provided file is not a valid, not a file")
+        raise ValueError("The provided file is not a valid, not a file")
     from os import listdir
     for file_name in listdir(folder_path):
         file_path = folder_path.joinpath(file_name)

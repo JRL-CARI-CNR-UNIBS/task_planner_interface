@@ -11,11 +11,13 @@ import copy
 
 RECIPE_NAMES = {"SAFETY_AREA_BOTH_AGENT_HUMAN_AWARE_EASIER": "Safety Areas-HA",
                 "SAFETY_AREA_NO_AWARE": "Safety Areas-Random",
-                "NOT_NEIGHBORING_TASKS": "Safety Areas (Not Neighboring Tasks)",
+                "NOT_NEIGHBORING_TASKS_": "Safety Areas (Not Neighboring Tasks)",
+                "NOT_NEIGHBORING_TASKS2_": "Safety Areas (Not Neighboring Tasks) 2",
                 "ONELINE": "aware",
                 "RELAXED_HA_SOLVER": "Safety Areas-HA (Relaxed)",
                 "BASIC_SOLVER": "Basic TP",
-                "COMPLETE_SOLVER": "Complete HATP"}
+                "COMPLETE_SOLVER_": "Complete HATP (30)",
+                "COMPLETE_SOLVER2": "Complete HATP (50)"}
 
 
 def main():
@@ -40,7 +42,7 @@ def main():
     results_collection_name = "task_results_learning_phase"
 
     database_name = "new_safety_areas"  # "milp_task_planner"
-    results_collection_name = "task_results_online"
+    results_collection_name = "task_results_final_version"
 
     mongo_interface = MongoInterface(database_name)
 

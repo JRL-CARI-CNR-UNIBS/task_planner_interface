@@ -27,13 +27,10 @@ def main():
     results_collection_name = "task_results"
     mongo_interface = MongoInterface(database_name)
 
-
-    
     results = mongo_interface.get_collection(results_collection_name)
-    
-    results.delete_many({"recipe":recipe_name})
 
-    
+    results.delete_many({"recipe": recipe_name})
+
 
 if __name__ == "__main__":
     main()
