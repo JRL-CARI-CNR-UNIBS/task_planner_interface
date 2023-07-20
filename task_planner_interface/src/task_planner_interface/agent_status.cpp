@@ -23,5 +23,10 @@ std::string AgentStatus::getObjectInHandId() const { return m_object_in_hand_id;
 
 std::string AgentStatus::getObjectInHandType() const { return m_object_in_hand_type; }
 
+void AgentStatus::resetAgentStatus()
+{
+  m_object_in_hand_id.clear();
+  m_object_in_hand_type.clear();
+}
 
 } //end namespace

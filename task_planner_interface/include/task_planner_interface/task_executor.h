@@ -29,6 +29,8 @@
 #include <task_planner_interface_msgs/BasicSkill.h>
 #include <task_planner_interface_msgs/PickPlaceSkill.h>
 
+#include<std_srvs/Trigger.h>
+
 namespace taskPlannerInterface
 {
 
@@ -60,8 +62,14 @@ protected:
 
   taskPlannerInterface::skills::GoToSkillPtr m_basic_goto_skill;
 
+  ros::ServiceServer m_reset_agent_state_srv;
+
+
   void executeTask(const task_planner_interface_msgs::TaskExecuteGoalConstPtr& goal);
   bool checkSkillType(const std::string name, std::string& skill_type);
+  bool resetAgentState(std_srvs::Trigger::Request&  req,
+                       std_srvs::Trigger::Response& res);
+
 public:
   TaskExecutor(const ros::NodeHandle& nh,
                const ros::NodeHandle& pnh,
@@ -69,7 +77,8 @@ public:
                const std::string group_name,
                const std::string home_position,
                const std::string retry_position,
-               const bool go_home_after_execution);
+               const bool go_home_after_execution,
+               const std::string reset_agent_srv_name);
 
 
 };

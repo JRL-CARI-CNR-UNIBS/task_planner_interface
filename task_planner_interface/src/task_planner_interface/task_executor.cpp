@@ -12,7 +12,8 @@ namespace taskPlannerInterface
                                const std::string group_name,
                                const std::string home_position,
                                const std::string retry_position,
-                               const bool go_home_after_execution):
+                               const bool go_home_after_execution,
+                               const std::string reset_agent_srv_name):
             m_nh(nh),
             m_pnh(pnh),
             m_action_name(action_name),
@@ -30,7 +31,7 @@ namespace taskPlannerInterface
 
               /* Define AgentStatus */
 
-              taskPlannerInterface::AgentStatusPtr m_agent_status(new taskPlannerInterface::AgentStatus());
+              m_agent_status = std::make_shared<taskPlannerInterface::AgentStatus>();
 
               //Single skills
               taskPlannerInterface::skills::PickSkillPtr pick_skill(new taskPlannerInterface::skills::PickSkill(m_agent_status));
@@ -53,12 +54,23 @@ namespace taskPlannerInterface
 
               m_basic_goto_skill->init(m_group_name);
 
+              m_reset_agent_state_srv  = m_nh.advertiseService(reset_agent_srv_name, &TaskExecutor::resetAgentState, this);
+
               ROS_INFO("Goto skill ok");
 
               ros::Duration m_t_total;
 
 
-            }
+    }
+    bool TaskExecutor::resetAgentState(std_srvs::Trigger::Request&  req,
+                                       std_srvs::Trigger::Response& res)
+    {
+      m_agent_status->resetAgentStatus();
+      res.success = true;
+      res.message = "";
+      ROS_INFO_STREAM("Agent status of: " << m_group_name << " resetted");
+      return true;
+    }
 
     bool TaskExecutor::checkSkillType(const std::string name, std::string& skill_type)
     {

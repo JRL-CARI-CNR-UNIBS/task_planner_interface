@@ -42,7 +42,14 @@ int main(int argc, char **argv)
     ROS_ERROR("go_home_after_execution not defined. Default: false");
   }
 
-  taskPlannerInterface::TaskExecutor task_executor(nh,pnh,topic_request_from_planner+action_name,group_name,home_position,retry_position,go_home_after_execution);
+  taskPlannerInterface::TaskExecutor task_executor(nh,
+                                                   pnh,
+                                                   topic_request_from_planner+action_name,
+                                                   group_name,
+                                                   home_position,
+                                                   retry_position,
+                                                   go_home_after_execution,
+                                                   topic_request_from_planner + "/reset_agent_state");
   ros::spin();
   return 0;
 
