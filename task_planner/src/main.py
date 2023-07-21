@@ -111,6 +111,8 @@ def compute_synergy_val(solution: TaskSolution) -> float:
                 overlapping = 0
             synergy = main_agent_task_sol.get_task().get_synergy("ur5_on_guide", "human_right_arm",
                                                                  parallel_agent_task_sol.get_task().get_type())
+            if not synergy:
+                synergy = 1
             synergy_index = overlapping * (synergy - 1)
             synergy_tot += synergy_index
 
@@ -384,6 +386,7 @@ def main():
         print(f"Best plan is the number {best_plan}")
     # show_timeline(tp.get_solution(0))
     # Evaluate solution
+
     makespan = max([task_sol.get_end_time() for task_sol in tp.get_solution(0)])
     synergy_index = compute_synergy_val(tp.get_solution(0))
     print("----------------------------------------")
