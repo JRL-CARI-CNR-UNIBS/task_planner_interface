@@ -18,7 +18,13 @@ RECIPE_NAMES = {"SAFETY_AREA_BOTH_AGENT_HUMAN_AWARE_EASIER": "Safety Areas-HA",
                 "BASIC_SOLVER": "Basic TP",
                 "COMPLETE_SOLVER_": "Complete HATP (30)",
                 "COMPLETE_SOLVER2": "Complete HATP (50)"}
-
+RECIPE_NAMES = {"TEST": "Safety Areas - HA",
+          "SAFETY_AREA_NO_AWARE": "Safety Areas - Random",
+          "NOT_NEIGHBORING_TASKS": "Not Neighboring Tasks",
+          "TEST_WITH_GOHOME": "test", "ONELINE": "AWARE",
+          "RELAXED_HA_SOLVER": "Relaxed HA-TP",
+          "BASIC_SOLVER": "Basic TP",
+          "COMPLETE_SOLVER": "Complete HA-TP"}
 
 def main():
     # rospy.init_node("Recipe_Duration_Statistics")
@@ -113,10 +119,10 @@ def main():
 
     # sns.displot(result_pd, x="recipe_duration")
     # sns.boxplot(data=result_pd, x="recipe_duration", y="recipe_name", showfliers = False )
-    result_pd.rename(columns={'recipe_duration': 'Recipe Duration (s)', 'recipe_name': 'Recipe Name'}, inplace=True)
+    result_pd.rename(columns={'recipe_duration': 'Plan Duration (s)', 'recipe_name': 'Task Planner'}, inplace=True)
 
-    sns.boxplot(data=result_pd, x="Recipe Duration (s)", y="Recipe Name", showfliers=False).set(
-        title='Recipe Duration Comparison')
+    sns.boxplot(data=result_pd, x="Plan Duration (s)", y="Task Planner", showfliers=False).set(
+        title='Comparison of plan execution duration')
     # sns.relplot(data=result_pd["Recipe Duration (s)"])
     plt.show()
 

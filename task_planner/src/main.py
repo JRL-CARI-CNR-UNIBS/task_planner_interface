@@ -28,7 +28,7 @@ from pathlib import Path
 
 RECIPE_NAME = {"base": "BASIC_SOLVER", "human_aware": "COMPLETE_HA_SOLVER",
                "human_aware_easier": "RELAXED_HA_SOLVER", "areas": "NOT_NEIGHBORING_TASKS",
-               "human_aware_complete": "COMPLETE_SOLVER2"}
+               "human_aware_complete": "COMPLETE_SOLVER"}
 DATE_FORMAT = "%Y_%m_%d_%H:%M"
 
 

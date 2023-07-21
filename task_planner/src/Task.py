@@ -27,7 +27,8 @@ class Task:
             bool: True if the update was successful, False otherwise.
 
         Raises:
-            AssertionError: If the list of agents is empty or if the specified agent is not present in the list.
+            AssertionError: If the list of agents is empty or if the
+                            specified agent is not present in the list.
             ValueError: If the duration is not a positive numeric value.
         """
         assert self.agents is not None
@@ -152,10 +153,10 @@ class Task:
                 print(f"Task: {self.id} has no exp_duration for agent: {agent}")
                 raise Exception
             return self.exp_duration[agent]
-        elif len(args) == 0:
+        if len(args) == 0:
             return self.exp_duration
-        else:
-            raise NotImplemented
+        raise NotImplementedError("Invalid arguments provided.")
+
 
     def get_synergy(self, agent: str, parallel_agent: str, parallel_task: str) -> Optional[str]:
         """
@@ -250,6 +251,7 @@ class Task:
 
 @dataclass
 class TaskSolution:
+
     task: Task
     t_start: float
     t_end: float
@@ -290,6 +292,19 @@ class Status(Enum):
 
 @dataclass
 class TaskExecution:
+    """Represents the execution of a task.
+
+    Attributes:
+        task (Task): The task object associated with this execution.
+        t_start (float): The start time of the task execution.
+        assignment (str): The assignment identifier for the task execution.
+        status (Status, optional): The status of the task execution (default: Status.NOT_COMPLETED).
+        t_end (float, optional): The end time of the task execution (default: None).
+
+    Raises:
+        ValueError: If the provided t_start or t_end is unfeasible.
+
+    """
     task: Task
     t_start: float
     assignment: str
@@ -297,6 +312,12 @@ class TaskExecution:
     t_end: Optional[float] = None
 
     def __post_init__(self):
+        """Initializes the TaskExecution object after the dataclass is created.
+
+        Raises:
+            ValueError: If the provided t_start or t_end is unfeasible.
+
+        """
         if self.t_start < -1e-3:
             raise ValueError("Unfeasible t. start or t. end")
         if self.t_end is not None:
@@ -305,10 +326,25 @@ class TaskExecution:
             self.status = Status.COMPLETED
 
     def set_as_completed(self, t_end: float):
+        """Sets the task execution as completed with the given end time.
+
+        Args:
+            t_end (float): The end time of the task execution.
+
+        Raises:
+            ValueError: If the provided t_end is unfeasible.
+
+        """
         if t_end < self.t_start or t_end < -1e-3:
             raise ValueError(f"Tend must be feasible, task: {self.task.get_id()}")
         self.t_end = t_end
         self.status = Status.COMPLETED
 
     def get_task(self) -> Task:
+        """Returns the task associated with this execution.
+
+        Returns:
+            Task: The task object associated with this execution.
+
+        """
         return self.task

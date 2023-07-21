@@ -22,7 +22,7 @@ def main():
     #     rospy.loginfo("Param: distance_topic_name not defined")
     #     return 0
     # recipes_to_compare = rospy.get_param("~recipes_to_compare")
-    recipes_to_compare = ["COMPLETE_SOLVER","RELAXED_HA_SOLVER", "NOT_NEIGHBORING_TASKS", "BASIC_SOLVER"]
+    recipes_to_compare = ["RELAXED_HA_SOLVER", "NOT_NEIGHBORING_TASKS"]
     recipes_to_compare = recipes_to_compare[0:]
     RENAME = {"TEST": "Safety Areas - HA",
               "SAFETY_AREA_NO_AWARE": "Safety Areas - Random",
@@ -34,9 +34,9 @@ def main():
     RECIPE_NAME_COLUMN = "Recipe Name"
     RECIPE_TYPE_COLUMN = "Recipe Type"
     RECIPE_PERCENTAGE_COLUMN = "Percentage Under Safety Distance"
-    RECIPE_S_D_TYPE_COLUMN = "Safety Distance Levels"
+    RECIPE_S_D_TYPE_COLUMN = "Speed OVR Levels"
 
-    risky_distances = [0.4, 0.5, 0.7, 0.8]
+    risky_distances = [0, 25, 50, 75, 100]
     # file_path = Path(rospy.get_param("~distance_monitoring_path") + "distance_monitoring_safety_area.csv")
     # file_path = "/home/samuele/projects/planning_ws/src/task-planner-interface/task_planner_statistics/file/distance_monitoring_safety_area_both.csv"
     # file_path = "/home/samuele/projects/cells_ws/src/hrc_simulator/hrc_simulator/hrc_mosaic_task_planning/hrc_mosaic_task_planning_interface/statistics/distance_monitoring_safety_area.csv"
@@ -48,7 +48,7 @@ def main():
 
     file_path = "/home/samuele/projects/cells_ws/src/hrc_simulator/hrc_simulator/hrc_mosaic_task_planning/hrc_mosaic_task_planning_interface/statistics/distance_monitoring_test_old_scaling.csv"
     file_path = "/home/samuele/projects/cells_ws/src/hrc_simulator/hrc_simulator/hrc_mosaic_task_planning/hrc_mosaic_task_planning_interface/statistics/new_safety_areas/distance_monitoring_new_areas_online_phase.csv"
-    file_path = "/home/samuele/projects/cells_ws/src/hrc_simulator/hrc_simulator/hrc_mosaic_task_planning/hrc_mosaic_task_planning_interface/statistics/new_safety_areas/distance_monitoring_final_version.csv"
+    file_path = "/home/samuele/projects/cells_ws/src/hrc_simulator/hrc_simulator/hrc_mosaic_task_planning/hrc_mosaic_task_planning_interface/statistics/new_safety_areas/ovr_monitoring_final_version.csv"
 
     distance_dataset = pd.read_csv(file_path)
     fig, ax = plt.subplots(figsize=(16, 8))
@@ -71,10 +71,10 @@ def main():
         for single_recipe in single_type_recipe_names:
             single_recipe_distance_data = distance_dataset.loc[distance_dataset['Recipe'] == single_recipe]  # ["Mean"]
 
-            n_bins = len(single_recipe_distance_data["Mean"])
+            n_bins = len(single_recipe_distance_data["Safe_Ovr"])
 
             hist, bin_edges = np.histogram(
-                single_recipe_distance_data["Mean"],
+                single_recipe_distance_data["Safe_Ovr"],
                 bins=n_bins)
             cumulative_dist_recipes.append(np.cumsum(hist) / float(n_bins))
             bin_edges_recipes.append(bin_edges)
@@ -85,7 +85,7 @@ def main():
             recipe_timestamp = np.array(single_recipe_distance_data["Timestamp"])
             time_intervals = recipe_timestamp[1:] - recipe_timestamp[:-1]
             for risky_distance in risky_distances:
-                tot_time_under_risky = np.sum(time_intervals[single_recipe_distance_data["Mean"][:-1] < risky_distance])
+                tot_time_under_risky = np.sum(time_intervals[single_recipe_distance_data["Safe_Ovr"][:-1] < risky_distance])
                 print(f"Tot time under risky: {tot_time_under_risky}")
 
                 percentage_time_under_risky = tot_time_under_risky / (recipe_timestamp[-1] - recipe_timestamp[0]) * 100
@@ -94,11 +94,11 @@ def main():
                 percentage_under_risky_dataset[RECIPE_NAME_COLUMN].append(single_recipe)
                 percentage_under_risky_dataset[RECIPE_TYPE_COLUMN].append(recipe_name)
                 percentage_under_risky_dataset[RECIPE_PERCENTAGE_COLUMN].append(percentage_time_under_risky)
-                percentage_under_risky_dataset[RECIPE_S_D_TYPE_COLUMN].append(f"Under {risky_distance} m")
+                percentage_under_risky_dataset[RECIPE_S_D_TYPE_COLUMN].append(f"Under {risky_distance} %")
 
         min_distance_recipes = min(min_distance)
-        max_distance_recipes = max(max_distance)
-        delta_distance_recipes = 0.01  # min(delta_distance)
+        max_distance_recipes = max(max_distance) + 2
+        delta_distance_recipes = 1  # min(delta_distance)
 
         maximum = max(max_distance_recipes, 2.5) + delta_distance_recipes
 
@@ -131,14 +131,16 @@ def main():
 
         ax.legend(handles=[(h1, h2) for h1, h2 in zip(handles[::2], handles[1::2])],
                   labels=[l1 + " " + l2 for l1, l2 in zip(labels[::2], labels[1::2])])
-    # plt.gca().yaxis.set_major_formatter(mtick.PercentFormatter(xmax=1))
 
-    plt.xlabel("Minimum H-R Distance (m)")
+    plt.xlabel("Safe OVR")
     plt.ylabel("Cumulative Density")
-    plt.title("Comparison on cumulative probability density on minimum H-R distance")
-    plt.axvline(x=0.8, ymin=0, ymax=1, ls='--', color="#636E72")
-    plt.annotate(xy=(0, 0.8), xytext=(0.8, 0.8), arrowprops=dict(arrowstyle='<|-|>', color="#636E72", lw=1.5), text="")
-    plt.annotate(xy=(0.1, 0.81), text="RISKY H-R DISTANCE (0.8 m) ")
+    plt.title("Comparison on cumulative probability density on Safe OVR")
+    plt.gca().xaxis.set_major_formatter(mtick.PercentFormatter())
+    plt.gca().yaxis.set_major_formatter(mtick.PercentFormatter(xmax=1))
+
+    # plt.axvline(x=0.8, ymin=0, ymax=1, ls='--', color="#636E72")
+    # plt.annotate(xy=(0, 0.8), xytext=(0.8, 0.8), arrowprops=dict(arrowstyle='<|-|>', color="#636E72", lw=1.5), text="")
+    # plt.annotate(xy=(0.1, 0.81), text="RISKY H-R DISTANCE (0.8 m) ")
 
     percentage_under_risky_dataset_pd = pandas.DataFrame(percentage_under_risky_dataset)
 
@@ -148,7 +150,6 @@ def main():
     sns.catplot(data=percentage_under_risky_dataset_pd, kind="bar", x=RECIPE_S_D_TYPE_COLUMN,
                 y=RECIPE_PERCENTAGE_COLUMN, hue=RECIPE_TYPE_COLUMN, height=8, aspect=1.5)
     # sns.set(rc={'figure.figsize': (11.7, 8.27)})
-
 
     plt.gca().yaxis.set_major_formatter(mtick.PercentFormatter())
     plt.title("Safety Distance Comparison")
