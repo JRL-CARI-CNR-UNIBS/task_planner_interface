@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+
+<launch>
+  <arg name="gui_request_topic_name" value="gui/request" />
+  <arg name="gui_feedback_topic_name" value="gui/feedback" />
+  <arg name="high_level_request_topic_name" value="hmi/task_execution_request" />
+  <arg name="high_level_feedback_topic_name" value="hmi/task_execution_result" />
+
+  <!-- <remap from="topic_motion_feedback_gui" to="sharework/test/stiima/human/feedback"/> -->
+  <param name="gui_request_topic_name" value="$(arg gui_request_topic_name)" />
+  <param name="gui_feedback_topic_name" value="$(arg gui_feedback_topic_name)" />
+  <param name="high_level_request_topic_name" value="$(arg high_level_request_topic_name)" />
+  <param name="high_level_feedback_topic_name" value="$(arg high_level_feedback_topic_name)" />
+
+  <node pkg="task_planner_gui" type="gui_interface.py" name="task_interface_gui" output="screen" >
+  </node>
+
+</launch>

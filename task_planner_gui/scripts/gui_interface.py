@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from dataclasses import dataclass, field
 
 import rospy
@@ -11,6 +13,8 @@ from task_planner_interface_msgs.msg import MotionTaskExecutionRequest, \
 class GuiInterface:
     gui_request_topic_name: str
     gui_feedback_topic_name: str
+    high_level_feedback_topic_name: str
+
     task_name: str = field(init=False)
     gui_request_pub: rospy.Publisher = field(init=False)
 
@@ -18,6 +22,8 @@ class GuiInterface:
 
     def __post_init__(self):
         self.gui_request_pub = rospy.Publisher(self.gui_request_topic_name, String, queue_size=10)
+        self.high_level_feedback_pub = rospy.Publisher(self.high_level_feedback_topic_name, MotionTaskExecutionFeedback,
+                                                       queue_size=10)
 
     def request(self, msg):
         self.task_name = msg.tasks[0].task_id
@@ -33,23 +39,35 @@ class GuiInterface:
     def wait_response(self):
         received = False
         while not received:
-            response = rospy.wait_for_message(self.gui_feedback_topic_name,
-                                          Bool, 1000)
+            response = rospy.wait_for_message(self.gui_feedback_topic_name, Bool, 1000)
             if response.data:
                 received = True
         rospy.loginfo(f"Received feedback for: {self.task_name}")
         feedback_msg = MotionTaskExecutionFeedback()
         feedback_msg.result = 1
+        self.high_level_feedback_pub.publish(feedback_msg)
 
 
 def main():
-    gui_request_topic_name = "prova_request"
-    gui_feedback_topic_name = "prova_feedback"
-    high_level_request_topic_name = "prova_high_level"
-
     rospy.init_node("gui_interface")
 
-    gui_interface = GuiInterface(gui_request_topic_name, gui_feedback_topic_name)
+    params = ["gui_request_topic_name",
+              "gui_feedback_topic_name",
+              "high_level_request_topic_name",
+              "high_level_feedback_topic_name"]
+    if all([rospy.has_param(param) for param in params]):
+        gui_request_topic_name = rospy.get_param("gui_request_topic_name")
+        gui_feedback_topic_name = rospy.get_param("gui_feedback_topic_name")
+
+        high_level_request_topic_name = rospy.get_param("high_level_request_topic_name")
+        high_level_feedback_topic_name = rospy.get_param("high_level_feedback_topic_name")
+
+    else:
+        print(([rospy.has_param(param) for param in params]))
+        rospy.loginfo("Not all necessary params defined")
+        return 0
+
+    gui_interface = GuiInterface(gui_request_topic_name, gui_feedback_topic_name, high_level_feedback_topic_name)
 
     request_from_high_level = rospy.Subscriber(high_level_request_topic_name,
                                                MotionTaskExecutionRequestArray,
