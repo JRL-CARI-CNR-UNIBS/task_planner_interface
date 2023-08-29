@@ -129,6 +129,9 @@ class Problem:
                                                                       "duration_std": tasks_stats.duration_std}
         # TODO: Pass in Task also the duration std
         for task in self.task_list:
+            if task.get_type() not in tasks_stasts_dict.keys():
+                print(f"Missing task statistics for: {task}")
+                return False
             for agent in task.get_agents():
                 if agent not in tasks_stasts_dict[task.get_type()].keys():
                     print(f"Missing task statistics for: {task}, for agent: {agent}")

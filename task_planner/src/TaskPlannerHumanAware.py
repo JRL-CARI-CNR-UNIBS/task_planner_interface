@@ -46,6 +46,8 @@ class TaskPlannerHumanAware(TaskPlanner):
 
         # self.model.setParam("heuristics", 0.001)
         self.model.setParam("PoolSearchMode", 0)
+        self.model.setParam('TimeLimit', 240)
+
         # self.model.setParam("MIPGap", 0.001)
 
     def add_t_end_constraints(self, agent_task_combination, cost) -> None:

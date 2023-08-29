@@ -209,8 +209,11 @@ def show_solutions_from_folder(folder_path: Path):
     from os import listdir
     for file_name in listdir(folder_path):
         file_path = folder_path.joinpath(file_name)
-        show_solution_from_yaml(file_path, file_name)
-
+        if file_path.is_file():
+            print(file_path)
+            show_solution_from_yaml(file_path, file_name)
+        else:
+            print(f"Provided folder contains also: {file_path} that is not a file")
 
 class Behaviour(Enum):
     DISCRETE = 1

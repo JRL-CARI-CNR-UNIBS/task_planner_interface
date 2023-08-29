@@ -215,7 +215,7 @@ class TaskDispatcher:
         return self.timeout
 
     def is_failed_and_not_in_execution(self):
-        print(f"Task da completare: {len(self.task_solutions)}, agenti impegnati: {self.busy}")
+        # print(f"Task da completare: {len(self.task_solutions.values())}, agenti impegnati: {self.busy}")
         # print([agent_busy for agent_busy in self.busy.items()])
         if all([len(task_list) == 0 for task_list in self.task_solutions.values()]):
             if self.is_failed() and all([not agent_busy for agent_busy in self.busy.values()]):

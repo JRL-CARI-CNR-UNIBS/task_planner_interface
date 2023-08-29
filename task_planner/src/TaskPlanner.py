@@ -61,7 +61,7 @@ class TaskPlanner:
         if self.n_solutions == 1:
             self.model.setParam("PoolSearchMode", 0)
         else:
-            self.model.setParam("PoolSearchMode", 1)
+            self.model.setParam("PoolSearchMode", 1) # ERA 2
 
             self.model.setParam("PoolSolutions", self.n_solutions)
         # self.model.setParam("IntFeasTol", 1e-3)
@@ -236,7 +236,7 @@ class TaskPlanner:
         #     self.model.write('tune' + str(i) + '.prm')
 
         self.model.optimize(lambda model, where: self.callback(model, where))
-
+        print()
         status = self.model.Status
         if status in (gp.GRB.INF_OR_UNBD, gp.GRB.INFEASIBLE, gp.GRB.UNBOUNDED):
             print('The model cannot be solved because it is infeasible or '
