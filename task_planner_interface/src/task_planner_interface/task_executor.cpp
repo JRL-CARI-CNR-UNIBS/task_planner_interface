@@ -132,7 +132,7 @@ namespace taskPlannerInterface
               current_skill = it->second;
 
               bool is_preempted = false;
-              for (unsigned int i_try=0;i_try<2;i_try++)
+              for (unsigned int i_try=0;i_try<5;i_try++)
               {
                 ROS_INFO("Trial %d",i_try+1);
                 current_skill->execute();
@@ -152,7 +152,7 @@ namespace taskPlannerInterface
                       ROS_INFO("Go to: %s", m_retry_position.c_str());
                       m_basic_goto_skill->sendDirectLocation(m_retry_position);
                     }
-                    ros::Duration(5.0).sleep();
+                    ros::Duration(2.5).sleep();
                  }
 
                 // Check that preempt has not been requested by the client
