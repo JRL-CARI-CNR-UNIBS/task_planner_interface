@@ -17,7 +17,8 @@ class GuiInterface:
 
     task_name: str = field(init=False)
     gui_request_pub: rospy.Publisher = field(init=False)
-
+    n_task: int = field(default=0, init=False)
+    performed_task: list[str] = field(default_factory=list, init=False)
     # gui_feedback_sub: rospy.Subscriber()= field(default_factory=None, init=False)
 
     def __post_init__(self):
@@ -30,11 +31,18 @@ class GuiInterface:
         task_description = msg.tasks[0].task_description
         rospy.loginfo(f"Task request: {self.task_name}")
 
-        msg_to_pub = String(self.task_name)
+        msg_to_pub = String(f"{self.n_task}) {self.task_name}")
 
+        str_to_pub = ""
+        for task in self.performed_task:
+            str_to_pub.append(f"PERFORMED: {task} \n")
+
+        msg_to_pub = String(f"TODO: {self.task_name}... \n {str_to_pub}")
         self.gui_request_pub.publish(msg_to_pub)
 
         self.wait_response()
+
+        self.performed_task.append(self.task_name)
 
     def wait_response(self):
         received = False
