@@ -661,23 +661,45 @@ class MongoStatistics:
             print(data_matrix)
             rospy.loginfo(RED + " ----------- " + END)
             print(data_matrix)
-
+            sns.set_theme()
             def plot_a_graph():
-                print("CHARTTT")
+                # print("CHARTTT")
                 plt.figure(index)
-                sns.set_theme()
-                ax = sns.heatmap(data_matrix, annot=True)
+                # sns.set_theme()
+                ax = sns.heatmap(data_matrix, annot=True, cmap="flare")
                 # plt.title(plot_title)
-                ax.set_title(plot_title, pad=20)
-
+                # ax.set_title(plot_title, pad=20)
+                plt.ylabel("Robot Tasks", labelpad=25)
                 plt.xticks(rotation=45, ha="right")
-                plt.savefig(self.results_folder_path + "3dynamic_risk_agent_" + main_agent + ".png",
+                plt.savefig(self.results_folder_path + "dynamic_risk_agent_" + main_agent + ".png",
                             bbox_inches='tight')
-                plt.savefig(self.results_folder_path + "test" + "3dynamic_risk_agent_" + main_agent + ".pdf",
+                plt.savefig(self.results_folder_path + "test" + "dynamic_risk_agent_" + main_agent + ".pdf",
                             bbox_inches='tight')
 
                 plt.show()
                 print(multiprocessing.current_process().name)
+
+                # Plotly
+
+                # import plotly.tools as tls
+                # import plotly.graph_objects as go
+                # def df_to_plotly(df):
+                #     return {'z': df.values.tolist(),
+                #             'x': df.columns.tolist(),
+                #             'y': df.index.tolist()}
+                #
+                # fig = go.Figure(data=go.Heatmap(df_to_plotly(data_matrix),text=data_matrix.values.tolist(), hoverongaps=False, colorscale='Viridis', showscale=False))
+                # # Aggiungi le annotazioni
+                # for i in range(len(data_matrix.index)):
+                #     for j in range(len(data_matrix.columns)):
+                #         fig.add_annotation(
+                #             x=data_matrix.columns[j],
+                #             y=data_matrix.index[i],
+                #             text=str(data_matrix.values[i][j]),
+                #             showarrow=False,
+                #             font=dict(color="white" if data_matrix.values[i][j] < 0.5 else "black")
+                #         )
+                # fig.show()
 
             job_for_another_core = multiprocessing.Process(target=plot_a_graph, args=())
             job_for_another_core.start()
@@ -1627,7 +1649,6 @@ class MongoStatistics:
         Returns:
             SetBoolResponse: _description_
         """
-
         t_start = rospy.Time.now()
 
         # Delete older dynamic risk collection
@@ -1830,7 +1851,8 @@ class MongoStatistics:
 
             # print(dataF.columns.values[:-1])
             concurrent_task_name = dataF.columns.values[:-1]
-
+            print("--- Concurrent task name ---")
+            print(concurrent_task_name)
             train = torch.tensor(dataF.values, dtype=torch.float)
 
             task_data, main_task_duration = train[:, 0:-1], train[:, -1]
@@ -1839,7 +1861,7 @@ class MongoStatistics:
             mcmc.run(task_data, main_task_duration, concurrent_task_name)
             hmc_samples = {k: v.detach().cpu().numpy() for k, v in mcmc.get_samples().items()}
 
-
+            print("task_group")
             print(task_group)
             fig, axs = plt.subplots(nrows=2, ncols=2, figsize=(12, 10))
 
@@ -1851,12 +1873,12 @@ class MongoStatistics:
                                                                                                              chart_title),
                 fontsize=16)
 
-            with open(self.results_folder_path + f"synergy_estimation_{chart_agent_name}.yaml", 'w') as outfile:
-                yaml.dump(hmc_samples, outfile, default_flow_style=False)
-            with open(self.results_folder_path + f"synergy_estimation_{chart_agent_name}.pkl", 'wb') as fp:
-                pickle.dump(hmc_samples, fp)
+            with open(self.results_folder_path + f"ISO5_synergy_estimation_{chart_agent_name}.yaml", 'w') as outfile:
+                yaml.dump([hmc_samples, concurrent_task_name], outfile, default_flow_style=False)
+            with open(self.results_folder_path + f"ISO5_synergy_estimation_{chart_agent_name}.pkl", 'wb') as fp:
+                pickle.dump([hmc_samples, concurrent_task_name], fp)
 
-            np.save(self.results_folder_path + f"synergy_estimation_{chart_agent_name}.npy", hmc_samples)
+            # np.save(self.results_folder_path + f"ISO5_synergy_estimation_{chart_agent_name}.npy", hmc_samples)
             sns.set_theme()
 
             for i, ax in enumerate(axs.reshape(-1)):
@@ -1873,9 +1895,9 @@ class MongoStatistics:
             fig.tight_layout()
             # plt.show()
             sns.set_theme()
-            plt.savefig(self.results_folder_path + "3Bayesian_Gamma_dynamic_risk_agent_" + concurrent_agent + "_" +
+            plt.savefig(self.results_folder_path + "ISO5_Bayesian_Gamma_dynamic_risk_agent_" + concurrent_agent + "_" +
                         task_group["_id"][0] + ".png", bbox_inches='tight')
-            plt.savefig(self.results_folder_path + "3Bayesian_Gamma_dynamic_risk_agent_" + concurrent_agent + "_" +
+            plt.savefig(self.results_folder_path + "ISO5_Bayesian_Gamma_dynamic_risk_agent_" + concurrent_agent + "_" +
                         task_group["_id"][0] + ".pdf", bbox_inches='tight')
 
             reg_model = smf.ols(formula="duration ~ " + formula_string + " -1 ", data=dataF)
