@@ -25,8 +25,8 @@ namespace taskPlannerInterface
               m_skill_properties_client = m_nh.serviceClient <task_planner_interface_msgs::BasicSkill>("mongo_handler/get_task_properties_human");
 
               /*Publishers for hmi interaction*/
-              m_pub_task_request = m_nh.advertise<task_planner_interface_msgs::MotionTaskExecutionRequestArray>("hmi/task_execution_request", 10);
-              m_sub_task_result.reset(new ros_helper::SubscriptionNotifier<task_planner_interface_msgs::MotionTaskExecutionFeedback> (m_nh, "hmi/task_execution_result",10));
+              m_pub_task_request = m_nh.advertise<task_planner_interface_msgs::MotionTaskExecutionRequestArray>("hmi/task_execution_req", 10);
+              m_sub_task_result.reset(new ros_helper::SubscriptionNotifier<task_planner_interface_msgs::MotionTaskExecutionFeedback> (m_nh, "hmi/task_execution_res",10));
 
               ros::Duration m_t_total;
 

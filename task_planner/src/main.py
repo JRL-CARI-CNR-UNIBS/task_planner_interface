@@ -79,12 +79,13 @@ def add_go_home(task_solution: List[TaskSolution], agents: List[str]):
                     TaskSolution(Task("go_home", "go_home", [agent], [], []),
                                  agent_task.get_end_time() + 0.1, agent_task.get_end_time() + go_home_duration, agent))
 
-        if task_solution[agent]:
-            task_solution.append(
-                TaskSolution(Task("go_home", "go_home", [agent], [], []),
-                             task_solutions[agent][-1].get_end_time() + 0.1,
-                             task_solutions[agent][-1].get_end_time() + go_home_duration,
-                             agent))
+        if agent in task_solutions:
+            if task_solutions[agent]:
+                task_solution.append(
+                    TaskSolution(Task("go_home", "go_home", [agent], [], []),
+                                 task_solutions[agent][-1].get_end_time() + 0.1,
+                                 task_solutions[agent][-1].get_end_time() + go_home_duration,
+                                 agent))
 
     return task_solution
 

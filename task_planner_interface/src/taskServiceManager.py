@@ -112,9 +112,13 @@ class TaskServiceManager:
 
         reset_agent_state_srv_name = prefix_topic_name + self.agent + "/reset_agent_state"
         # print("Waiting: "+ reset_agent_state_srv_name)
-        rospy.wait_for_service(reset_agent_state_srv_name)
+        print(f"Agent: {self.agent}, type: {self.agent_type}, is real: {self.is_human_real}")
+        if "human" not in agent_type or not is_human_real:
+            reset_agent_state_srv_name = prefix_topic_name + self.agent + "/reset_agent_state"
+            print("Waiting: "+ reset_agent_state_srv_name)
+            rospy.wait_for_service(reset_agent_state_srv_name)
 
-        self.reset_agent_state_srv_client = rospy.ServiceProxy(reset_agent_state_srv_name, Trigger)
+            self.reset_agent_state_srv_client = rospy.ServiceProxy(reset_agent_state_srv_name, Trigger)
 
         rospy.loginfo(YELLOW + "Services and action server ready" + END)
         # print(prefix_topic_name + agent)
