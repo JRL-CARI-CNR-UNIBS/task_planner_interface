@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from dataclasses import dataclass, field
+from typing import List
 
 import rospy
 from std_msgs.msg import String, Bool
@@ -18,7 +19,7 @@ class GuiInterface:
     task_name: str = field(init=False)
     gui_request_pub: rospy.Publisher = field(init=False)
     n_task: int = field(default=0, init=False)
-    performed_task: list[str] = field(default_factory=list, init=False)
+    performed_task: List[str] = field(default_factory=list, init=False)
     # gui_feedback_sub: rospy.Subscriber()= field(default_factory=None, init=False)
 
     def __post_init__(self):
