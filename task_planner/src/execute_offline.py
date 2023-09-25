@@ -68,7 +68,7 @@ def add_go_home(task_solution: List[TaskSolution], agents: List[str]):
     # 1.4 per il caso base e aree
     # go_home_duration = 3 #era 1.4 qui e 1.5 sotto
     # go_home_duration = 1 # per il caso h-a easier??? bohh
-    go_home_duration = 5
+    go_home_duration = 15
 
     go_home_duration_expanded = go_home_duration + 0.1
     task_solution.sort(key=lambda task_sol: task_sol.get_start_time())
@@ -76,16 +76,22 @@ def add_go_home(task_solution: List[TaskSolution], agents: List[str]):
                                                           == agent, task_solution)) for agent in
                       agents}
     for agent in agents:
+        k = 0
         for id, agent_task in enumerate(task_solutions[agent][:-1]):
             if task_solutions[agent][id + 1].get_start_time() > agent_task.get_end_time() + go_home_duration_expanded:
+                if k < 4:
+                    task_solution.append(
+                        TaskSolution(Task("go_home", "go_home", [agent], [], []),
+                                     agent_task.get_end_time() + 0.1, agent_task.get_end_time() + go_home_duration, agent))
+                k+= 1
+
+        if agent in task_solutions:
+            if task_solutions[agent]:
                 task_solution.append(
                     TaskSolution(Task("go_home", "go_home", [agent], [], []),
-                                 agent_task.get_end_time() + 0.1, agent_task.get_end_time() + go_home_duration, agent))
-        task_solution.append(
-            TaskSolution(Task("go_home", "go_home", [agent], [], []),
-                         task_solutions[agent][-1].get_end_time() + 0.1,
-                         task_solutions[agent][-1].get_end_time() + go_home_duration,
-                         agent))
+                                 task_solutions[agent][-1].get_end_time() + 0.1,
+                                 task_solutions[agent][-1].get_end_time() + go_home_duration,
+                                 agent))
 
     return task_solution
 
@@ -345,11 +351,13 @@ def main():
     # path = Path("/home/samuele/projects/cells_ws/src/hrc_simulator/hrc_simulator/hrc_mosaic_task_planning/hrc_mosaic_task_planning_interface/solutions/soluzioni")
     path = Path("/home/samuele/projects/cells_ws/src/hrc_simulator/hrc_simulator/hrc_mosaic_task_planning/hrc_mosaic_task_planning_interface/solutions/iso15066_lun_31")
     path = Path("/home/samuele/projects/cells_ws/src/hrc_simulator/hrc_simulator/hrc_mosaic_task_planning/hrc_mosaic_task_planning_interface/solutions/test")
+    path = Path("/home/samuele/projects/cells_ws/src/hrc_simulator/hrc_simulator/hrc_mosaic_task_planning/hrc_mosaic_task_planning_interface/solutions/safety_areas_less_tasks")
+
     # path = Path("/home/samuele/Desktop/DatiArticolo/SicurezzaContinua/Risultati/Solutions/")
     if (not path.exists()):
         raise ValueError("THe provided file is not a valid, not a file")
     solutions_files = os.listdir(path)
-    only_interested_file = [file_name for file_name in solutions_files if "recipe_solution_0_human_aware_easier_online_phase_2023_08_25_12:08.yaml" in file_name]
+    only_interested_file = [file_name for file_name in solutions_files if "recipe_solution_43_areas_online_phase_2023_08_28_11:03.yaml" in file_name]
     for solution_name in only_interested_file:
         actual_problem_to_solve = copy.deepcopy(problem_to_solve)
         file_path = Path(join(path, solution_name))

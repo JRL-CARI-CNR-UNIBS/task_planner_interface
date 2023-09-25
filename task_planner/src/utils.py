@@ -87,6 +87,8 @@ class UserMessages(Enum):
     UNABLE_GO_ON = " ---------------- Unable to go on! -------------------- "
     UNABLE_CAPABILITIES = "Unable to get agents capabilities (task properties)"
     UNABLE_STATS = "Unable to get tasks statistics"
+
+
 def show_timeline(problem_solution: List[TaskSolution],
                   solution_name: Optional[str] = "Timeline") -> None:
     solution = []
@@ -99,6 +101,54 @@ def show_timeline(problem_solution: List[TaskSolution],
     print(df)
     fig = px.timeline(df, x_start="Start", x_end="Finish", y="Agents", color="Task", title=solution_name)
     fig.update_layout(xaxis_title="Time")
+    fig.show()
+
+
+def show_timeline_irim(problem_solution: List[TaskSolution],
+                       solution_name: Optional[str] = "Timeline") -> None:
+    print("ciao")
+    color_mapping = {
+        "pick_orange_box": "coral",
+        "place_orange_box": "peachpuff",  # Arancio più tenue
+        "pick_blue_box": "deepskyblue",  # Blu più tenue
+        "place_blue_box_ur5_on_guide": "lightsteelblue",  # Blu chiaro
+        "place_blue_box_human_right_arm": "lightsteelblue",  # Blu chiaro
+        "pick_white_box": "lightgray",  # Grigio chiaro
+        "place_white_box": "whitesmoke",  # Bianco fumé
+    }
+    color_mapping = {
+        "pick_orange_box": "#ffc048",
+        "place_orange_box": "peachpuff",  # Arancio più tenue
+        "pick_blue_box": "#4a69bd",  # Blu più tenue
+        "place_blue_box_ur5_on_guide": "#6a89cc",  # Blu chiaro
+        "place_blue_box_human_right_arm": "#6a89cc",  # Blu chiaro
+        "pick_white_box": "#95a5a6",  # Grigio chiaro
+        "place_white_box": "#bdc3c7",  # Bianco fumé
+    }
+
+    agent_order = ["ur5_on_guide", "human_right_arm"]  # Sostituisci con gli agenti effettivi
+
+    solution = []
+    for task in problem_solution:
+        print(task.get_task().get_type())
+        solution.append(dict(Task=task.get_task().get_type(),
+                             Start=datetime.fromtimestamp(task.get_start_time()).strftime("2020-04-06 %I:%M:%S"),
+                             Finish=datetime.fromtimestamp(task.get_end_time()).strftime("2020-04-06 %I:%M:%S"),
+                             Agents=task.get_assignment(),
+                             AgentOrder=agent_order.index(task.get_assignment()),  # Ordine degli agenti
+                             TaskColor=color_mapping.get(task.get_task().get_type(), "gray")))
+    df = pd.DataFrame(solution)
+    df = df.sort_values(by="AgentOrder")
+
+    print(df)
+    # fig = px.timeline(df, x_start="Start", x_end="Finish", y="Agents", color="Task", title=solution_name)
+    task_color_map = {task: color_mapping.get(task, "gray") for task in df["Task"].unique()}
+
+    fig = px.timeline(df, x_start="Start", x_end="Finish", y="Agents", color="Task", color_discrete_map=task_color_map,
+                      title=solution_name)
+    fig.update_layout(xaxis_title="Time", yaxis_title="Agents")
+
+    # fig.update_layout(xaxis_title="Time")
     fig.show()
 
 
@@ -149,7 +199,7 @@ def save_planning_solution_to_yaml(solution: List[TaskSolution], path: Path, pro
 def show_solution_from_yaml(path: Path,
                             solution_name: Optional[str] = "Timeline"):
     solution = load_solution_from_yaml(path, solution_name)
-    show_timeline(solution,solution_name)
+    show_timeline(solution, solution_name)
 
 
 def load_solution_from_yaml(path: Path,
@@ -169,7 +219,7 @@ def load_solution_from_yaml(path: Path,
     solution = list()
     for task_name, task_solution in loaded_sol.items():
         # TODO: Sistemare name in type
-        task_name=task_name[:-2]
+        task_name = task_name[:-2]
         if all(feature in task_solution.keys() for feature in task_feature):
             t_start = task_solution["t_start"]
             t_end = task_solution["t_end"]
@@ -202,7 +252,7 @@ def load_solution_from_yaml(path: Path,
 
 
 def show_solutions_from_folder(folder_path: Path):
-    if not isinstance(folder_path, Path) and isinstance(folder_path,str):
+    if not isinstance(folder_path, Path) and isinstance(folder_path, str):
         folder_path = Path(folder_path)
     if (not folder_path.exists()) or (not folder_path.is_dir()):
         raise ValueError("The provided file is not a valid, not a file")
@@ -214,6 +264,7 @@ def show_solutions_from_folder(folder_path: Path):
             show_solution_from_yaml(file_path, file_name)
         else:
             print(f"Provided folder contains also: {file_path} that is not a file")
+
 
 class Behaviour(Enum):
     DISCRETE = 1

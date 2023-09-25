@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import pandas as pd
 
 import rospy
 from utils import *
@@ -16,7 +17,7 @@ from TaskPlannerSynergistic import TaskPlannerSynergistic
 from TaskPlannerSynergisticEasier import TaskPlannerSynergisticEasier
 from TaskPlannerSynergisticBand import TaskPlannerSynergisticBand
 from TaskPlannerAreas import TaskPlannerAreas
-from task_planner_interface_msgs.srv import DeleteRecipe, DeleteRecipeRequest,DeleteRecipeResponse
+from task_planner_interface_msgs.srv import DeleteRecipe, DeleteRecipeRequest, DeleteRecipeResponse
 
 from Prove import Prove
 from TaskDispatcher import TaskDispatcher
@@ -25,10 +26,14 @@ from std_msgs.msg import String
 import copy
 import numpy as np
 from pathlib import Path
+import yaml
+from pathlib import Path
+from os import listdir
+from os.path import isfile, join
 
 RECIPE_NAME = {"base": "BASIC_SOLVER", "human_aware": "COMPLETE_HA_SOLVER",
                "human_aware_easier": "RELAXED_HA_SOLVER", "areas": "NOT_NEIGHBORING_TASKS",
-               "human_aware_complete": "COMPLETE_HA_SOLVER"}
+               "human_aware_complete": "COMPLETE_SOLVER"}
 DATE_FORMAT = "%Y_%m_%d_%H:%M"
 
 
@@ -60,27 +65,27 @@ def add_go_home(task_solution: List[TaskSolution], agents: List[str]):
 
     """
     task_solution: TaskSolution
-    # 1 forse per il ha-complete
     # 3 per il human aware
     # 1.4 per il caso base e aree
     # go_home_duration = 3 #era 1.4 qui e 1.5 sotto
-    go_home_duration = 5
+    # go_home_duration = 1 # per il caso h-a easier??? bohh
+    go_home_duration = 15
+
     go_home_duration_expanded = go_home_duration + 0.1
     task_solution.sort(key=lambda task_sol: task_sol.get_start_time())
     task_solutions = {agent: list(filter(lambda task_sol: task_sol.get_assignment()
                                                           == agent, task_solution)) for agent in
                       agents}
     for agent in agents:
-        # if "human" not in agent:
-        #     continue
         k = 0
         for id, agent_task in enumerate(task_solutions[agent][:-1]):
             if task_solutions[agent][id + 1].get_start_time() > agent_task.get_end_time() + go_home_duration_expanded:
-                if k < 1:
+                if k < 4:
                     task_solution.append(
                         TaskSolution(Task("go_home", "go_home", [agent], [], []),
-                                     agent_task.get_end_time() + 0.1, agent_task.get_end_time() + go_home_duration, agent))
-                k+= 1
+                                     agent_task.get_end_time() + 0.1, agent_task.get_end_time() + go_home_duration,
+                                     agent))
+                k += 1
 
         if agent in task_solutions:
             if task_solutions[agent]:
@@ -231,7 +236,6 @@ def select_planner(optimization_type: str,
                               problem_to_solve,
                               objective=Objective.MAKESPAN,
                               n_solutions=n_recipe_to_compute)
-
         # tp = TaskPlannerHumanAwareSimplified("Task_Allocation_Scheduling_Human_Aware",
         #                                      problem_to_solve,
         #                                      behaviour=Behaviour.CONTINUOUS,
@@ -280,29 +284,18 @@ def main():
 
     # rospy.wait_for_service('/reload_scene')
 
-    # Services and Publishers
-    reload_scene_srv_client = rospy.ServiceProxy('/reload_scene', Trigger)
-    pub_recipe_name = rospy.Publisher("set_recipe_name", String, queue_size=10)
-
-    acquire_distance = rospy.get_param("acquire_distance", False)
-    if acquire_distance:
-        stop_distance_acq_srv_client = rospy.ServiceProxy("stop_distance_acq", Trigger)
-        reset_distance_acq_srv_client = rospy.ServiceProxy("reset_distance_acq", Trigger)
-
     # Agents group name ("Agent name")
     agents_group_name = []
     for agent_type in agents_name.values():
         for agent in agent_type:
+
             if agent not in list(agents_group_name_param.keys()):
                 rospy.logerr(UserMessages.CUSTOM_RED.value.format(
                     "Param: agents_group_names, does not contain group name of agent: " + str(agent)))
                 return 0
             agents_group_name.append(agents_group_name_param[agent])
-    # print(agents_group_name)
-    # agents_group_name = ["human_right_arm", "ur5_on_guide"]
 
     # Build the problem to solve
-
     problem_to_solve = Problem(agents_group_name)
 
     # Iterate the goal in yaml
@@ -341,249 +334,117 @@ def main():
         rospy.logerr(UserMessages.UNABLE_GO_ON.value)
         return 0
     if not problem_to_solve.update_tasks_synergy() and "aware" in optimization_type:
-        rospy.logerr(UserMessages.UNABLE_GO_ON.value)
         return 0
 
     rospy.loginfo(f"Consistency Check: {problem_to_solve.consistency_check()}")
 
-    # Choose the tp
-    try:
-        tp = select_planner(optimization_type,
-                            problem_to_solve,
-                            n_recipe_to_compute,
-                            mip_gap)
+    # path = Path("/home/samuele/projects/cells_ws/src/hrc_simulator/hrc_simulator/hrc_mosaic_task_planning/hrc_mosaic_task_planning_interface/solutions/soluzioni")
+    # path = Path(
+    #     "/home/samuele/projects/cells_ws/src/hrc_simulator/hrc_simulator/hrc_mosaic_task_planning/hrc_mosaic_task_planning_interface/solutions/iso15066_lun_31")
+    # path = Path(
+    #     "/home/samuele/projects/cells_ws/src/hrc_simulator/hrc_simulator/hrc_mosaic_task_planning/hrc_mosaic_task_planning_interface/solutions/test")
+    # path = Path(
+    #     "/home/samuele/projects/cells_ws/src/hrc_simulator/hrc_simulator/hrc_mosaic_task_planning/hrc_mosaic_task_planning_interface/solutions/safety_areas_less_tasks")
+    # path = Path("/home/samuele/Desktop/DatiArticolo/Definitivi/SicurezzaContinua/soluzioni_solo_usate")
+    # path = Path("/home/samuele/Desktop/DatiArticolo/Definitivi/LessTaskSafetyAreas/solutions/safety_areas_less_tasks_usate")
+    # path = Path("/home/samuele/Desktop/DatiArticolo/SicurezzaAree/Piani")
+    path = Path("/home/samuele/projects/cells_ws/src/hrc_simulator/hrc_simulator/hrc_mosaic_task_planning/hrc_mosaic_task_planning_interface/solutions/irim2023")
 
-    except ValueError:
-        rospy.logerr(UserMessages.CONSISTENCY_CHECK_FAILED.value)
-        return 0
+    # path = Path("/home/samuele/Desktop/DatiArticolo/SicurezzaContinua/Risultati/Solutions/")
+    if (not path.exists()):
+        raise ValueError("THe provided file is not a valid, not a file")
+    solutions_files = os.listdir(path)
 
-    tp.initialize()
-    tp.create_model()
-    tp.add_precedence_constraints()
-    # if not tp.check_feasibility():
-    #     rospy.logerr(UserMessages.PROBLEM_NOT_FEASIBLE.value.format())
-    #     return 0
-    tp.add_general_constraints()
-    tp.set_objective()
-    # if not tp.check_feasibility():
-    #     rospy.logerr(UserMessages.PROBLEM_NOT_FEASIBLE_DATA.value.format())
-    #     return 0
-    tp.save_model_to_file()
-    tp.solve()
-    data = datetime.today().strftime(DATE_FORMAT)
+    recipes = ["base_online", "area", "easier","complete"]
+    recipes = ["base_online"]
+    recipe_names = {"base_online": "Baseline TP", "area": "Not Neighboring TP", "easier": "HA-TP (Relaxed)", "complete": "HATP"}
+    dati = []
+    solutions_list = []
+    for analyzed_recipe in recipes:
+        # anylized_recipe = "base_online"
+        only_interested_file = [file_name for file_name in solutions_files if analyzed_recipe in file_name]
 
-    if save_result:
-        for n_sol in range(0, n_recipe_to_compute):
-            save_planning_solution_to_yaml(tp.get_solution(n_sol),
-                                           Path(
-                                               f"{result_file_path}recipe_solution_{n_sol}_{optimization_type}_online_phase_{data}.yaml"),
-                                           problem_to_solve)
-    # makespan = max([task_sol.get_end_time() for task_sol in tp.get_solution(n_sol)])
-    # synergy_index = compute_synergy_val(tp.get_solution(n_sol))
-    # print("----------------------------------------")
-    # print(f"Recipe number: {0}")
-    # print(f"Recipe synerdy index: {synergy_index}")
-    # print(f"Makespan: {makespan}")
-    # print("----------------------------------------")
+        for solution_name in only_interested_file:
+            print(solution_name)
+            actual_problem_to_solve = copy.deepcopy(problem_to_solve)
+            file_path = Path(join(path, solution_name))
+            print(solution_name)
+            loaded_sol = dict()
+            with open(file_path, "r") as stream:
+                try:
+                    loaded_sol = yaml.safe_load(stream)
+                except yaml.YAMLError as exc:
+                    raise yaml.YAMLError("Error Loading yaml")
 
-    actual_problem_to_solve = copy.deepcopy(problem_to_solve)
+            task_feature = ["t_start", "t_end", "agent"]
+            solution = list()
+            for task_id, task_solution in loaded_sol.items():
+                if actual_problem_to_solve.task_in_task_list(task_id):
+                    if all(feature in task_solution.keys() for feature in task_feature):
+                        t_start = task_solution["t_start"]
+                        t_end = task_solution["t_end"]
+                        agent = task_solution["agent"]
+                        solution.append(actual_problem_to_solve.add_task_solution(task_id,
+                                                                                  t_start,
+                                                                                  t_end,
+                                                                                  agent))
+            makespan = max([task_sol.get_end_time() for task_sol in solution])
+            synergy_index = compute_synergy_val(solution)
+            # show_timeline(solution)
+            dati.append({"Method": recipe_names[analyzed_recipe], "Makespan": makespan, "Synergy Val": synergy_index})
+            solutions_list.append({"name":solution_name,
+                                   "solution":solution,
+                                   "makespan":makespan,
+                                   "synergy_index":synergy_index})
 
-    # Compute best plan if request and in brute_force mode (usefull for comparison)
-    best_plan = None
-    if brute_force and optimization_type == "base":
-        best_plan = get_best_plan(n_recipe_to_compute, tp)
-        show_timeline(tp.get_solution(best_plan))
-        print(f"Best plan is the number {best_plan}")
-    # show_timeline(tp.get_solution(0))
-    # Evaluate solution
+            print("----------------------------------------")
+            print(f"Recipe number: {0}")
+            print(f"Recipe synerdy index: {synergy_index}")
+            print(f"Makespan: {makespan}")
+            print("----------------------------------------")
+        # return 0
+    df = pd.DataFrame(dati)
+    media_makespan = df.groupby("Method")["Makespan"].mean()
+    media_sinergia = df.groupby("Method")["Synergy Val"].mean()
+    stdev_sinergia = df.groupby("Method")["Synergy Val"].std()
+    uncertainty_95_sinergia = df.groupby("Method")["Synergy Val"].std() * 2
 
-    makespan = max([task_sol.get_end_time() for task_sol in tp.get_solution(0)])
-    synergy_index = compute_synergy_val(tp.get_solution(0))
-    print("----------------------------------------")
-    print(f"Recipe number: {0}")
-    print(f"Recipe synerdy index: {synergy_index}")
-    print(f"Makespan: {makespan}")
-    print("----------------------------------------")
+    min_sinergia = df.groupby("Method")["Synergy Val"].min()
+    max_sinergia = df.groupby("Method")["Synergy Val"].max()
 
-    # for k in range(0,n_recipe_to_compute):
-    #     show_timeline(tp.get_solution(k))
+    print(media_makespan.head())
+    print(media_sinergia.head())
 
-    # return 0
-    # Exit from the loop if does not have to dispatch the plan
-    if not dispatch_plan:
-        if not save_result:
-            for k in range(0, n_recipe_to_compute):
-                pass
-                # compute_synergy_val(tp.get_solution(k))
-                # makespan = max([task_sol.get_end_time() for task_sol in tp.get_solution(k)])
-                # synergy_index = compute_synergy_val(tp.get_solution(k))
-                # print("----------------------------------------")
-                # print(f"Recipe number: {k}")
-                # print(f"Recipe synerdy index: {synergy_index}")
-                # print(f"Makespan: {makespan}")
-                # print("----------------------------------------")
-                # show_timeline(tp.get_solution(k))
-        # for k in range(0,n_recipe_to_compute):
-        if best_plan:
-            show_timeline(tp.get_solution(best_plan))
-        else:
-            print(tp.get_solution(0))
-            show_timeline(tp.get_solution(0))
-            # if n_recipe_to_execute>1:
-            #     for k in range(n_recipe_to_execute):
-            #         show_timeline(tp.get_solution(k))
-        return 0
+    from tabulate import tabulate
 
-    td = TaskDispatcher(agents_group_name,
-                        agents_group_name_param,
-                        RECIPE_NAME.get(optimization_type, "DEFAULT_NAME"))
+    # Unisce i risultati in un unico DataFrame
+    result_df = pd.merge(media_makespan, media_sinergia, on="Method")
+    result_df = pd.merge(result_df, stdev_sinergia, on="Method")
+    result_df = pd.merge(result_df, uncertainty_95_sinergia, on="Method")
 
-    # Iterate all task planner solution
-    for recipe in range(0, n_recipe_to_execute):
-        print(recipe)
-        if rospy.is_shutdown():
-            break
-        # If Brute force skip if it is not the best one
-        if best_plan is not None:
-            if recipe != best_plan:
-                continue
-        # Show solution
-        # show_timeline(tp.get_solution(recipe))
+    result_df = pd.merge(result_df, min_sinergia, on="Method")
+    result_df = pd.merge(result_df, max_sinergia, on="Method")
+    #
+    # # Rinomina le colonne
+    result_df.columns = ["Makespan","Average Synergy", "Std Dev Synergy",  "Unc (95) Synergy","Min Synergy", "Max Synergy"]
+    #
+    #
+    # # Tabulate il DataFrame in formato LaTeX
+    table = tabulate(result_df, headers="keys", tablefmt="latex_raw")
 
-        makespan = max([task_sol.get_end_time() for task_sol in tp.get_solution(recipe)])
-        synergy_index = compute_synergy_val(tp.get_solution(recipe))
-        print("----------------------------------------")
-        print(f"Recipe number: {recipe}")
-        print(f"Recipe synerdy index: {synergy_index}")
-        print(f"Makespan: {makespan}")
-        print("----------------------------------------")
+    # Trova la soluzione con il synergy index minimo
+    min_solution = min(solutions_list, key=lambda x: x["synergy_index"])
 
-        tasks_solution = add_go_home(copy.deepcopy(tp.get_solution(recipe)), agents_group_name)
-        # print(tasks_solution)
-        show_timeline(tasks_solution)
-        # dato = input("Do you want to exectute? ")
-        # if "y" not in dato:
-        #     continue
-        # if "stop" in dato:
-        #     break
-        # show_gantt(tasks_solution)
-        # Iterate over the execution repetitions to do
-        for n_rep in range(starting_recipe_number, starting_recipe_number + n_repetitions):
-            print(n_rep)
-            error_occurred_during_execution = True
-            trials = 0
-            while error_occurred_during_execution and trials <= 2:
-                recipe_name = f"{RECIPE_NAME.get(optimization_type, 'DEFAULT_NAME')}_rec_{recipe}_rep_{n_rep}_{data}"
-                # Set recipe name to dispatcher (set param of a task used by service manager)
-                td.set_recipe_name(recipe_name)
-                # Publish the recipe name
-                pub_recipe_name.publish(String(recipe_name))
-
-                # Dispatch the solution
-                if not rospy.is_shutdown():
-                    td.dispatch_solution(tasks_solution)
-                    trials += 1
-                # Execution loop
-                while not rospy.is_shutdown():
-                    executed_task = td.get_performed_task()
-
-                    # Remove from problem performed task
-                    if executed_task is not None:
-                        actual_problem_to_solve.remove_task(executed_task.get_task())
-
-                    # Check if the plan failed
-                    if td.is_failed_and_not_in_execution() or td.is_timeout():
-                        error_occurred_during_execution = True
-                        rospy.loginfo(UserMessages.PLAN_FAILED.value)
-                        # Stop distance acquisition and Reload scene
-                        if acquire_distance:
-                            end_recipe_procedure_failure_case(recipe_name,
-                                                              reset_distance_acq_srv_client,
-                                                              reload_scene_srv_client)
-                        else:
-                            end_recipe_procedure_failure_case(recipe_name,
-                                                              None,
-                                                              reload_scene_srv_client)
-                        td.send_recipe_end()
-                        rospy.sleep(5)
-                        break
-
-                    # Check if the plan is finished
-                    if td.is_finished():
-                        error_occurred_during_execution = False
-                        rospy.loginfo(UserMessages.PLAN_FINISHED.value)
-                        # Stop distance acquisition and Reload scene
-                        if acquire_distance:
-                            end_recipe_procedure(stop_distance_acq_srv_client, reload_scene_srv_client)
-                        else:
-                            reload_scene(reload_scene_srv_client)
-
-                        td.send_recipe_end()
-                        print("Service called and executed")
-
-                        rospy.sleep(5)
-
-                        break
-                    rospy.sleep(1)
-    #     for agent in agents:
-    #         task_exec =td.get_performed_task
-    #     rospy.sleep(1)
-    # threads.append(threading.Thread(target=td.dispatch_solution(tp.get_solution(1)), args=tp.get_solution(1)))
-    #     print("prova")
-    # print("ora")
-    # for thread in threads:
-    #     print("dentro")
-    #     thread.start()
-    # td.dispatch_solution(tp.get_solution(1))
-    # show_gantt(tp.get_solution())
-    # rospy.loginfo(f"Consistency Check: {problem_to_solve.consistency_check()}")
-
-
-def end_recipe_procedure_failure_case(recipe_name,
-                                      reset_distance_acq_srv_client,
-                                      reload_scene_srv_client):
-    delete_recipe_clnt = rospy.ServiceProxy("mongo_handler/delete_recipe", DeleteRecipe)
-    recipe = DeleteRecipeRequest()
-    recipe.name = recipe_name
-    try:
-        delete_recipe_clnt(recipe)
-        rospy.loginfo(UserMessages.SERVICE_CALLBACK.value.format("recipe"))
-        print("ok")
-    except rospy.ServiceException as e:
-        rospy.loginfo(UserMessages.SERVICE_FAILED.value.format("recipe"))
-
-    if reset_distance_acq_srv_client:
-        try:
-            reset_distance_acq_srv_client()
-            rospy.loginfo(UserMessages.SERVICE_CALLBACK.value.format("reset_distance_acq_srv"))
-            print("ok")
-        except rospy.ServiceException as e:
-            rospy.loginfo(UserMessages.SERVICE_FAILED.value.format("reset_distance_acq_srv"))
-
-    reload_scene(reload_scene_srv_client)
-
-def end_recipe_procedure(stop_distance_acq_srv_client,
-                         reload_scene_srv_client):
-    stop_acquisition_distance(stop_distance_acq_srv_client)
-    reload_scene(reload_scene_srv_client)
-
-
-def stop_acquisition_distance(stop_distance_acq_srv_client):
-    # Stop distance acquisition
-    try:
-        stop_distance_acq_srv_client()
-        rospy.loginfo(UserMessages.SERVICE_CALLBACK.value.format("stop_distance_acq"))
-    except rospy.ServiceException as e:
-        rospy.loginfo(UserMessages.SERVICE_FAILED.value.format("stop_distance_acq"))
-
-
-def reload_scene(reload_scene_srv_client):
-    # Reload scene
-    try:
-        reload_scene_srv_resp = reload_scene_srv_client()
-        rospy.loginfo(UserMessages.SERVICE_CALLBACK.value.format("reload_scene"))
-    except rospy.ServiceException as e:
-        rospy.loginfo(UserMessages.SERVICE_FAILED.value.format("reload_scene"))
+    # Trova la soluzione con il synergy index massimo
+    max_solution = max(solutions_list, key=lambda x: x["synergy_index"])
+    
+    print("Solution min")
+    show_timeline_irim(min_solution["solution"])
+    print("Solution max")
+    show_timeline_irim(max_solution["solution"])
+    print(min_solution["makespan"], min_solution["synergy_index"])
+    print(max_solution["makespan"], max_solution["synergy_index"])
+    print(table)
 
 
 if __name__ == "__main__":
