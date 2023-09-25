@@ -27,6 +27,7 @@ class GuiInterface:
         self.gui_request_pub = rospy.Publisher(self.gui_request_topic_name, String, queue_size=10)
         self.high_level_feedback_pub = rospy.Publisher(self.high_level_feedback_topic_name, MotionTaskExecutionFeedback,
                                                        queue_size=10)
+        rospy.sleep(2)
         self.gui_request_pub.publish(String("Let's start"))
 
     def request(self, msg):
@@ -35,8 +36,8 @@ class GuiInterface:
         rospy.loginfo(f"Task request: {self.task_name}")
 
         str_to_pub = ""
-        for task in self.performed_task:
-            str_to_pub += f"PERFORMED: {task} \n"
+        # for task in self.performed_task:
+        #     str_to_pub += f"PERFORMED: {task} \n"
 
         msg_to_pub = String(f"TODO: {self.task_name}... \n{str_to_pub}")
         self.gui_request_pub.publish(msg_to_pub)

@@ -46,7 +46,8 @@ protected:
 
 public:
   PickPlaceSkill();
-  PickPlaceSkill(const AgentStatusPtr& agent_status_ptr):GenericSkill(agent_status_ptr){};
+
+  PickPlaceSkill(const AgentStatusPtr& agent_status_ptr);
   bool execute();
   void init(const std::string& arg);
   bool setPropertiesFromBSON(bsoncxx::stdx::optional<bsoncxx::document::value>& bson_doc);

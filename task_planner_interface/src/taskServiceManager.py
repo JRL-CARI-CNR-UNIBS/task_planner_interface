@@ -150,7 +150,7 @@ class TaskServiceManager:
         try:
 
             task_type_msg = self.task_type_service(task)  # Check type (rosservice call)
-
+            print(task_type_msg)
             if task_type_msg.exist:
                 if self.is_human_real:
                     rospy.loginfo(TASK_TYPE.format(task_type_msg.type))
@@ -162,10 +162,10 @@ class TaskServiceManager:
                         self.execute_client(task, task_cmd_id, t_start_planned, t_end_planned)  # Il task name
 
                     elif task_type_msg.type in ["Assembly", "Disassembly", "Sequence", "unscrew", "Unscrew", "screw",
-                                                "Screw"]:
+                                                "Screw", "sequence"]:
                         rospy.loginfo(TASK_TYPE.format(task_type_msg.type))
                         # Call method for execute the sequence of sub-tasks
-                        self.execute_sequence_client(task, task_cmd_id)  # Il task name
+                        self.execute_sequence_client(task, task_cmd_id, t_start_planned, t_end_planned)  # Il task name
 
                     elif task == "end":  # task e' name
                         # Note that in db task properties the end task has to be associated to all agents goal: it has to be ok for all agents. Home pose of all agent
@@ -237,6 +237,7 @@ class TaskServiceManager:
             task_result = TaskResultRequest()
             task_result.name = task_name  # Name
             task_result.type = action_result.type
+            print(action_result.agent)
             task_result.agent = action_result.agent  # Agent
             task_result.outcome = action_result.outcome
             task_result.duration_planned = action_result.duration_planned
@@ -297,7 +298,7 @@ class TaskServiceManager:
             task_result = TaskResultRequest()
             task_result.name = task_name  # Name
             task_result.type = action_result.type
-            task_result.agent = self.agent  # Agent
+            task_result.agent = action_result.agent #self.agent  # Agent
             task_result.outcome = action_result.outcome
             task_result.duration_planned = action_result.duration_planned
             task_result.duration_real = action_result.duration_real

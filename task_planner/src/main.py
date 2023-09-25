@@ -64,7 +64,7 @@ def add_go_home(task_solution: List[TaskSolution], agents: List[str]):
     # 3 per il human aware
     # 1.4 per il caso base e aree
     # go_home_duration = 3 #era 1.4 qui e 1.5 sotto
-    go_home_duration = 15
+    go_home_duration = 5
     go_home_duration_expanded = go_home_duration + 0.1
     task_solution.sort(key=lambda task_sol: task_sol.get_start_time())
     task_solutions = {agent: list(filter(lambda task_sol: task_sol.get_assignment()
@@ -290,7 +290,6 @@ def main():
     agents_group_name = []
     for agent_type in agents_name.values():
         for agent in agent_type:
-
             if agent not in list(agents_group_name_param.keys()):
                 rospy.logerr(UserMessages.CUSTOM_RED.value.format(
                     "Param: agents_group_names, does not contain group name of agent: " + str(agent)))
@@ -300,6 +299,7 @@ def main():
     # agents_group_name = ["human_right_arm", "ur5_on_guide"]
 
     # Build the problem to solve
+
     problem_to_solve = Problem(agents_group_name)
 
     # Iterate the goal in yaml

@@ -12,6 +12,10 @@ PickPlaceSkill::PickPlaceSkill(){
     m_skill_properties_client =  m_nh.serviceClient<task_planner_interface_msgs::PickPlaceSkill>("mongo_handler/get_task_properties_pickplace");
 }
 
+PickPlaceSkill::PickPlaceSkill(const AgentStatusPtr& agent_status_ptr):GenericSkill(agent_status_ptr)
+{
+  m_skill_properties_client = m_nh.serviceClient <task_planner_interface_msgs::PickPlaceSkill>("mongo_handler/get_task_properties_pickplace");
+}
 bool PickPlaceSkill::execute()
 {
   m_outcome = FAILURE;
@@ -19,6 +23,11 @@ bool PickPlaceSkill::execute()
   m_duration_planned=0.0;
   m_planning_time=0.0;
   m_path_length=0.0;
+  ROS_INFO_STREAM("EXECUTING PICKPLACE: "<< m_pick_goal.size());
+  for(std::string &goal: m_pick_goal)
+  {
+    ROS_INFO_STREAM("Pick goal" << goal);
+  }
 
   for (auto it=m_pick_goal.begin(); it!=m_pick_goal.end(); ++it)
   {
@@ -35,7 +44,20 @@ bool PickPlaceSkill::execute()
     {
       manipulation_msgs::PickObjectsGoal pick_goal;
       pick_goal.object_types = m_pick_goal;
+      pick_goal.tool_id="robotiq_gripper";
+      pick_goal.property_pre_exec_id="open_60";
+      pick_goal.property_exec_id="close";
+      pick_goal.job_exec_name="pick";
+      for(std::string &pick_goal: pick_goal.object_types)
+      {
+        ROS_INFO_STREAM("--- PICK GOAL "<< pick_goal);
+      }
+      for(std::string &pick_goal: m_pick_goal)
+      {
+        ROS_INFO_STREAM("--- PICK GOAL "<< pick_goal);
+      }
       m_pick_ac->sendGoalAndWait(pick_goal);
+
       if (m_pick_ac->getResult()->result<0)
       {
         ROS_ERROR_STREAM("Command " << m_id << ": unable to pick any of the object types:");
@@ -68,6 +90,10 @@ bool PickPlaceSkill::execute()
 
   manipulation_msgs::PlaceObjectsGoal place_goal;
   place_goal.object_name=m_agent_status->getObjectInHandId();
+  place_goal.tool_id="robotiq_gripper";
+  place_goal.property_exec_id="open_100";
+  place_goal.property_post_exec_id="open";
+  place_goal.job_exec_name="place";
   //place_goal.object_type=m_agent_status->getObjectInHandType();
   place_goal.slots_group_names=m_place_goal;
   m_place_ac->sendGoalAndWait(place_goal);
@@ -102,8 +128,8 @@ void PickPlaceSkill::init(const std::string& arg)
   m_place_ac.reset(new actionlib::SimpleActionClient<manipulation_msgs::PlaceObjectsAction>("/outbound_place_server/"+group_name+"/place"));
   m_pick_ac->waitForServer();
   m_place_ac->waitForServer();
-  m_pick_goal.clear();
-  m_place_goal.clear();
+//  m_pick_goal.clear();
+//  m_place_goal.clear();
   ROS_INFO("Initilized pickplace skill for movegroup %s", group_name.c_str());
 }
 
@@ -159,7 +185,14 @@ bool PickPlaceSkill::setPropertiesFromService(std::string name, std::string type
           ROS_INFO("Task properties retrieved correctly");
           m_pick_goal = srv.response.pick_goal;
           m_place_goal = srv.response.place_goal;
-
+          for(std::string &goal: m_pick_goal)
+          {
+            ROS_INFO_STREAM("Pick goal" << goal);
+          }
+          for(std::string &goal: m_place_goal)
+          {
+            ROS_INFO_STREAM("Pick goal" << goal);
+          }
           if(!srv.response.job_name.empty())
           {
               m_job_name = srv.response.job_name;

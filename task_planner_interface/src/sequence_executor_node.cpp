@@ -154,6 +154,8 @@ public:
     XmlRpc::XmlRpcValue param;
     if (!nh_.getParam(skill_recipe + "/recipe",param))
     {
+      ROS_INFO_STREAM("Recipe not found: " << skill_recipe + "/recipe");
+
       ROS_ERROR("Recipe not found: %s",goal->name.c_str());
       return;
     }
@@ -424,6 +426,8 @@ public:
         if (go_to_ac->getResult()->result < 0)
         {
           ROS_ERROR("[Group %s] unable to go to -> location name = %s",group_name_.c_str(), go_to_goal.location_names.at(0).c_str());
+          ROS_ERROR("Error: %d", go_to_ac->getResult()->result);
+
           as_.setAborted();
           return;
         }

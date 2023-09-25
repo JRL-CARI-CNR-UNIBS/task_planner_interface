@@ -227,7 +227,6 @@ class MongoHandler:
             skill_response.place_goal = query_result["place_goal"]
             if "job_name" in query_result.keys():
                 skill_response.job_name = query_result["job_name"]
-
         return skill_response
 
     def getPauseProperties(self, task_info):
@@ -438,7 +437,7 @@ def main():
     # Ros service
     rospy.Service("mongo_handler/task_result", TaskResult, mongo_handler.uploadResult)
     rospy.Service("mongo_handler/get_task_properties", BasicSkill, mongo_handler.getTaskProperties)
-    rospy.Service("mongo_handler/get_task_properties_pickplace", BasicSkill, mongo_handler.getPickPlaceProperties)
+    rospy.Service("mongo_handler/get_task_properties_pickplace", PickPlaceSkill, mongo_handler.getPickPlaceProperties)
     rospy.Service("mongo_handler/get_pause_properties", PauseSkill, mongo_handler.getPauseProperties)
 
     rospy.Service("mongo_handler/get_task_properties_human", BasicSkill, mongo_handler.getHumanTaskProperties)

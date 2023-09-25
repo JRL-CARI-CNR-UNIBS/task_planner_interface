@@ -26,11 +26,11 @@ bool PlaceSkill::execute()
   {
     manipulation_msgs::PlaceObjectsGoal place_goal;
     place_goal.object_name=m_agent_status->getObjectInHandId();
-    //place_goal.tool_id="gripper_fake";
-    //place_goal.property_exec_id="open_100";
-    //place_goal.property_post_exec_id="open";
-    //place_goal.job_exec_name=m_job_name;
-    //place_goal.object_name=m_agent_status->getObjectInHandType();
+    place_goal.tool_id="robotiq_gripper";
+    place_goal.property_exec_id="open_100";
+    place_goal.property_post_exec_id="open";
+    place_goal.job_exec_name=m_job_name;
+//    place_goal.object_name=m_agent_status->getObjectInHandType();
     place_goal.slots_group_names=m_place_goal;
 
     ROS_ERROR_STREAM("goal place:");
