@@ -25,6 +25,7 @@ RECIPE_NAMES = {"TESTdsfds": "Safety Areas - HA",
                 "RELAXED_HA_SOLVER": "HA-TP (Relaxed)",
                 "BASIC_SOLVER": "Baseline TP",
                 "COMPLETE_SOLVER": "HA-TP",
+                "COMPLETE_HA_SOLVER": "HA-TP",
                 "TEST_COMPLETE": "Test",
                 "TEST_RELAXED": "Test REL"
                 }
@@ -61,6 +62,8 @@ def main():
     # Ultimo
     database_name = "safety_areas_7_ago"  # "milp_task_planner"
     results_collection_name = "task_results_25_ago"
+    # database_name = "iso15066_lun_31"  # "milp_task_planner"
+    # results_collection_name = "complete_task_results"
 
     mongo_interface = MongoInterface(database_name)
 
@@ -184,10 +187,13 @@ def main():
     # sns.relplot(data=result_pd["Plan Duration (s)"])
     path = "/home/samuele/projects/cells_ws/src/hrc_simulator/hrc_simulator/hrc_mosaic_task_planning/hrc_mosaic_task_planning_interface/statistics/fig/safety_areas/"
     path = "/home/samuele/projects/cells_ws/src/hrc_simulator/hrc_simulator/hrc_mosaic_task_planning/hrc_mosaic_task_planning_interface/statistics/fig/iso15066/new_version_25_ago/duration/"
+    # path = "/home/samuele/Desktop/DatiArticolo/Definitivi/LessTaskSafetyAreas/grafici/"
+    # fig.write_html(f"{path}duration.html")
     #
+    # #
     # plt.title("Comparison of plan execution duration", pad=20)
     # plt.ylabel("Task Planner Type", labelpad=25)
-    # plt.xlim(60, 90)
+    # plt.xlim(77, 92)
     # plt.savefig(f"{path}iso15066_comparison_plan_duration_with_label.png", bbox_inches='tight')
     # plt.savefig(f"{path}iso15066_comparison_plan_duration_with_label.pdf", bbox_inches='tight')
     # #

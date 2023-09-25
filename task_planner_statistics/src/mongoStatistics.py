@@ -671,10 +671,10 @@ class MongoStatistics:
                 # ax.set_title(plot_title, pad=20)
                 plt.ylabel("Robot Tasks", labelpad=25)
                 plt.xticks(rotation=45, ha="right")
-                plt.savefig(self.results_folder_path + "dynamic_risk_agent_" + main_agent + ".png",
-                            bbox_inches='tight')
-                plt.savefig(self.results_folder_path + "test" + "dynamic_risk_agent_" + main_agent + ".pdf",
-                            bbox_inches='tight')
+                # plt.savefig(self.results_folder_path + "dynamic_risk_agent_" + main_agent + ".png",
+                #             bbox_inches='tight')
+                # plt.savefig(self.results_folder_path + "test" + "dynamic_risk_agent_" + main_agent + ".pdf",
+                #             bbox_inches='tight')
 
                 plt.show()
                 print(multiprocessing.current_process().name)
@@ -1492,7 +1492,7 @@ class MongoStatistics:
         """
 
         agents = self.getAgents()
-
+        print(agents)
         task_results = {"task_name": [], "agent_name": [], "duration": []}
         for main_agent in agents:
             pipeline_get_only_speciefied_agent_elements = [
@@ -1526,7 +1526,7 @@ class MongoStatistics:
             sns.set(rc={'figure.figsize': (17, 7)})
 
             #ax = sns.violinplot(data=task_results_data, x="task_name", y="duration", hue="agent_name")
-
+            print(task_results_data)
             ax = sns.boxplot(data=task_results_data, x="task_name", y="duration", hue="agent_name",
                              showmeans=True,
                              meanprops={"marker": "o",
@@ -1548,9 +1548,9 @@ class MongoStatistics:
 
             ax.figure.set_size_inches(17, 8)
 
-            plt.savefig(self.results_folder_path + "task_durations.png", bbox_inches='tight')
+            # plt.savefig(self.results_folder_path + "task_durations.png", bbox_inches='tight')
 
-            # plt.figure()
+            plt.figure()
             plt.show()
 
         job_for_another_core = multiprocessing.Process(target=plot_a_graph, args=())

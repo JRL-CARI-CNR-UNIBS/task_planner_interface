@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+
+<launch>
+
+  <node pkg="task_planner_gui" type="minimal_gui.py" name="minimal_gui" output="screen" >
+  </node>
+
+</launch>
