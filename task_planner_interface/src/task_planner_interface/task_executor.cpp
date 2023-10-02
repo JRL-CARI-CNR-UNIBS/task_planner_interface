@@ -33,10 +33,41 @@ namespace taskPlannerInterface
 
               m_agent_status = std::make_shared<taskPlannerInterface::AgentStatus>();
 
+              /* Changes Here */
+              std::map<std::string, std::string> additional_pick_skill_properties;
+              std::map<std::string, std::string> additional_place_skill_properties;
+              taskPlannerInterface::skills::PickSkillPtr pick_skill;
+              taskPlannerInterface::skills::PlaceSkillPtr place_skill;
+              taskPlannerInterface::skills::PickPlaceSkillPtr pick_place_skill;
+
+              if (getAdditionalProperties("pick_execution_properties", additional_pick_skill_properties)) {
+                  pick_skill = std::make_shared<taskPlannerInterface::skills::PickSkill>(m_agent_status, additional_pick_skill_properties);
+              } else {
+                  pick_skill = std::make_shared<taskPlannerInterface::skills::PickSkill>(m_agent_status);
+              }
+
+              if (getAdditionalProperties("place_execution_properties", additional_place_skill_properties)) {
+                  place_skill = std::make_shared<taskPlannerInterface::skills::PlaceSkill>(m_agent_status, additional_place_skill_properties);
+              } else {
+                  place_skill = std::make_shared<taskPlannerInterface::skills::PlaceSkill>(m_agent_status);
+              }
+
+              if (getAdditionalProperties("pickplace_execution_properties/pick", additional_pick_skill_properties) &&
+                  getAdditionalProperties("pickplace_execution_properties/place", additional_place_skill_properties)) {
+                  pick_place_skill = std::make_shared<taskPlannerInterface::skills::PickPlaceSkill>(m_agent_status, additional_pick_skill_properties, additional_place_skill_properties);
+              } else {
+                  pick_place_skill = std::make_shared<taskPlannerInterface::skills::PickPlaceSkill>(m_agent_status);
+              }
+
+
+              /* Changes Stop Here*/
+
               //Single skills
+              /*
               taskPlannerInterface::skills::PickSkillPtr pick_skill(new taskPlannerInterface::skills::PickSkill(m_agent_status));
               taskPlannerInterface::skills::PlaceSkillPtr place_skill(new taskPlannerInterface::skills::PlaceSkill(m_agent_status));
               taskPlannerInterface::skills::PickPlaceSkillPtr pick_place_skill(new taskPlannerInterface::skills::PickPlaceSkill(m_agent_status));
+              */
               taskPlannerInterface::skills::GoToSkillPtr goto_skill(new taskPlannerInterface::skills::GoToSkill(m_agent_status));
 
               //Fill map of skills (class attribute)
@@ -207,6 +238,41 @@ namespace taskPlannerInterface
         }
 
 
+    }
+    bool TaskExecutor::getAdditionalProperties(const std::string& skill_name,
+                                               std::map<std::string, std::string>& additional_properties)
+    {
+      additional_properties.clear();
+      if(m_nh.hasParam(skill_name))
+      {
+        XmlRpc::XmlRpcValue additional_properties_tmp;
+        m_nh.getParam(skill_name, additional_properties_tmp);
+        if(additional_properties_tmp.getType() != XmlRpc::XmlRpcValue::TypeStruct)
+        {
+          ROS_ERROR("Param: %s, not well formatted, must be struct", skill_name);
+          return false;
+        }
+
+        if(not(additional_properties_tmp.hasMember("tool_id") &&
+               additional_properties_tmp.hasMember("pre_exec_id") &&
+               additional_properties_tmp.hasMember("exec_id")))
+        {
+          ROS_ERROR("Missing correct additional properties to pick_skills: tool_id, pre_exec_id, exec_id");
+          return false;
+        }
+        if (not(additional_properties_tmp["tool_id"].getType() == XmlRpc::XmlRpcValue::TypeString &&
+                additional_properties_tmp["pre_exec_id"].getType() == XmlRpc::XmlRpcValue::TypeString &&
+                additional_properties_tmp["exec_id"].getType() == XmlRpc::XmlRpcValue::TypeString))
+        {
+          ROS_ERROR("Additional properties are not string");
+          return false;
+        }
+          additional_properties["tool_id" ]  = static_cast<std::string>(additional_properties_tmp["tool_id"]);
+          additional_properties["pre_exec_id" ]  = static_cast<std::string>(additional_properties_tmp["pre_exec_id"]);
+          additional_properties["exec_id" ]  = static_cast<std::string>(additional_properties_tmp["exec_id"]);
+          return true;
+      }
+      return false;
     }
 
 } //end namespace

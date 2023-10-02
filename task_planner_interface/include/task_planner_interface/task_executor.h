@@ -69,7 +69,8 @@ protected:
   bool checkSkillType(const std::string name, std::string& skill_type);
   bool resetAgentState(std_srvs::Trigger::Request&  req,
                        std_srvs::Trigger::Response& res);
-
+  bool getAdditionalProperties(const std::string& skill_name,
+                               std::map<std::string, std::string>& additional_properties);
 public:
   TaskExecutor(const ros::NodeHandle& nh,
                const ros::NodeHandle& pnh,

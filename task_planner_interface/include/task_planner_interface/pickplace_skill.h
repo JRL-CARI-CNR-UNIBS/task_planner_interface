@@ -43,11 +43,18 @@ protected:
   std::vector<std::string> m_place_goal;
   boost::shared_ptr<actionlib::SimpleActionClient<manipulation_msgs::PickObjectsAction> > m_pick_ac;
   boost::shared_ptr<actionlib::SimpleActionClient<manipulation_msgs::PlaceObjectsAction> > m_place_ac;
+  bool m_have_additional_properties = false;
+  std::map<std::string,std::string> m_pick_additional_properties;
+  std::map<std::string,std::string> m_place_additional_properties;
 
 public:
   PickPlaceSkill();
 
   PickPlaceSkill(const AgentStatusPtr& agent_status_ptr);
+  PickPlaceSkill(const AgentStatusPtr& agent_status_ptr,
+                 const std::map<std::string, std::string>& pick_additional_properties,
+                 const std::map<std::string, std::string>& place_additional_properties);
+
   bool execute();
   void init(const std::string& arg);
   bool setPropertiesFromBSON(bsoncxx::stdx::optional<bsoncxx::document::value>& bson_doc);

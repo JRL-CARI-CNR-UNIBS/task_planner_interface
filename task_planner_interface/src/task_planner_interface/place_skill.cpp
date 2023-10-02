@@ -10,6 +10,12 @@ namespace skills {
 
 PlaceSkill::PlaceSkill(){}
 
+PlaceSkill::PlaceSkill(const AgentStatusPtr& agent_status_ptr,
+          const std::map<std::string, std::string>& additional_properties):GenericSkill(agent_status_ptr)
+{
+  m_have_additional_properties = true;
+  m_additional_properties = additional_properties;
+}
 bool PlaceSkill::execute()
 {
   if (m_agent_status->getObjectInHandType().empty())
@@ -26,10 +32,13 @@ bool PlaceSkill::execute()
   {
     manipulation_msgs::PlaceObjectsGoal place_goal;
     place_goal.object_name=m_agent_status->getObjectInHandId();
-    place_goal.tool_id="robotiq_gripper";
-    place_goal.property_exec_id="open_100";
-    place_goal.property_post_exec_id="open";
-    place_goal.job_exec_name=m_job_name;
+    if(m_have_additional_properties)
+    {
+      place_goal.tool_id = m_additional_properties["tool_id"];
+      place_goal.property_pre_exec_id = m_additional_properties["property_pre_exec_id"];
+      place_goal.property_exec_id = m_additional_properties["property_exec_id"];
+      place_goal.job_exec_name=m_job_name;
+    }
 //    place_goal.object_name=m_agent_status->getObjectInHandType();
     place_goal.slots_group_names=m_place_goal;
 

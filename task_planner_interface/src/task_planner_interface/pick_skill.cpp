@@ -10,6 +10,13 @@ namespace skills {
 
 PickSkill::PickSkill(){}
 
+PickSkill::PickSkill(const AgentStatusPtr& agent_status_ptr,
+                     const std::map<std::string, std::string>& additional_properties):GenericSkill(agent_status_ptr)
+{
+  m_have_additional_properties = true;
+  m_additional_properties = additional_properties;
+}
+
 bool PickSkill::execute()
 {
   m_outcome = FAILURE;
@@ -33,10 +40,13 @@ bool PickSkill::execute()
   {
     manipulation_msgs::PickObjectsGoal pick_goal;
     pick_goal.object_types=m_pick_goal;
-    pick_goal.tool_id="robotiq_gripper";
-    pick_goal.property_pre_exec_id="open_60";
-    pick_goal.property_exec_id="close";
-    pick_goal.job_exec_name=m_job_name;
+    if(m_have_additional_properties)
+    {
+      pick_goal.tool_id = m_additional_properties["tool_id"];
+      pick_goal.property_pre_exec_id = m_additional_properties["property_pre_exec_id"];
+      pick_goal.property_exec_id = m_additional_properties["property_exec_id"];
+      pick_goal.job_exec_name=m_job_name;
+    }
     m_pick_ac->sendGoalAndWait(pick_goal);
 
     if (m_pick_ac->getResult()->result<0)

@@ -39,10 +39,17 @@ class PlaceSkill : public GenericSkill
 protected:
   std::vector<std::string> m_place_goal;
   boost::shared_ptr<actionlib::SimpleActionClient<manipulation_msgs::PlaceObjectsAction> > m_place_ac;
+  bool m_have_additional_properties = false;
+  std::map<std::string,std::string> m_additional_properties;
 
 public:
   PlaceSkill();
-  PlaceSkill(const AgentStatusPtr& agent_status_ptr):GenericSkill(agent_status_ptr){};
+  PlaceSkill(const AgentStatusPtr& agent_status_ptr):GenericSkill(agent_status_ptr){
+    m_have_additional_properties = false;
+  }
+  PlaceSkill(const AgentStatusPtr& agent_status_ptr,
+            const std::map<std::string, std::string>& additional_properties);
+
   bool execute();
   void init(const std::string& group_name);
   bool setPropertiesFromBSON(bsoncxx::stdx::optional<bsoncxx::document::value>& bson_doc);

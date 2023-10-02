@@ -10,12 +10,25 @@ namespace skills {
 
 PickPlaceSkill::PickPlaceSkill(){
     m_skill_properties_client =  m_nh.serviceClient<task_planner_interface_msgs::PickPlaceSkill>("mongo_handler/get_task_properties_pickplace");
+    m_have_additional_properties = false;
 }
 
 PickPlaceSkill::PickPlaceSkill(const AgentStatusPtr& agent_status_ptr):GenericSkill(agent_status_ptr)
 {
   m_skill_properties_client = m_nh.serviceClient <task_planner_interface_msgs::PickPlaceSkill>("mongo_handler/get_task_properties_pickplace");
+  m_have_additional_properties = false;
 }
+
+PickPlaceSkill::PickPlaceSkill(const AgentStatusPtr& agent_status_ptr,
+                               const std::map<std::string, std::string>& pick_additional_properties,
+                               const std::map<std::string, std::string>& place_additional_properties):GenericSkill(agent_status_ptr)
+{
+  m_skill_properties_client = m_nh.serviceClient <task_planner_interface_msgs::PickPlaceSkill>("mongo_handler/get_task_properties_pickplace");
+  m_have_additional_properties = true;
+  m_pick_additional_properties = pick_additional_properties;
+  m_place_additional_properties = place_additional_properties;
+}
+
 bool PickPlaceSkill::execute()
 {
   m_outcome = FAILURE;

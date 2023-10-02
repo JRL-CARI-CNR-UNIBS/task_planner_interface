@@ -20,10 +20,17 @@ class PickSkill : public GenericSkill
 protected:
   std::vector<std::string> m_pick_goal;
   boost::shared_ptr<actionlib::SimpleActionClient<manipulation_msgs::PickObjectsAction> > m_pick_ac;
+  bool m_have_additional_properties = false;
+  std::map<std::string,std::string> m_additional_properties;
 
 public:
   PickSkill();
-  PickSkill(const AgentStatusPtr& agent_status_ptr):GenericSkill(agent_status_ptr){};
+  PickSkill(const AgentStatusPtr& agent_status_ptr):GenericSkill(agent_status_ptr){
+    m_have_additional_properties = false;
+  }
+  PickSkill(const AgentStatusPtr& agent_status_ptr,
+            const std::map<std::string, std::string>& additional_properties);
+
   bool execute();
   void init(const std::string& group_name);
   bool setPropertiesFromBSON(bsoncxx::stdx::optional<bsoncxx::document::value>& bson_doc);
