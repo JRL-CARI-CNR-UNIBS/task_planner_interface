@@ -205,7 +205,7 @@ class Problem:
     def get_soft_precedence_constraints(self):
         soft_precedence_constraints = {}
         for task in self.task_list:
-            soft_precedence_constraints[task.get_id()] = task.get_soft_precedence_constraints()
+            soft_precedence_constraints[task.get_id()] = task.get_soft_constraints()
         return soft_precedence_constraints
 
     def get_tasks_per_agent(self):

@@ -219,7 +219,6 @@ class Task:
         return self.precedence_constraints
 
     def get_soft_constraints(self) -> Optional[List[str]]:
-        # TODO: Definire soft precedence constraints
         return self.soft_precedence_constraints
 
     def check_precedence_constraint(self, task: str) -> bool:

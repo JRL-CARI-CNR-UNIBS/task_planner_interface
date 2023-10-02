@@ -360,6 +360,8 @@ def main():
     tp.initialize()
     tp.create_model()
     tp.add_precedence_constraints()
+    tp.add_soft_precedence_constraints()
+
     # if not tp.check_feasibility():
     #     rospy.logerr(UserMessages.PROBLEM_NOT_FEASIBLE.value.format())
     #     return 0
@@ -413,6 +415,7 @@ def main():
     if not dispatch_plan:
         if not save_result:
             for k in range(0, n_recipe_to_compute):
+                show_timeline(tp.get_solution(k))
                 pass
                 # compute_synergy_val(tp.get_solution(k))
                 # makespan = max([task_sol.get_end_time() for task_sol in tp.get_solution(k)])
