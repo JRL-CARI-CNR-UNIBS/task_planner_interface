@@ -5,6 +5,7 @@ from tkinter import ttk
 import rospy
 from std_msgs.msg import String, Bool, Float32
 
+
 class TaskRequestApp:
     def __init__(self, root):
         self.root = root
@@ -23,7 +24,8 @@ class TaskRequestApp:
         self.empty_label = tk.Label(root, text="")
         self.empty_label.grid(row=2, column=0)
 
-        self.send_button = tk.Button(root, text="Send Feedback", command=self.send_feedback, bg="#3498db", fg="white", padx=5, pady=5)
+        self.send_button = tk.Button(root, text="Send Feedback", command=self.send_feedback, bg="#3498db", fg="white",
+                                     padx=5, pady=5)
         self.send_button.grid(row=3, column=0, columnspan=2, pady=(0, 10))
 
         # Configura il layout della griglia in modo che le celle si espandano con la finestra
@@ -58,6 +60,10 @@ class TaskRequestApp:
         # Callback chiamato quando arriva una nuova richiesta
         # Aggiorna l'interfaccia grafica con la richiesta ricevuta
         self.request_text.set(f"TODO: {data.data}")
+        if "end" in data.data:
+            rospy.sleep(1)
+            self.execution_publisher.publish(True)
+            self.request_text.set("")
 
     def send_feedback(self):
         # Invia la conferma di esecuzione sul topic ROS
@@ -71,7 +77,7 @@ class TaskRequestApp:
         # Callback chiamato quando arriva un nuovo valore di avanzamento
         # Aggiorna il valore della barra di avanzamento
         progress_value = data.data
-        self.progress_value.set(progress_value/100)
+        self.progress_value.set(progress_value / 100)
 
         # Calcola il valore in percentuale
         percent_value = progress_value
@@ -83,6 +89,7 @@ class TaskRequestApp:
         # Funzione chiamata quando si preme la "x" della finestra
         rospy.signal_shutdown("Chiusura tramite interfaccia grafica")
         self.root.destroy()
+
 
 if __name__ == "__main__":
     root = tk.Tk()
