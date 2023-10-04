@@ -137,7 +137,7 @@ class TaskServiceManager:
         t_start_planned = data.tasks[0].t_start_planned
         t_end_planned = data.tasks[0].t_end_planned
         recipe_name = data.tasks[0].recipe_name
-
+        print(recipe_name)
         if recipe_name:
             self.recipe_name = recipe_name
         # rospy.loginfo(self.cycle_initialized)
@@ -315,6 +315,7 @@ class TaskServiceManager:
 
             # Define recipe name
             task_result.recipe = RECIPE_NAME_FORMAT.format(self.recipe_name, self.data, self.recipe_index)
+            task_result.recipe = RECIPE_NAME_SHORT_FORMAT.format(self.recipe_name, self.recipe_index)
 
             # rospy.loginfo(task_result)
 

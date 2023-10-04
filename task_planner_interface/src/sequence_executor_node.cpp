@@ -445,6 +445,9 @@ public:
 
     task_planner_interface_msgs::TaskExecuteResult result;
     result.outcome = 1;
+    result.type = skill_type;
+    result.agent = group_name_;
+
     as_.setSucceeded(result);
 
   }

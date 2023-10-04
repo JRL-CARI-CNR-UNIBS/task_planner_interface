@@ -39,7 +39,8 @@ class GuiInterface:
         # for task in self.performed_task:
         #     str_to_pub += f"PERFORMED: {task} \n"
 
-        msg_to_pub = String(f"TODO: {self.task_name}... \n{str_to_pub}")
+        # msg_to_pub = String(f"TODO: {self.task_name}... \n{str_to_pub}")
+        msg_to_pub = self.task_name
         self.gui_request_pub.publish(msg_to_pub)
 
         self.wait_response()

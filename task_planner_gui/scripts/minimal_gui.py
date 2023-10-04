@@ -57,7 +57,7 @@ class TaskRequestApp:
     def request_callback(self, data):
         # Callback chiamato quando arriva una nuova richiesta
         # Aggiorna l'interfaccia grafica con la richiesta ricevuta
-        self.request_text.set(data.data)
+        self.request_text.set(f"TODO: {data.data}")
 
     def send_feedback(self):
         # Invia la conferma di esecuzione sul topic ROS
