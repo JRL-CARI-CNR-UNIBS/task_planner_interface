@@ -30,8 +30,9 @@ from pathlib import Path
 from os import listdir
 from os.path import isfile, join
 
-RECIPE_NAME = {"base": "BASIC_SOLVER", "human_aware": "COMPLETE_HA_SOLVER",
-               "human_aware_easier": "RELAXED_HA_SOLVER", "areas": "NOT_NEIGHBORING_TASKS",
+RECIPE_NAME = {"base": "BASIC_SOLVER",
+               "human_aware_easier": "RELAXED_HA_SOLVER",
+               "areas": "NOT_NEIGHBORING_TASKS",
                "human_aware_complete": "COMPLETE_SOLVER"}
 DATE_FORMAT = "%Y_%m_%d_%H:%M"
 
@@ -82,8 +83,9 @@ def add_go_home(task_solution: List[TaskSolution], agents: List[str]):
                 if k < 4:
                     task_solution.append(
                         TaskSolution(Task("go_home", "go_home", [agent], [], []),
-                                     agent_task.get_end_time() + 0.1, agent_task.get_end_time() + go_home_duration, agent))
-                k+= 1
+                                     agent_task.get_end_time() + 0.1, agent_task.get_end_time() + go_home_duration,
+                                     agent))
+                k += 1
 
         if agent in task_solutions:
             if task_solutions[agent]:
@@ -132,126 +134,16 @@ def compute_synergy_val(solution: TaskSolution) -> float:
     return synergy_tot
 
 
-def get_best_plan(n_recipe_to_compute: int, tp: TaskPlanner) -> int:
-    """
-    Utility function for finding the best plan accordingly to the synergy index
-    Args:
-        n_recipe_to_compute: number of different solution to use to compute synergy cost
-        tp: Task planner Object
-
-    Returns: The best plan id. of solution
-
-    """
-    synergy = []
-    for recipe in range(0, n_recipe_to_compute):
-        solution = tp.get_solution(recipe)
-
-        makespan = max([task_sol.get_end_time() for task_sol in solution])
-        synergy.append(compute_synergy_val(tp.get_solution(recipe)))
-        show_timeline(tp.get_solution(recipe))
-        print(f"Recipe number: {recipe}")
-        print(f"Recipe synerdy index: {synergy[recipe]}")
-        print(f"Makespan: {makespan}")
-        print("----------------------------------------")
-        # rospy.sleep(10)
-
-    best_plan = np.argmin(synergy)
-    return best_plan
-
-
-def select_planner(optimization_type: str,
-                   problem_to_solve: Problem,
-                   n_recipe_to_compute: int,
-                   mip_gap: float) -> TaskPlanner:
-    """
-    Utlity function to select the proper planner object
-
-    Args:
-        mip_gap:
-        optimization_type:
-        problem_to_solve:
-        n_recipe_to_compute:
-
-    Returns: The proper TaskPlanner based on input parameters
-
-    """
-    if optimization_type == "base":
-        tp = TaskPlanner("Task_Allocation_Scheduling",
-                         problem_to_solve,
-                         objective=Objective.MAKESPAN,
-                         n_solutions=n_recipe_to_compute,
-                         gap=mip_gap)
-
-    elif optimization_type == "human_aware_complete":
-        # tp = TaskPlannerHumanAwareRelaxed("tp",
-        #                                   problem_to_solve,
-        #                                   behaviour=Behaviour.CONTINUOUS,
-        #                                   objective=Objective.MAKESPAN)
-        tp = TaskPlannerHumanAware("tp",
-                                   problem_to_solve,
-                                   behaviour=Behaviour.CONTINUOUS,
-                                   objective=Objective.MAKESPAN,
-                                   gap=mip_gap)
-        # tp = TaskPlannerHumanAwareLast("tp",
-        #                            problem_to_solve,
-        #                            behaviour=Behaviour.CONTINUOUS,
-        #                            objective=Objective.MAKESPAN)
-    elif optimization_type == "human_aware_easier":
-        tp = TaskPlannerHumanAwareEasier("Task_Planning&Scheduling",
-                                         problem_to_solve,
-                                         behaviour=Behaviour.CONTINUOUS,
-                                         objective=Objective.MAKESPAN,
-                                         n_solutions=n_recipe_to_compute,
-                                         gap=mip_gap)
-    elif optimization_type == "human_aware_easier_abs":
-
-        tp = TaskPlannerSynergisticEasier("Task_Planning&Scheduling",
-                                          problem_to_solve,
-                                          behaviour=Behaviour.CONTINUOUS,
-                                          objective=Objective.MAKESPAN,
-                                          n_solutions=n_recipe_to_compute,
-                                          gap=mip_gap)
-    elif optimization_type == "human_aware_approx":
-        tp = TaskPlannerSynergistic("Task_Allocation_Scheduling_Human_Aware",
-                                    problem_to_solve,
-                                    behaviour=Behaviour.CONTINUOUS,
-                                    objective=Objective.SYNERGY,
-                                    gap=mip_gap)
-    elif optimization_type == "human_aware_approx_band":
-        tp = TaskPlannerSynergisticBand("tp",
-                                        problem_to_solve,
-                                        behaviour=Behaviour.CONTINUOUS,
-                                        objective=Objective.SYNERGY,
-                                        epsilon=0.2,
-                                        relaxed=False)
-    elif optimization_type == "test":
-        tp = Prove("tp",
-                   problem_to_solve,
-                   behaviour=Behaviour.CONTINUOUS,
-                   objective=Objective.SYNERGY)
-    elif optimization_type == "areas":
-        tp = TaskPlannerAreas("tp_areas",
-                              problem_to_solve,
-                              objective=Objective.MAKESPAN,
-                              n_solutions=n_recipe_to_compute)
-
-        # tp = TaskPlannerHumanAwareSimplified("Task_Allocation_Scheduling_Human_Aware",
-        #                                      problem_to_solve,
-        #                                      behaviour=Behaviour.CONTINUOUS,
-        #                                      objective=Objective.ACTUAL_MAKESPAN)
-    else:
-        tp = TaskPlanner("Task_Allocation_Scheduling",
-                         problem_to_solve,
-                         objective=Objective.MAKESPAN,
-                         n_solutions=n_recipe_to_compute)
-    return tp
+def get_optimization_name(recipe_name: str) -> str:
+    for optimization_type in RECIPE_NAME.keys():
+        if optimization_type in recipe_name:
+            return optimization_type
+    return "NOT_DEFINED_NAME"
 
 
 def main():
     rospy.init_node("task_planner")
-    parameters = ["~goal", "/agents", "/agents_group_names", "~dispatch_plan",
-                  "~optimization/type", "~optimization/n_recipe", "~optimization/brute_force", "~optimization/mip_gap",
-                  "~execution/repetitions", "~execution/n_recipe", "~save_result", "~result_file_path"]
+    parameters = ["~goal", "/agents", "/agents_group_names", "~repetitions", "~method"]
 
     if not params_exist(parameters):
         return 0
@@ -260,28 +152,11 @@ def main():
     agents_name = rospy.get_param("/agents")
     agents_group_name_param = rospy.get_param("/agents_group_names")
 
-    n_recipe_to_compute = rospy.get_param("~optimization/n_recipe")
-    optimization_type = rospy.get_param("~optimization/type")
-    mip_gap = rospy.get_param("~optimization/mip_gap")
-    if mip_gap <= 0:
-        mip_gap = 0
+    n_repetitions = rospy.get_param("~repetitions")
+    if n_repetitions < 1:
+        return 0
 
-    n_repetitions = rospy.get_param("~execution/repetitions")
-    n_recipe_to_execute = rospy.get_param("~execution/n_recipe")
-
-    starting_recipe_number = 0
-    if not rospy.has_param("starting_recipe_number"):
-        rospy.loginfo(UserMessages.PARAM_NOT_DEFINED_ERROR.value.format("starting_recipe_number"))
-        rospy.loginfo("Param: starting_recipe_number set to 0")
-    else:
-        starting_recipe_number = rospy.get_param("starting_recipe_number")
-    dispatch_plan = rospy.get_param("~dispatch_plan")
-
-    brute_force = rospy.get_param("~optimization/brute_force")
-    save_result = rospy.get_param("~save_result")
-    result_file_path = rospy.get_param("~result_file_path")
-
-    # rospy.wait_for_service('/reload_scene')
+    method = rospy.get_param("~method")
 
     # Services and Publishers
     reload_scene_srv_client = rospy.ServiceProxy('/reload_scene', Trigger)
@@ -302,9 +177,9 @@ def main():
                     "Param: agents_group_names, does not contain group name of agent: " + str(agent)))
                 return 0
             agents_group_name.append(agents_group_name_param[agent])
-    # print(agents_group_name)
-    # agents_group_name = ["human_right_arm", "ur5_on_guide"]
+
     print(agents_group_name)
+
     # Build the problem to solve
     problem_to_solve = Problem(agents_group_name)
 
@@ -343,46 +218,41 @@ def main():
         rospy.loginfo(UserMessages.UNABLE_STATS.value)
         rospy.logerr(UserMessages.UNABLE_GO_ON.value)
         return 0
-    if not problem_to_solve.update_tasks_synergy() and "aware" in optimization_type:
+    if not problem_to_solve.update_tasks_synergy():
         return 0
 
     rospy.loginfo(f"Consistency Check: {problem_to_solve.consistency_check()}")
 
-    # path = Path("/home/samuele/projects/cells_ws/src/hrc_simulator/hrc_simulator/hrc_mosaic_task_planning/hrc_mosaic_task_planning_interface/solutions/soluzioni")
-    path = Path("/home/samuele/projects/cells_ws/src/hrc_simulator/hrc_simulator/hrc_mosaic_task_planning/hrc_mosaic_task_planning_interface/solutions/iso15066_lun_31")
-    path = Path("/home/samuele/projects/cells_ws/src/hrc_simulator/hrc_simulator/hrc_mosaic_task_planning/hrc_mosaic_task_planning_interface/solutions/test")
-    path = Path("/home/samuele/projects/cells_ws/src/hrc_simulator/hrc_simulator/hrc_mosaic_task_planning/hrc_mosaic_task_planning_interface/solutions/safety_areas_less_tasks")
+    base_path = "/home/galois/projects/cells_ws/src/hrc_case_study_cell/hrc_case_study/hrc_case_study_task_planning/solutions/remaining/"
 
-    path = Path("/home/galois/projects/cells_ws/src/hrc_case_study_cell/hrc_case_study/hrc_case_study_task_planning/solutions/remaining")
-    path = Path("/home/galois/projects/cells_ws/src/hrc_case_study_cell/hrc_case_study/hrc_case_study_task_planning/solutions/remaining/areas/todo")
+    if method == "A":
+        path = Path(f"{base_path}base/todo_new")
+        n_repetitions = 1
+    elif method == "B":
+        path = Path(f"{base_path}areas/todo_new/prove")
+        n_repetitions = 1
+    elif method == "C":
+        path = Path(f"{base_path}relaxed")
+        n_repetitions = 5
+    elif method == "D":
+        path = Path(f"{base_path}hatp")
+        n_repetitions = 1
+    else:
+        return 0
 
-    # path = Path("/home/galois/projects/cells_ws/src/hrc_case_study_cell/hrc_case_study/hrc_case_study_task_planning/solutions/remaining/relaxed")
-    # path = Path("/home/galois/projects/cells_ws/src/hrc_case_study_cell/hrc_case_study/hrc_case_study_task_planning/solutions/remaining/base/todo/caso2")
-    # path = Path("/home/galois/projects/cells_ws/src/hrc_case_study_cell/hrc_case_study/hrc_case_study_task_planning/solutions/remaining/hatp")
-    # path = Path("/home/samuele/Desktop/DatiArticolo/SicurezzaContinua/Risultati/Solutions/")
-    path = Path("/home/galois/projects/cells_ws/src/hrc_case_study_cell/hrc_case_study/hrc_case_study_task_planning/solutions/remaining/base/todo_new")
-    path = Path("/home/galois/projects/cells_ws/src/hrc_case_study_cell/hrc_case_study/hrc_case_study_task_planning/solutions/remaining/areas/todo_new/prove")
-
-    if (not path.exists()):
+    if not path.exists():
         raise ValueError("THe provided file is not a valid, not a file")
     solutions_files = os.listdir(path)
-    # only_interested_file = [file_name for file_name in solutions_files if "recipe_solution_43_areas_online_phase_2023_08_28_11:03.yaml" in file_name]
+
     only_interested_file = solutions_files
     only_interested_file = sorted(only_interested_file)
 
     recipe = 0
-    data = "2023_10_13_15:28" #datetime.today().strftime(DATE_FORMAT)
-    starting_repetition_number = 0
-    n_goal_repetitions = 1
-    data = "2023_10_13_15:28" #datetime.today().strftime(DATE_FORMAT)
-    data = datetime.today().strftime(DATE_FORMAT)
-
-    if n_goal_repetitions <= starting_recipe_number:
-        print()
-        return 0
+    data = "2023_10_26_19:29" # Data Mladen
+    # data = datetime.today().strftime(DATE_FORMAT)
 
     for solution_name in only_interested_file:
-        for repetition in range(starting_repetition_number, n_goal_repetitions):
+        for repetition in range(0, n_repetitions):
 
             actual_problem_to_solve = copy.deepcopy(problem_to_solve)
             file_path = Path(join(path, solution_name))
@@ -404,9 +274,9 @@ def main():
                         t_end = task_solution["t_end"]
                         agent = task_solution["agent"]
                         solution.append(actual_problem_to_solve.add_task_solution(task_id,
-                                                                           t_start,
-                                                                           t_end,
-                                                                           agent))
+                                                                                  t_start,
+                                                                                  t_end,
+                                                                                  agent))
 
             makespan = max([task_sol.get_end_time() for task_sol in solution])
             synergy_index = compute_synergy_val(solution)
@@ -419,32 +289,29 @@ def main():
             # return 0
             td = TaskDispatcher(agents_group_name,
                                 agents_group_name_param,
-                                RECIPE_NAME.get(optimization_type, "DEFAULT_NAME"))
+                                RECIPE_NAME.get(get_optimization_name(solution_name), "DEFAULT_NAME"))
 
             error_occurred_during_execution = True
             trials = 0
-            show_timeline(solution)
-            dato = input("Do you want to exectute? ")
+            # dato = input("Do you want to exectute? ")
+            dato = "y"
+            rospy.sleep(1)
             if "y" not in dato:
                 continue
             if "stop" in dato:
                 break
             while error_occurred_during_execution and trials <= 2:
-                # solution_name = "TEST_COMPLETE"
-                # recipe_name = f"TEST_COMPLETE_rec_0_rep_0_2023_08_07_15:22"
-                recipe_name = solution_name
-                recipe_name = f"{RECIPE_NAME.get(optimization_type, 'DEFAULT_NAME')}_rec_{recipe}_rep_{repetition}_{data}"
+                recipe_name = f"{RECIPE_NAME.get(get_optimization_name(solution_name), 'DEFAULT_NAME')}_rec_{recipe}_rep_{repetition}_{data}"
                 td.set_recipe_name(recipe_name)
                 print(recipe_name)
 
                 # Publish the recipe name
-                pub_recipe_name.publish(String(recipe_name))
+                if acquire_distance:
+                    pub_recipe_name.publish(String(recipe_name))
 
                 # Dispatch the solution
                 if not rospy.is_shutdown():
-
                     tasks_solution = add_go_home(copy.deepcopy(solution), agents_group_name)
-                    print(tasks_solution)
                     td.dispatch_solution(tasks_solution)
                     trials += 1
                 # Execution loop
@@ -469,7 +336,7 @@ def main():
                                                               None,
                                                               reload_scene_srv_client)
                         td.send_recipe_end()
-                        rospy.sleep(5)
+                        rospy.sleep(2)
                         break
 
                     # Check if the plan is finished
@@ -483,13 +350,14 @@ def main():
                             reload_scene(reload_scene_srv_client)
 
                         td.send_recipe_end()
-                        # recipe += 1
+                        recipe += 1
                         print("Service called and executed")
 
-                        rospy.sleep(5)
+                        rospy.sleep(2)
 
                         break
                     rospy.sleep(1)
+            input("Next...")
 
 
 def end_recipe_procedure_failure_case(recipe_name,

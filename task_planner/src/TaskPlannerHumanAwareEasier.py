@@ -184,40 +184,46 @@ class TaskPlannerHumanAwareEasier(TaskPlannerHumanAware):
     def set_objective(self) -> None:
         cost_function = self.model.addVar(name="J", vtype=gp.GRB.CONTINUOUS)
 
-        sigma_index = self.model.addVar(name="sigma_index", vtype=gp.GRB.CONTINUOUS, lb=-5) # -2)
+        sigma_index = self.model.addVar(name="sigma_index", vtype=gp.GRB.CONTINUOUS, lb=-50) # -2)
 
-        parallel_agent = "human_right_arm"
-        main_agent = "ur5_on_guide"
-        # TODO: Set two agents in "init"
+        robot_agents = self.problem_definition.get_robot_agents()
+        human_agents = self.problem_definition.get_not_robot_agents()
+
         tasks_type_correspondence = self.problem_definition.get_tasks_type_correspondence()
         tasks_synergies = self.problem_definition.get_tasks_synergies()
 
         sigma_val = 0.0
         sigma_tot = 0.0
         _, cost = gp.multidict(self.problem_definition.get_combinations())
-        for task in self.decision_variables["t_start"].keys():
-            for task_pair in self.decision_variables["overlapping"].keys():
+        
+        for robot_agent in robot_agents:
+            for human_agent in human_agents:
+                main_agent = robot_agent
+                parallel_agent = human_agent
 
-                if task in task_pair:
-                    parallel_task = set(task_pair).difference({task}).pop()
-                    task_type = tasks_type_correspondence[task]
-                    parallel_task_type = tasks_type_correspondence[parallel_task]
-                    overlapping = self.decision_variables["overlapping"][task_pair]
+                for task in self.decision_variables["t_start"].keys():
+                    for task_pair in self.decision_variables["overlapping"].keys():
 
-                    if (main_agent, task) in self.decision_variables["assignment"].keys() and \
-                            (parallel_agent, parallel_task) in self.decision_variables["assignment"].keys():
-                        assignment_main = self.decision_variables["assignment"][(main_agent, task)]
-                        # assignment_parallel = self.decision_variables["assignment"][(parallel_agent, parallel_task)]
+                        if task in task_pair:
+                            parallel_task = set(task_pair).difference({task}).pop()
+                            task_type = tasks_type_correspondence[task]
+                            parallel_task_type = tasks_type_correspondence[parallel_task]
+                            overlapping = self.decision_variables["overlapping"][task_pair]
 
-                        if (task_type, main_agent, parallel_task_type, parallel_agent) in tasks_synergies:
-                            synergy = tasks_synergies[(task_type, main_agent, parallel_task_type, parallel_agent)]
+                            if (main_agent, task) in self.decision_variables["assignment"].keys() and \
+                                    (parallel_agent, parallel_task) in self.decision_variables["assignment"].keys():
+                                assignment_main = self.decision_variables["assignment"][(main_agent, task)]
+                                # assignment_parallel = self.decision_variables["assignment"][(parallel_agent, parallel_task)]
 
-                            # if (main_agent, parallel_task) in cost.keys(): Se discreto ci vuole il cost
-                            if self.behaviour == Behaviour.CONTINUOUS:
-                                sigma_val += overlapping * (synergy - 1) * assignment_main
-                            elif self.behaviour == Behaviour.DISCRETE:
-                                sigma_val += overlapping * (synergy - 1) * assignment_main * cost[(main_agent, task)]
-                            sigma_tot += synergy
+                                if (task_type, main_agent, parallel_task_type, parallel_agent) in tasks_synergies:
+                                    synergy = tasks_synergies[(task_type, main_agent, parallel_task_type, parallel_agent)]
+
+                                    # if (main_agent, parallel_task) in cost.keys(): Se discreto ci vuole il cost
+                                    if self.behaviour == Behaviour.CONTINUOUS:
+                                        sigma_val += overlapping * (synergy - 1) * assignment_main
+                                    elif self.behaviour == Behaviour.DISCRETE:
+                                        sigma_val += overlapping * (synergy - 1) * assignment_main * cost[(main_agent, task)]
+                                    sigma_tot += synergy
 
         self.model.addConstr(sigma_index == sigma_val / 1)
 

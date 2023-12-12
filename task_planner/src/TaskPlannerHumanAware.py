@@ -22,7 +22,7 @@ class TaskPlannerHumanAware(TaskPlanner):
         tasks_list = self.problem_definition.get_tasks_list()
         tasks_pairs = itertools.combinations(tasks_list, 2)
         upper_bound = self.problem_definition.get_nominal_upper_bound()
-
+        
         if self.behaviour == Behaviour.DISCRETE:
             self.decision_variables["overlapping"] = self.model.addVars(tasks_pairs,
                                                                         name="overlapping",
@@ -34,7 +34,7 @@ class TaskPlannerHumanAware(TaskPlanner):
                                                                         name="overlapping",
                                                                         vtype=gp.GRB.CONTINUOUS,
                                                                         lb=0,
-                                                                        ub=15)
+                                                                        ub=50)
         super().create_model()
         self.add_overlapping_constraints()
         # self.model.setParam("cutoff",105)
@@ -59,47 +59,51 @@ class TaskPlannerHumanAware(TaskPlanner):
         tasks_type_correspondence = self.problem_definition.get_tasks_type_correspondence()
         tasks_synergies = self.problem_definition.get_tasks_synergies()
 
-        parallel_agent = "human_right_arm"
-        main_agent = "ur5_on_guide"
-        # TODO: define agents in "init"
+        robot_agents = self.problem_definition.get_robot_agents()
+        human_agents = self.problem_definition.get_not_robot_agents()
+
         # t_end_add = {}
-        for task in self.decision_variables["t_start"].keys():
-            for task_pair in self.decision_variables["overlapping"].keys():
-                if task in task_pair:
-                    parallel_task = set(task_pair).difference({task}).pop()
-                    task_type = tasks_type_correspondence[task]
-                    parallel_task_type = tasks_type_correspondence[parallel_task]
-                    overlapping = self.decision_variables["overlapping"][task_pair]
-                    if (main_agent, task) in self.decision_variables["assignment"].keys():
-                        assignment_main_task = self.decision_variables["assignment"][(main_agent, task)]
-                        if (task_type, main_agent, parallel_task_type, parallel_agent) in tasks_synergies:
-                            synergy = tasks_synergies[(task_type, main_agent, parallel_task_type, parallel_agent)]
-                            if self.behaviour == Behaviour.CONTINUOUS:
-                                t_end[task] += overlapping * (synergy - 1) * assignment_main_task
-                                # if task not in t_end_add:
-                                #     t_end_add[task] = overlapping * (synergy - 1)
-                                # else:
-                                #     t_end_add[task] += overlapping * (synergy - 1)
+        for robot_agent in robot_agents:
+            for human_agent in human_agents:
+                main_agent = robot_agent
+                parallel_agent = human_agent
+                for task in self.decision_variables["t_start"].keys():
+                    for task_pair in self.decision_variables["overlapping"].keys():
+                        if task in task_pair:
+                            parallel_task = set(task_pair).difference({task}).pop()
+                            task_type = tasks_type_correspondence[task]
+                            parallel_task_type = tasks_type_correspondence[parallel_task]
+                            overlapping = self.decision_variables["overlapping"][task_pair]
+                            if (main_agent, task) in self.decision_variables["assignment"].keys():
+                                assignment_main_task = self.decision_variables["assignment"][(main_agent, task)]
+                                if (task_type, main_agent, parallel_task_type, parallel_agent) in tasks_synergies:
+                                    synergy = tasks_synergies[(task_type, main_agent, parallel_task_type, parallel_agent)]
+                                    if self.behaviour == Behaviour.CONTINUOUS:
+                                        t_end[task] += overlapping * (synergy - 1) * assignment_main_task
+                                        # if task not in t_end_add:
+                                        #     t_end_add[task] = overlapping * (synergy - 1)
+                                        # else:
+                                        #     t_end_add[task] += overlapping * (synergy - 1)
 
-                                # No
-                                # S_ij = self.model.addVar(name=f"S_ij({task_pair})",
-                                #                          vtype=gp.GRB.CONTINUOUS,
-                                #                          lb=-5,
-                                #                          ub=15)
-                                # self.model.addConstr((assignment_main_task == 1) >> (S_ij == overlapping * (synergy - 1)))
-                                # self.model.addConstr((assignment_main_task == 0) >> (S_ij == 0))
-                                # t_end[task] += S_ij
-                                # No
+                                        # No
+                                        # S_ij = self.model.addVar(name=f"S_ij({task_pair})",
+                                        #                          vtype=gp.GRB.CONTINUOUS,
+                                        #                          lb=-5,
+                                        #                          ub=15)
+                                        # self.model.addConstr((assignment_main_task == 1) >> (S_ij == overlapping * (synergy - 1)))
+                                        # self.model.addConstr((assignment_main_task == 0) >> (S_ij == 0))
+                                        # t_end[task] += S_ij
+                                        # No
 
-                            elif self.behaviour == Behaviour.DISCRETE:  # Add cost (Measurement: time)
-                                t_end[task] += overlapping * (synergy - 1) * assignment_main_task * cost[
-                                    (main_agent, task)]
-                    # else:
-                    #     t_end_add[task] = 0
-            self.model.addConstr(self.decision_variables["t_end"][task] == t_end[task], name=f"t_end({task})")
-            # self.model.addConstr((assignment_main_task == 0) >> (self.decision_variables["t_end"][task] == t_end[task]))
-            # self.model.addConstr((assignment_main_task == 1) >> (
-            #             self.decision_variables["t_end"][task] == t_end[task] + t_end_add[task]))
+                                    elif self.behaviour == Behaviour.DISCRETE:  # Add cost (Measurement: time)
+                                        t_end[task] += overlapping * (synergy - 1) * assignment_main_task * cost[
+                                            (main_agent, task)]
+                            # else:
+                            #     t_end_add[task] = 0
+                    self.model.addConstr(self.decision_variables["t_end"][task] == t_end[task], name=f"t_end({task})")
+                    # self.model.addConstr((assignment_main_task == 0) >> (self.decision_variables["t_end"][task] == t_end[task]))
+                    # self.model.addConstr((assignment_main_task == 1) >> (
+                    #             self.decision_variables["t_end"][task] == t_end[task] + t_end_add[task]))
 
     def add_overlapping_constraints(self, upper_bound=None):
 
@@ -188,87 +192,86 @@ class TaskPlannerHumanAware(TaskPlanner):
             self.model.addConstr(cost_function == gp.quicksum(self.decision_variables["t_end"]))
         elif self.objective == Objective.SYNERGY:
             upper_bound = self.problem_definition.get_nominal_upper_bound()
-            parallel_agent = "human_right_arm"
-            main_agent = "ur5_on_guide"
-            t_start_robot = self.model.addVars(list(self.decision_variables["t_start"].keys()), lb=0, ub=upper_bound,
-                                               name="t_start_robot", vtype=gp.GRB.CONTINUOUS)
-            t_start_human = self.model.addVars(list(self.decision_variables["t_start"].keys()), lb=0, ub=upper_bound,
-                                               name="t_start_human", vtype=gp.GRB.CONTINUOUS)
-            t_end_robot = self.model.addVars(list(self.decision_variables["t_end"].keys()), lb=0, ub=upper_bound,
-                                             name="t_end_robot", vtype=gp.GRB.CONTINUOUS)
-            t_end_human = self.model.addVars(list(self.decision_variables["t_end"].keys()), lb=0, ub=upper_bound,
-                                             name="t_end_human", vtype=gp.GRB.CONTINUOUS)
-            duration_human = self.model.addVar(lb=0, ub=upper_bound * 10, name="duration_human",
-                                               vtype=gp.GRB.CONTINUOUS)
-            duration_robot = self.model.addVar(lb=0, ub=upper_bound * 10, name="duration_human",
-                                               vtype=gp.GRB.CONTINUOUS)
+
+            
+            agents = self.problem_definition.get_agents()
+            t_start_agents = dict.fromkeys(agents, None)
+            t_end_agents = dict.fromkeys(agents, None)
+            plan_duration_agents = dict.fromkeys(agents, None)
+            idle_agents = dict.fromkeys(agents, None)
+
+            for agent in agents:
+                t_start_agents[agent] = self.model.addVars(list(self.decision_variables["t_start"].keys()), 
+                                                           lb=0, 
+                                                           ub=upper_bound,
+                                                           name=f"t_start_{agent}", 
+                                                           vtype=gp.GRB.CONTINUOUS)
+                t_end_agents[agent] = self.model.addVars(list(self.decision_variables["t_end"].keys()), 
+                                                         lb=0, 
+                                                         ub=upper_bound,
+                                                         name=f"t_end_{agent}", 
+                                                         vtype=gp.GRB.CONTINUOUS)
+                plan_duration_agents[agent] = self.model.addVar(lb=0, 
+                                                                ub=upper_bound * 10, 
+                                                                name=f"duration_{agent}",
+                                                                vtype=gp.GRB.CONTINUOUS)
+                idle_agents[agent] = self.model.addVar(name=f"idle_{agent}", 
+                                                lb=0,
+                                                ub=self.problem_definition.get_nominal_upper_bound() * 5,
+                                                vtype=gp.GRB.CONTINUOUS)
+                self.model.addConstr(plan_duration_agents[agent] == gp.max_(t_end_agents[agent]))
+                self.model.addConstr(idle_agents[agent] == plan_duration_agents[agent] - 
+                                                            gp.quicksum(t_end_agents[agent]) + 
+                                                            gp.quicksum(t_start_agents[agent]))
+
 
             for task in self.decision_variables["t_start"].keys():
-                if (main_agent, task) in self.decision_variables["assignment"].keys():
-                    self.model.addConstr(
-                        t_start_robot[task] == self.decision_variables["assignment"][(main_agent, task)] *
-                        self.decision_variables["t_start"][task])
-                    self.model.addConstr(
-                        t_end_robot[task] == self.decision_variables["assignment"][(main_agent, task)] *
-                        self.decision_variables["t_end"][task])
-                else:
-                    self.model.addConstr(t_start_robot[task] == 0)
-                    self.model.addConstr(t_end_robot[task] == 0)
-                if (parallel_agent, task) in self.decision_variables["assignment"].keys():
-                    self.model.addConstr(
-                        t_start_human[task] == self.decision_variables["assignment"][(parallel_agent, task)] *
-                        self.decision_variables["t_start"][task])
-                    self.model.addConstr(
-                        t_end_human[task] == self.decision_variables["assignment"][(parallel_agent, task)] *
-                        self.decision_variables["t_end"][task])
-                else:
-                    self.model.addConstr(t_start_human[task] == 0)
-                    self.model.addConstr(t_end_human[task] == 0)
+                for agent in agents:
+                    if (agent, task) in self.decision_variables["assignment"].keys():
+                        self.model.addConstr(
+                            t_start_agents[agent][task] == self.decision_variables["assignment"][(agent, task)] *
+                            self.decision_variables["t_start"][task])
+                        self.model.addConstr(
+                            t_end_agents[agent][task] == self.decision_variables["assignment"][(agent, task)] *
+                            self.decision_variables["t_end"][task])
+                    else:
+                        self.model.addConstr(t_start_agents[agent][task] == 0)
+                        self.model.addConstr(t_end_agents[agent][task] == 0)
 
-            self.model.addConstr(duration_robot == gp.max_(t_end_robot))
-            self.model.addConstr(duration_human == gp.max_(t_end_human))
+
 
             tasks_type_correspondence = self.problem_definition.get_tasks_type_correspondence()
             tasks_synergies = self.problem_definition.get_tasks_synergies()
 
             sigma_val = 0.0
             _, cost = gp.multidict(self.problem_definition.get_combinations())
-            for task in self.decision_variables["t_start"].keys():
-                for task_pair in self.decision_variables["overlapping"].keys():
-                    if task in task_pair:
-                        parallel_task = set(task_pair).difference({task}).pop()
-                        task_type = tasks_type_correspondence[task]
-                        parallel_task_type = tasks_type_correspondence[parallel_task]
-                        overlapping = self.decision_variables["overlapping"][task_pair]
-                        if (main_agent, task) in self.decision_variables["assignment"].keys() and \
-                                (parallel_agent, parallel_task) in self.decision_variables["assignment"].keys():
-                            assignment_main = self.decision_variables["assignment"][(main_agent, task)]
-                            if (task_type, main_agent, parallel_task_type, parallel_agent) in tasks_synergies:
-                                synergy = tasks_synergies[(task_type, main_agent, parallel_task_type, parallel_agent)]
-                                if self.behaviour == Behaviour.CONTINUOUS:
-                                    sigma_val += overlapping * (synergy - 1) * assignment_main
-                                elif self.behaviour == Behaviour.DISCRETE:
-                                    sigma_val += overlapping * (synergy - 1) * assignment_main * cost[
-                                        (main_agent, task)]
-                                # sigma_tot += synergy
-            # duration = self.model.addVar(lb=0,
-            #                              ub=self.problem_definition.get_nominal_upper_bound()*5,
-            #                              name="duration",
-            #                              vtype=gp.GRB.CONTINUOUS)
-            idle_human = self.model.addVar(name="idle_human", lb=0,
-                                           ub=self.problem_definition.get_nominal_upper_bound() * 5,
-                                           vtype=gp.GRB.CONTINUOUS)
-            idle_robot = self.model.addVar(name="idle_robot", lb=0,
-                                           ub=self.problem_definition.get_nominal_upper_bound() * 5,
-                                           vtype=gp.GRB.CONTINUOUS)
+            
+            robot_agents = self.problem_definition.get_robot_agents()
+            human_agents = self.problem_definition.get_not_robot_agents()
+            for robot_agent in robot_agents:
+                for human_agent in human_agents:
+                    main_agent = robot_agent
+                    parallel_agent = human_agent
 
-            self.model.addConstr(idle_robot == duration_robot - gp.quicksum(t_end_robot) + gp.quicksum(t_start_robot))
-            self.model.addConstr(idle_human == duration_human - gp.quicksum(t_end_human) + gp.quicksum(t_start_human))
-            self.model.addConstr(cost_function == sigma_val + idle_human + idle_robot)
+                    for task in self.decision_variables["t_start"].keys():
+                        for task_pair in self.decision_variables["overlapping"].keys():
+                            if task in task_pair:
+                                parallel_task = set(task_pair).difference({task}).pop()
+                                task_type = tasks_type_correspondence[task]
+                                parallel_task_type = tasks_type_correspondence[parallel_task]
+                                overlapping = self.decision_variables["overlapping"][task_pair]
+                                if (main_agent, task) in self.decision_variables["assignment"].keys() and \
+                                        (parallel_agent, parallel_task) in self.decision_variables["assignment"].keys():
+                                    assignment_main = self.decision_variables["assignment"][(main_agent, task)]
+                                    if (task_type, main_agent, parallel_task_type, parallel_agent) in tasks_synergies:
+                                        synergy = tasks_synergies[(task_type, main_agent, parallel_task_type, parallel_agent)]
+                                        if self.behaviour == Behaviour.CONTINUOUS:
+                                            sigma_val += overlapping * (synergy - 1) * assignment_main
+                                        elif self.behaviour == Behaviour.DISCRETE:
+                                            sigma_val += overlapping * (synergy - 1) * assignment_main * cost[
+                                                (main_agent, task)]
 
-            # self.model.addConstr(duration == gp.max_(self.decision_variables["t_end"]))
-
-            # self.model.addConstr(duration <= 95)
+            self.model.addConstr(cost_function == sigma_val + gp.quicksum(idle_agents))
 
         # Objective function
         self.model.setObjective(cost_function, gp.GRB.MINIMIZE)

@@ -19,15 +19,18 @@ class TaskPlannerAreas(TaskPlanner):
 
     def __post_init__(self):
         """
-        The methos make sure that the TaskPlanner if is correctly defined: consistency check, requested solution >
+        The method make sure that the TaskPlanner if is correctly defined: consistency check, requested solution >
         and if is able to solve respect that objective Returns:
 
         """
         if self.problem_definition.consistency_check() is not True:
+            self.model.close()
             raise ValueError("The problem is not consistent. Check it!")
         if self.n_solutions < 1:
+            self.model.close()
             raise ValueError("Unable to specify a number of solutions less than 1")
         if not isinstance(self.objective, Objective):
+            self.model.close()
             raise ValueError("Objective should be an instance of Objective class")
 
     def create_model(self) -> None:
@@ -39,8 +42,9 @@ class TaskPlannerAreas(TaskPlanner):
         """
         try:
             neighboring_tasks = self.problem_definition.get_near_tasks()
-        except ValueError():
-            raise Exception()
+        except ValueError as exception:
+            self.model.close()
+            raise ValueError(exception)
         self.decision_variables["neighboring_tasks"] = self.model.addVars(neighboring_tasks,
                                                                           name="neighboring_tasks",
                                                                           vtype=gp.GRB.BINARY)

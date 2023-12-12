@@ -50,7 +50,7 @@ class DistanceMonitoring:
     task_feedback_sub: Dict[str, rospy.Subscriber] = field(init=False)
     task_request_sub: Dict[str, rospy.Subscriber] = field(init=False)
 
-    task_in_execution: Dict[str,str] = field(init=False)
+    task_in_execution: Dict[str, str] = field(init=False)
 
     timeseries_task_ovr: Dict[str, np.array] = field(init=False)
     timeseries_task_distance: Dict[str, np.array] = field(init=False)
@@ -128,7 +128,7 @@ class DistanceMonitoring:
         self.timestamp_ovr = np.empty(0)
 
         for agent in self.task_in_execution:
-            self.task_in_execution[agent]  = ""
+            self.task_in_execution[agent] = ""
 
     def reset_window_data(self):
         self.n_received_sample = 0
@@ -141,7 +141,6 @@ class DistanceMonitoring:
         if self.recipe_name is None:
             rospy.loginfo("Recipe name not defined")
             return 0
-        # print(self.timeseries_task_distance)
         self.window_data[self.n_received_sample] = msg.data
         self.n_received_sample += 1
         if self.n_received_sample == self.window_size:
@@ -149,8 +148,10 @@ class DistanceMonitoring:
             self.timeseries_mean = np.append(self.timeseries_mean, self.window_data.mean())
             self.timeseries_std = np.append(self.timeseries_std, self.window_data.std())
             for agent in self.timeseries_task_distance:
+                print(self.timeseries_task_distance[agent].shape)
                 self.timeseries_task_distance[agent] = np.append(self.timeseries_task_distance[agent],
                                                                  self.task_in_execution[agent])
+                print(self.timeseries_task_distance[agent].shape)
 
             self.reset_window_data()
 
@@ -165,8 +166,11 @@ class DistanceMonitoring:
         self.timeseries_ovr = np.append(self.timeseries_ovr, msg.data)
 
         for agent in self.timeseries_task_ovr:
+            print(self.timeseries_task_ovr[agent].shape)
+
             self.timeseries_task_ovr[agent] = np.append(self.timeseries_task_ovr[agent],
                                                         self.task_in_execution[agent])
+            print(self.timeseries_task_ovr[agent].shape)
 
     def update_recipe_name(self, msg):
         self.recipe_name = msg.data
@@ -174,16 +178,26 @@ class DistanceMonitoring:
         print("Acquisition...")
 
     def stop_distance_acq_srv(self, req):
+        self.acquire = False
         print("Stop acquisition")
 
         n_data_distance = self.timeseries_mean.shape[0]
+        print(self.timestamp_distance.shape)
+        print(self.timeseries_mean.shape)
+        print(self.timeseries_std.shape)
+        print(len([self.recipe_name] * n_data_distance))
+
         timeseries_distance = pd.DataFrame({"Timestamp": self.timestamp_distance,
                                             "Mean": self.timeseries_mean,
                                             "Std": self.timeseries_std,
                                             "Recipe": [self.recipe_name] * n_data_distance})
+        print(timeseries_distance.shape)
         for agent in self.task_in_execution:
-            # print(self.timeseries_task_distance)
+            print(self.timeseries_task_distance[agent].shape)
+            print(self.timeseries_task_distance[agent])
             timeseries_distance.insert(2, agent, self.timeseries_task_distance[agent], True)
+        print(timeseries_distance.shape)
+        print("-----------------------")
         # print(timeseries_distance.head())
         if self.file_path.is_file():
             timeseries_distance.to_csv(self.file_path, mode='a', header=False)
@@ -193,10 +207,17 @@ class DistanceMonitoring:
         timeseries_ovr = pd.DataFrame({"Timestamp": self.timestamp_ovr,
                                        "Recipe": [self.recipe_name] * n_data_ovr,
                                        "Safe_Ovr": self.timeseries_ovr})
+        print(timeseries_ovr.head())
+        print(timeseries_ovr.shape)
+        print(print(self.timestamp_ovr.shape))
+        print(len([self.recipe_name] * n_data_ovr))
+        print(self.timeseries_ovr.shape)
         for agent in self.task_in_execution:
+            print(len(self.timeseries_task_ovr[agent]))
             timeseries_ovr.insert(2, agent, self.timeseries_task_ovr[agent], True)
             print(self.timeseries_task_ovr)
         print(timeseries_ovr)
+        print(timeseries_ovr.shape)
         # print(timeseries_ovr.head())
         if self.file_path_ovr.is_file():
             timeseries_ovr.to_csv(self.file_path_ovr, mode='a', header=False)
@@ -205,7 +226,6 @@ class DistanceMonitoring:
 
         print(f"Data distance of recipe: {self.recipe_name} saved!")
 
-        self.acquire = False
         self.reset_window_data()
 
         self.timeseries_mean = np.empty(0)

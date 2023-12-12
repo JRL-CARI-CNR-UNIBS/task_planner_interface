@@ -16,7 +16,7 @@ from TaskPlannerSynergistic import TaskPlannerSynergistic
 from TaskPlannerSynergisticEasier import TaskPlannerSynergisticEasier
 from TaskPlannerSynergisticBand import TaskPlannerSynergisticBand
 from TaskPlannerAreas import TaskPlannerAreas
-from task_planner_interface_msgs.srv import DeleteRecipe, DeleteRecipeRequest,DeleteRecipeResponse
+from task_planner_interface_msgs.srv import DeleteRecipe, DeleteRecipeRequest, DeleteRecipeResponse
 
 from Prove import Prove
 from TaskDispatcher import TaskDispatcher
@@ -79,8 +79,9 @@ def add_go_home(task_solution: List[TaskSolution], agents: List[str]):
                 if k < 1:
                     task_solution.append(
                         TaskSolution(Task("go_home", "go_home", [agent], [], []),
-                                     agent_task.get_end_time() + 0.1, agent_task.get_end_time() + go_home_duration, agent))
-                k+= 1
+                                     agent_task.get_end_time() + 0.1, agent_task.get_end_time() + go_home_duration,
+                                     agent))
+                k += 1
 
         if agent in task_solutions:
             if task_solutions[agent]:
@@ -278,6 +279,7 @@ def main():
     save_result = rospy.get_param("~save_result")
     result_file_path = rospy.get_param("~result_file_path")
 
+    robot_agents = rospy.get_param("~robot_agents", list)
     # rospy.wait_for_service('/reload_scene')
 
     # Services and Publishers
@@ -303,7 +305,7 @@ def main():
 
     # Build the problem to solve
 
-    problem_to_solve = Problem(agents_group_name)
+    problem_to_solve = Problem(agents_group_name, robot_agents)
 
     # Iterate the goal in yaml
     for task in task_goal:
@@ -358,7 +360,11 @@ def main():
         return 0
 
     tp.initialize()
-    tp.create_model()
+    try:
+        tp.create_model()
+    except Exception as exception:
+        rospy.logerr(exception)
+        return 0
     tp.add_precedence_constraints()
     tp.add_soft_precedence_constraints()
 
@@ -443,6 +449,7 @@ def main():
 
     # Iterate all task planner solution
     for recipe in range(0, n_recipe_to_execute):
+        rospy.sleep(2)
         print(recipe)
         if rospy.is_shutdown():
             break
@@ -564,6 +571,7 @@ def end_recipe_procedure_failure_case(recipe_name,
             rospy.loginfo(UserMessages.SERVICE_FAILED.value.format("reset_distance_acq_srv"))
 
     reload_scene(reload_scene_srv_client)
+
 
 def end_recipe_procedure(stop_distance_acq_srv_client,
                          reload_scene_srv_client):

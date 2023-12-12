@@ -68,18 +68,29 @@ PARTIAL_FINAL = "partial_task_final"
 INNER = "inner_task"
 OUTER = "outer_task"
 
-paper = True
-
+paper = False
 
 AGENT_NAME_FOR_CHART = {"ur5_on_guide": "Robot", "human_right_arm": "Human"}
-TASK_NAME_FOR_CHART = {"pick_orange_box":"Pick orange box",
-                       "place_orange_box":"Place orange box",
-                       "pick_blue_box":"Pick blue Box",
-                       "place_blue_box_ur5_on_guide":"Place blue box (R)",
-                       "pick_white_box":"Pick white box",
-                       "place_white_box":"Place white box",
-                       "place_blue_box_human_right_arm":"Place blue box (H)"
+AGENT_NAME_FOR_CHART = {"manipulator": "Robot", "human": "Human"}
+
+TASK_NAME_FOR_CHART = {"pick_orange_box": "Pick orange box",
+                       "place_orange_box": "Place orange box",
+                       "pick_blue_box": "Pick blue Box",
+                       "place_blue_box_ur5_on_guide": "Place blue box (R)",
+                       "pick_white_box": "Pick white box",
+                       "place_white_box": "Place white box",
+                       "place_blue_box_human_right_arm": "Place blue box (H)"
                        }
+
+TASK_NAME_FOR_CHART = {"battery_sorting": "Battery Sorting",
+                       "board_localization": "Board Localization",
+                       "disassemble_remote_control": "disassemble_remote_control",
+                       "probe": "probe",
+                       "remove_notebook_components": "remove_notebook_components",
+                       "remove_notebook_cover": "remove_notebook_cover",
+                       "remove_plug": "remove_plug"
+                       }
+
 
 class MongoStatistics:
 
@@ -627,32 +638,42 @@ class MongoStatistics:
                 rospy.loginfo(RED + "There are duplicated task" + END)
                 rospy.loginfo(data.duplicated())
                 return SetBoolResponse(False, NOT_SUCCESSFUL)
-
+            print(main_agent)
+            print(concurrent_agent)
             # Prepare data for heatmap
-            data_matrix = data.pivot(main_agent, concurrent_agent, "dynamic_risk")
+            # data_matrix = data.pivot(main_agent, concurrent_agent, "dynamic_risk")
+            data_matrix = data.pivot(index=main_agent, columns=concurrent_agent, values='dynamic_risk')
 
+            print(data)
+            print("qui")
             plot_title = "Sinergy Matrix for agent: {}".format(main_agent)
+            # TODO: Fix paper names
             paper = True
             if paper:
-                if main_agent == "ur5_on_guide":
+                if main_agent == "ur5_on_guide" or main_agent == "manipulator":
                     main_agent_label = {"name": "Robot", "abbreviation": "R"}  # ("Robot","R")
                     concurrent_agent_label = {"name": "Human", "abbreviation": "H"}  # ("Robot","R")
 
-                elif main_agent == "human_right_arm":
+                elif main_agent == "human_right_arm" or main_agent == "human":
                     main_agent_label = {"name": "Human", "abbreviation": "H"}  # ("Human","H")
                     concurrent_agent_label = {"name": "Robot", "abbreviation": "R"}
                 else:
-                    main_agent_label = main_agent
+                    main_agent_label = {"name": main_agent, "abbreviation": main_agent}
                 plot_title = "Sinergy Matrix for agent: {} ($S^{}$)".format(main_agent_label["name"],
                                                                             main_agent_label["abbreviation"])
                 for agent in [main_agent, concurrent_agent]:
                     for k in data.index:
-                        data.at[k, agent] = self.getPaperTaskName(data.at[k, agent])
+                        if paper:
+                            data.at[k, agent] = self.getPaperTaskName(data.at[k, agent])
                 data = data.rename(columns={main_agent: main_agent_label["name"] + " Tasks",
                                             concurrent_agent: concurrent_agent_label["name"] + " Tasks"})
                 print(data)
-                data_matrix = data.pivot(main_agent_label["name"] + " Tasks", concurrent_agent_label["name"] + " Tasks",
-                                         "dynamic_risk")
+                print(main_agent_label["name"] + " Tasks")
+                print(concurrent_agent_label["name"] + " Tasks")
+                data_matrix = data.pivot(index=main_agent_label["name"] + " Tasks",
+                                         columns=concurrent_agent_label["name"] + " Tasks",
+                                         values="dynamic_risk")
+
             else:
                 main_agent_label = main_agent  # Remove label variable (unuseful)
 
@@ -662,6 +683,7 @@ class MongoStatistics:
             rospy.loginfo(RED + " ----------- " + END)
             print(data_matrix)
             sns.set_theme()
+
             def plot_a_graph():
                 # print("CHARTTT")
                 plt.figure(index)
@@ -670,11 +692,13 @@ class MongoStatistics:
                 # plt.title(plot_title)
                 # ax.set_title(plot_title, pad=20)
                 plt.ylabel("Robot Tasks", labelpad=25)
-                plt.xticks(rotation=45, ha="right")
-                # plt.savefig(self.results_folder_path + "dynamic_risk_agent_" + main_agent + ".png",
-                #             bbox_inches='tight')
-                # plt.savefig(self.results_folder_path + "test" + "dynamic_risk_agent_" + main_agent + ".pdf",
-                #             bbox_inches='tight')
+                # TODO: fix results folder path
+                plt.xticks(rotation=20, ha="right")
+                self.results_folder_path = "/home/galois/Documents/"
+                plt.savefig(self.results_folder_path + "dynamic_risk_agent_" + main_agent + ".png",
+                            bbox_inches='tight')
+                plt.savefig(self.results_folder_path + "test" + "dynamic_risk_agent_" + main_agent + ".pdf",
+                            bbox_inches='tight')
 
                 plt.show()
                 print(multiprocessing.current_process().name)
@@ -1521,11 +1545,12 @@ class MongoStatistics:
                 task_results["duration"].append(duration)
 
         task_results_data = pd.DataFrame(task_results)
+
         def plot_a_graph():
             sns.set_theme()
             sns.set(rc={'figure.figsize': (17, 7)})
 
-            #ax = sns.violinplot(data=task_results_data, x="task_name", y="duration", hue="agent_name")
+            # ax = sns.violinplot(data=task_results_data, x="task_name", y="duration", hue="agent_name")
             print(task_results_data)
             ax = sns.boxplot(data=task_results_data, x="task_name", y="duration", hue="agent_name",
                              showmeans=True,
@@ -1581,25 +1606,41 @@ class MongoStatistics:
         Returns:
             str: Paper task name
         """
-        if task == "pick_blue_box_human_right_arm":
-            task_name = "Pick Blue Box (H)"
-        elif task == "place_blue_box_human_right_arm":
-            task_name = "Place Blue Box (H)"
-        elif task == "pick_blue_box_ur5_on_guide":
-            task_name = "Pick Blue Box (R)"
-        elif task == "place_blue_box_ur5_on_guide":
-            task_name = "Place Blue Box (R)"
-        elif task == "place_blue_box_ur5_on_guide":
-            task_name = "Place Blue Box"
-        elif task == "pick_white_box":
-            task_name = "Pick White Box"
-        elif task == "place_white_box":
-            task_name = "Place White Box"
-        elif task == "pick_orange_box":
-            task_name = "Pick Orange Box"
-        elif task == "place_orange_box":
-            task_name = "Place Orange Box"
+        KNOWN_TASK_NAME = {"pick_blue_box_human_right_arm": "Pick Blue Box (H)",
+                           "place_blue_box_human_right_arm": "Place Blue Box (H)",
+                           "pick_blue_box_ur5_on_guide": "Pick Blue Box (R)",
+                           "place_blue_box_ur5_on_guide": "Place Blue Box (R)",
+                           "place_blue_box_ur5_on_guide": "Place Blue Box",
+                           "pick_white_box": "Pick White Box",
+                           "place_white_box": "Place White Box",
+                           "pick_orange_box": "Pick Orange Box",
+                           "place_orange_box": "Place Orange Box",
+                           "probe": "Probe_circuit"
+                           }
+        task_name = KNOWN_TASK_NAME.get(task, task)
+        task_name = task_name.split('_')
+        task_name = ' '.join(singol_word.capitalize() for singol_word in task_name)
+        print(task_name)
         return task_name
+        # if task == "pick_blue_box_human_right_arm":
+        #     task_name = "Pick Blue Box (H)"
+        # elif task == "place_blue_box_human_right_arm":
+        #     task_name = "Place Blue Box (H)"
+        # elif task == "pick_blue_box_ur5_on_guide":
+        #     task_name = "Pick Blue Box (R)"
+        # elif task == "place_blue_box_ur5_on_guide":
+        #     task_name = "Place Blue Box (R)"
+        # elif task == "place_blue_box_ur5_on_guide":
+        #     task_name = "Place Blue Box"
+        # elif task == "pick_white_box":
+        #     task_name = "Pick White Box"
+        # elif task == "place_white_box":
+        #     task_name = "Place White Box"
+        # elif task == "pick_orange_box":
+        #     task_name = "Pick Orange Box"
+        # elif task == "place_orange_box":
+        #     task_name = "Place Orange Box"
+        # return task_name
 
     def getPaperAgentName(self, agent):
         """Method for replacing agent names (for charts inherent in the paper)
@@ -1864,45 +1905,46 @@ class MongoStatistics:
             print("task_group")
             print(task_group)
             fig, axs = plt.subplots(nrows=2, ncols=2, figsize=(12, 10))
-
-            chart_title = TASK_NAME_FOR_CHART[task_group["_id"][0]]
-
-            chart_agent_name = AGENT_NAME_FOR_CHART[agent]
-            fig.suptitle(
-                "Marginal Posterior density - Regression Coefficients. \n Main agent: {}, Main Task: {}".format(chart_agent_name,
-                                                                                                             chart_title),
-                fontsize=16)
-
-            with open(self.results_folder_path + f"ISO5_synergy_estimation_{chart_agent_name}.yaml", 'w') as outfile:
-                yaml.dump([hmc_samples, concurrent_task_name], outfile, default_flow_style=False)
-            with open(self.results_folder_path + f"ISO5_synergy_estimation_{chart_agent_name}.pkl", 'wb') as fp:
-                pickle.dump([hmc_samples, concurrent_task_name], fp)
-
-            # np.save(self.results_folder_path + f"ISO5_synergy_estimation_{chart_agent_name}.npy", hmc_samples)
-            sns.set_theme()
-
-            for i, ax in enumerate(axs.reshape(-1)):
-                site = concurrent_task_name[i]
-
-                # sns.distplot(svi_samples[site], ax=ax, label="SVI (DiagNormal)")
-                sns.set_theme()
-                sns.distplot(hmc_samples[site], ax=ax, label="HMC")
-                ax_title = TASK_NAME_FOR_CHART[site]
-                ax.set_title(ax_title)
-                ax.set_xlabel("Synergy value")
-            handles, labels = ax.get_legend_handles_labels()
-            fig.legend(handles, labels, loc='upper right');
-            fig.tight_layout()
-            # plt.show()
-            sns.set_theme()
-            plt.savefig(self.results_folder_path + "ISO5_Bayesian_Gamma_dynamic_risk_agent_" + concurrent_agent + "_" +
-                        task_group["_id"][0] + ".png", bbox_inches='tight')
-            plt.savefig(self.results_folder_path + "ISO5_Bayesian_Gamma_dynamic_risk_agent_" + concurrent_agent + "_" +
-                        task_group["_id"][0] + ".pdf", bbox_inches='tight')
-
-            reg_model = smf.ols(formula="duration ~ " + formula_string + " -1 ", data=dataF)
-            reg_result = reg_model.fit()
-            print(reg_result.summary())
+            TODO: Bug fix in this section
+            # chart_title = TASK_NAME_FOR_CHART[task_group["_id"][0]]
+            #
+            # chart_agent_name = AGENT_NAME_FOR_CHART[agent]
+            # fig.suptitle(
+            #     "Marginal Posterior density - Regression Coefficients. \n Main agent: {}, Main Task: {}".format(
+            #         chart_agent_name,
+            #         chart_title),
+            #     fontsize=16)
+            #
+            # with open(self.results_folder_path + f"ISO5_synergy_estimation_{chart_agent_name}.yaml", 'w') as outfile:
+            #     yaml.dump([hmc_samples, concurrent_task_name], outfile, default_flow_style=False)
+            # with open(self.results_folder_path + f"ISO5_synergy_estimation_{chart_agent_name}.pkl", 'wb') as fp:
+            #     pickle.dump([hmc_samples, concurrent_task_name], fp)
+            #
+            # # np.save(self.results_folder_path + f"ISO5_synergy_estimation_{chart_agent_name}.npy", hmc_samples)
+            # sns.set_theme()
+            # print(concurrent_task_name)
+            # for i, ax in enumerate(axs.reshape(-1)):
+            #     site = concurrent_task_name[i]
+            #
+            #     # sns.distplot(svi_samples[site], ax=ax, label="SVI (DiagNormal)")
+            #     sns.set_theme()
+            #     sns.distplot(hmc_samples[site], ax=ax, label="HMC")
+            #     ax_title = TASK_NAME_FOR_CHART[site]
+            #     ax.set_title(ax_title)
+            #     ax.set_xlabel("Synergy value")
+            # handles, labels = ax.get_legend_handles_labels()
+            # fig.legend(handles, labels, loc='upper right');
+            # fig.tight_layout()
+            # # plt.show()
+            # sns.set_theme()
+            # plt.savefig(self.results_folder_path + "ISO5_Bayesian_Gamma_dynamic_risk_agent_" + concurrent_agent + "_" +
+            #             task_group["_id"][0] + ".png", bbox_inches='tight')
+            # plt.savefig(self.results_folder_path + "ISO5_Bayesian_Gamma_dynamic_risk_agent_" + concurrent_agent + "_" +
+            #             task_group["_id"][0] + ".pdf", bbox_inches='tight')
+            #
+            # reg_model = smf.ols(formula="duration ~ " + formula_string + " -1 ", data=dataF)
+            # reg_result = reg_model.fit()
+            # print(reg_result.summary())
 
             print("QUIIIII")
             print(task_index[concurrent_agent])
@@ -1914,7 +1956,8 @@ class MongoStatistics:
             for index, task in enumerate(task_index[concurrent_agent]):
                 counter, success_rate = self.getConcurrentTaskStatistics(task)
                 print(task)
-                print(reg_result.bse[task])
+                # TODO: Has to work
+                # print(reg_result.bse[task])
                 print(hmc_samples[task])
                 dynamic_risk = pd.DataFrame(hmc_samples[task])[0].describe()
                 try:

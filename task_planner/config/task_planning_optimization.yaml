@@ -18,6 +18,8 @@ execution:
   repetitions: 30
   n_recipe: 1
 
+robot_agents:
+  - manipulator
 # Problem Info #
 # agents_name:
 #   - ur5_on_guide
