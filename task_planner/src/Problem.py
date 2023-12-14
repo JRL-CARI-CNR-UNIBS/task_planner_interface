@@ -13,7 +13,7 @@ import itertools
 class Problem:
     task_list: List[Task] = field(default_factory=list, init=False)
     agents: List[str]
-    robot_agents: Optional[List[str]] = field(default=None, init=True)
+    robot_agents: List[str] = field(default_factory=list, init=True)
     solution: List[TaskSolution] = field(default_factory=list, init=False)
 
     def __post_init__(self):
@@ -26,6 +26,9 @@ class Problem:
         self.get_tasks_info_srv = rospy.ServiceProxy("mongo_handler/get_task_agents", TasksInformation)
         self.get_tasks_stats_srv = rospy.ServiceProxy("mongo_handler/get_tasks_statistics", TasksStatistics)
         self.get_task_synergies_srv = rospy.ServiceProxy("mongo_statistics/get_task_synergies", TaskSynergies)
+        if self.robot_agents:
+            if not self.__are_robots_agents_in_agents():
+                raise ValueError("Some robots or agents are not present in the list of agents.")
 
     def add_task(self, task: Task) -> None:
         if task not in self.task_list:
@@ -224,6 +227,15 @@ class Problem:
         for task in self.task_list:
             not_enabled_agents[task.get_id()] = task.get_not_enabled_agents()
         return not_enabled_agents
+
+    def get_robot_agents(self) -> List[str]:
+        return self.robot_agents
+
+    def get_not_robot_agents(self) -> List[str]:
+        return list(set(self.agents).difference(set(self.robot_agents)))
+
+    def __are_robots_agents_in_agents(self) -> bool:
+        return set(self.robot_agents).issubset(set(self.agents))
 
     def add_task_solution(self, task_id: str, t_start: float, t_end: float, assignment: str) -> TaskSolution:
         # It can be unusefull have a solution in problem class

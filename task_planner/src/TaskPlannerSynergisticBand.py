@@ -223,6 +223,8 @@ class TaskPlannerSynergisticBand(TaskPlanner):
             upper_bound = self.problem_definition.get_nominal_upper_bound()
             parallel_agent = "human_right_arm"
             main_agent = "ur5_on_guide"
+            parallel_agent = "human"
+            main_agent = "manipulator"
             t_start_robot = self.model.addVars(list(self.decision_variables["t_start"].keys()), lb=0, ub=upper_bound,
                                                name="t_start_robot", vtype=gp.GRB.CONTINUOUS)
             t_start_human = self.model.addVars(list(self.decision_variables["t_start"].keys()), lb=0, ub=upper_bound,

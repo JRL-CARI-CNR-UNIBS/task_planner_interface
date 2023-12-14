@@ -236,7 +236,6 @@ class TaskPlanner:
         #     self.model.write('tune' + str(i) + '.prm')
 
         self.model.optimize(lambda model, where: self.callback(model, where))
-        print()
         status = self.model.Status
         if status in (gp.GRB.INF_OR_UNBD, gp.GRB.INFEASIBLE, gp.GRB.UNBOUNDED):
             print('The model cannot be solved because it is infeasible or '

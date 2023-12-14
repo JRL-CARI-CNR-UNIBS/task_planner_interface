@@ -27,7 +27,8 @@ RECIPE_NAMES = {"TESTdsfds": "Safety Areas - HA",
                 "COMPLETE_SOLVER": "HA-TP",
                 "COMPLETE_HA_SOLVER": "HA-TP",
                 "TEST_COMPLETE": "Test",
-                "TEST_RELAXED": "Test REL"
+                "TEST_RELAXED": "Test REL",
+                "NEW": "New"
                 }
 
 
@@ -67,6 +68,9 @@ def main():
     # database_name = "iso15066_lun_31"  # "milp_task_planner"
     # results_collection_name = "complete_task_results"
 
+
+    database_name = "hrc_case_study"
+    results_collection_name = "real_test_results_test_75_plans"
     mongo_interface = MongoInterface(database_name)
 
     pipeline = StatisticalPipeline.recipes_duration_pipeline()
@@ -147,15 +151,17 @@ def main():
                             "HA-TP"])
     from tabulate import tabulate
 
-    # Calcola le medie per ciascun "Task Planner Type"
+    # # Calcola le medie per ciascun "Task Planner Type"
     mean_duration = result_pd.groupby("Task Planner Type")["Plan Duration (s)"].mean().reset_index()
 
     # Rinomina la colonna delle medie
     mean_duration.rename(columns={"Plan Duration (s)": "Mean Duration (s)"}, inplace=True)
 
+
     # Trova il valore per "baseline tp" e "not neighboring tp"
     baseline_duration = mean_duration[mean_duration["Task Planner Type"] == "Baseline TP"]["Mean Duration (s)"].values[
         0]
+
     not_neighboring_duration = \
     mean_duration[mean_duration["Task Planner Type"] == "Not Neighboring TP"]["Mean Duration (s)"].values[0]
 
@@ -170,12 +176,12 @@ def main():
     # Stampa la tabella LaTeX
     print(latex_table)
     # return 0
-    # print(mean_duration)
-    order=(["Baseline TP",
-                            "Not Neighboring TP",
-                            "HA-TP (Relaxed)",
-                            "HA-TP"])
-
+    # # print(mean_duration)
+    # order=(["Baseline TP",
+    #                         "Not Neighboring TP",
+    #                         "HA-TP (Relaxed)",
+    #                         "HA-TP"])
+    #
     import plotly.express as px
     fig = px.box(result_pd, x="Plan Duration (s)", y="Task Planner Type", color="Task Planner Type")
     fig.show()
@@ -209,8 +215,10 @@ def main():
     # # sns.set(rc={'figure.figsize': (25,8)})
     #
     # plt.savefig(f"{path}_iso15066_comparison_plan_duration_.png", bbox_inches='tight')
-    # plt.savefig(f"{path}_iso15066_comparison_plan_duration_.pdf", bbox_inches='tight')
 
+    path = "/home/galois/Desktop/Samuele/"
+    plt.ylabel("")
+    plt.savefig(f"{path}iso15066_comparison_plan_duration_test_finished.pdf", bbox_inches='tight')
     plt.show()
 
 

@@ -71,6 +71,7 @@ class TaskServiceManager:
             start_recipe_index (int): Starting recipe index
         """
 
+        self.t_start = None
         self.agent = agent  # Agent
         self.agent_type = agent_type  # Agent type human or robot
         self.recipe_index = start_recipe_index  # Recipe Index
@@ -114,8 +115,8 @@ class TaskServiceManager:
         # print("Waiting: "+ reset_agent_state_srv_name)
         print(f"Agent: {self.agent}, type: {self.agent_type}, is real: {self.is_human_real}")
         if "human" not in agent_type or not is_human_real:
-            reset_agent_state_srv_name = prefix_topic_name + self.agent + "/reset_agent_state"
-            print("Waiting: "+ reset_agent_state_srv_name)
+            # reset_agent_state_srv_name = prefix_topic_name + self.agent + "/reset_agent_state"
+            # print("Waiting: "+ reset_agent_state_srv_name)
             rospy.wait_for_service(reset_agent_state_srv_name)
 
             self.reset_agent_state_srv_client = rospy.ServiceProxy(reset_agent_state_srv_name, Trigger)
@@ -123,15 +124,14 @@ class TaskServiceManager:
         rospy.loginfo(YELLOW + "Services and action server ready" + END)
         # print(prefix_topic_name + agent)
         # Subscriber
-        rospy.Subscriber(prefix_topic_name + agent, MotionTaskExecutionRequestArray, self.subscribeTask)  # Subscriber
+        rospy.Subscriber(prefix_topic_name + agent, MotionTaskExecutionRequestArray, self.subscribe_task)  # Subscriber
 
-    def subscribeTask(self, data):
+    def subscribe_task(self, data: MotionTaskExecutionRequestArray):
         """Subscriber task from task planner
 
         Args:
             data ([MotionTaskExecutionRequestArray): Array of tasks request of execution
         """
-        # rospy.loginfo(GREEN + "Task Received" + END)
         task = data.tasks[0].task_id
         task_cmd_id = data.cmd_id
         t_start_planned = data.tasks[0].t_start_planned
@@ -148,15 +148,21 @@ class TaskServiceManager:
         rospy.loginfo(MESSAGE_TASK_RECEIVED.format(task, self.agent))
 
         try:
-
             task_type_msg = self.task_type_service(task)  # Check type (rosservice call)
             print(task_type_msg)
             if task_type_msg.exist:
                 if self.is_human_real:
                     rospy.loginfo(TASK_TYPE.format(task_type_msg.type))
                     self.execute_client(task, task_cmd_id, t_start_planned, t_end_planned)
+                    if task == "end":
+                        self.recipe_index += 1
+                        t_cycle = rospy.Time.now() - self.t_start
+                        self.pub_cycle_tyme.publish(t_cycle.to_sec())
+                        self.cycle_initialized = False
+                        rospy.loginfo(END_MESSAGE.format(self.recipe_index, t_cycle.to_sec()))
                 else:
-                    if task_type_msg.type in ["pick", "place", "pickplace", "goto"] and task != "end" and task != "go_home":
+                    if task_type_msg.type in ["pick", "place", "pickplace",
+                                              "goto"] and task != "end" and task != "go_home":
                         rospy.loginfo(TASK_TYPE.format(task_type_msg.type))
                         # Call method for execute the task
                         self.execute_client(task, task_cmd_id, t_start_planned, t_end_planned)  # Il task name
@@ -263,7 +269,8 @@ class TaskServiceManager:
                 # Cosa fare se mongo si e' disconnesso: il messaggio gia' in MongoHandler?
                 pass
 
-    def execute_sequence_client(self, task_name, task_cmd_id, t_start_planned, t_end_planned):  # task_name in realta' è il
+    def execute_sequence_client(self, task_name, task_cmd_id, t_start_planned,
+                                t_end_planned):  # task_name in realta' è il
         """Method for ask execution of task (calling action server)
 
         Args:
@@ -298,7 +305,7 @@ class TaskServiceManager:
             task_result = TaskResultRequest()
             task_result.name = task_name  # Name
             task_result.type = action_result.type
-            task_result.agent = action_result.agent #self.agent  # Agent
+            task_result.agent = action_result.agent  # self.agent  # Agent
             task_result.outcome = action_result.outcome
             task_result.duration_planned = action_result.duration_planned
             task_result.duration_real = action_result.duration_real
@@ -308,7 +315,6 @@ class TaskServiceManager:
             task_result.t_end = t_end_task
             task_result.t_start_planned = t_start_planned
             task_result.t_end_planned = t_end_planned
-
 
             # Publish result to task planner
             self.pub_feedback_task_planner.publish(MotionTaskExecutionFeedback(task_cmd_id, action_result.outcome))
@@ -320,7 +326,7 @@ class TaskServiceManager:
             # rospy.loginfo(task_result)
 
             result = self.upload_result_service(task_result)
-            if result.success == False:
+            if not result.success:
                 # Cosa fare se mongo si e' disconnesso: il messaggio gia' in MongoHandler?
                 pass
 
@@ -350,6 +356,7 @@ class TaskServiceManager:
         self.action_client.wait_for_result()
         self.pub_feedback_task_planner.publish(MotionTaskExecutionFeedback(task_cmd_id, 1))
         rospy.loginfo(GREEN + "Go home executed" + END)
+
 
 def main():
     rospy.init_node("task_service_manager")
