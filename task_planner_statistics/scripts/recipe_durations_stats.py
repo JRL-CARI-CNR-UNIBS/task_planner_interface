@@ -53,15 +53,17 @@ def main():
     results_collection_name = "task_results_learning_phase"
 
     # TODO: QUESTO E' OK PER LE AREE
-    # database_name = "new_safety_areas"  # "milp_task_planner"
-    # results_collection_name = "task_results_final_version"
+    database_name = "new_safety_areas"  # "milp_task_planner"
+    results_collection_name = "task_results_final_version"
 
     # database_name = "iso15066"  # "milp_task_planner"
     # results_collection_name = "task_results_online_more_tasks"
 
-    # Ultimo
-    database_name = "safety_areas_7_ago"  # "milp_task_planner"
-    results_collection_name = "task_results_25_ago"
+    # Ultimo aree con meno task ()
+    # database_name = "safety_areas_7_ago"  # "milp_task_planner"
+    # results_collection_name = "task_results_7_ago"
+
+    # TODO: QUESTO E' OK PER ISO15066
     # database_name = "iso15066_lun_31"  # "milp_task_planner"
     # results_collection_name = "complete_task_results"
 

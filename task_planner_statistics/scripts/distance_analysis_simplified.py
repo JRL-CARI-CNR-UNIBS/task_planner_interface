@@ -11,7 +11,7 @@ from pathlib import Path
 import matplotlib
 import matplotlib.ticker as mtick
 
-ZOOM = True
+ZOOM = False
 
 
 def main():
@@ -24,9 +24,7 @@ def main():
     #     rospy.loginfo("Param: distance_topic_name not defined")
     #     return 0
     # recipes_to_compare = rospy.get_param("~recipes_to_compare")
-    recipes_to_compare = ["COMPLETE_HA_SOLVER", "RELAXED_HA", "NOT_NEIGHBORING_TASKS", "BASIC_SOLVER"]
-    # recipes_to_compare = ["COMPLETE_SOLVER", "RELAXED_HA", "NOT_NEIGHBORING_TASKS", "BASIC_SOLVER"]
-
+    recipes_to_compare = ["COMPLETE_SOLVER", "RELAXED_HA", "NOT_NEIGHBORING_TASKS", "BASIC_SOLVER"]
     recipes_to_compare = recipes_to_compare[0:]
     RENAME = {"TEST": "Safety Areas - HA",
               "SAFETY_AREA_NO_AWARE": "Safety Areas - Random",
@@ -40,10 +38,10 @@ def main():
               "RELAXED_HA": "Relaxed HA-TP"}
     RECIPE_NAME_COLUMN = "Recipe Name"
     RECIPE_TYPE_COLUMN = "Recipe Type"
-    RECIPE_PERCENTAGE_COLUMN = "Percentage Under Safety Distance"
+    RECIPE_PERCENTAGE_COLUMN = "Percentage of Samples below the Safe Distance"
     RECIPE_S_D_TYPE_COLUMN = "Safety Distance Levels"
 
-    risky_distances = [0.4, 0.5, 0.7, 0.8]
+    risky_distances = [0.4, 0.8, 1.2]
     # file_path = Path(rospy.get_param("~distance_monitoring_path") + "distance_monitoring_safety_area.csv")
     # file_path = "/home/samuele/projects/planning_ws/src/task-planner-interface/task_planner_statistics/file/distance_monitoring_safety_area_both.csv"
     # file_path = "/home/samuele/projects/cells_ws/src/hrc_simulator/hrc_simulator/hrc_mosaic_task_planning/hrc_mosaic_task_planning_interface/statistics/distance_monitoring_safety_area.csv"
@@ -56,18 +54,25 @@ def main():
     file_path = "/home/samuele/projects/cells_ws/src/hrc_simulator/hrc_simulator/hrc_mosaic_task_planning/hrc_mosaic_task_planning_interface/statistics/distance_monitoring_test_old_scaling.csv"
     file_path = "/home/samuele/projects/cells_ws/src/hrc_simulator/hrc_simulator/hrc_mosaic_task_planning/hrc_mosaic_task_planning_interface/statistics/new_safety_areas/distance_monitoring_new_areas_online_phase.csv"
     file_path = "/home/samuele/projects/cells_ws/src/hrc_simulator/hrc_simulator/hrc_mosaic_task_planning/hrc_mosaic_task_planning_interface/statistics/new_safety_areas/distance_monitoring_final_version.csv"
-    # file_path = "/home/samuele/projects/cells_ws/src/hrc_simulator/hrc_simulator/hrc_mosaic_task_planning/hrc_mosaic_task_planning_interface/statistics/iso15066_lun_31/distance_monitoring_online_new_mar_1.csv"
+    file_path = "/home/samuele/projects/cells_ws/src/hrc_simulator/hrc_simulator/hrc_mosaic_task_planning/hrc_mosaic_task_planning_interface/statistics/iso15066_lun_31/distance_monitoring_online_new_mar_1.csv"
 
-    # file_path = "/home/samuele/projects/cells_ws/src/hrc_simulator/hrc_simulator/hrc_mosaic_task_planning/hrc_mosaic_task_planning_interface/statistics/iso15066_lun_31/distance_monitoring_online_new_mar_1_with_test.csv"
-    # file_path = "/home/samuele/projects/cells_ws/src/hrc_simulator/hrc_simulator/hrc_mosaic_task_planning/hrc_mosaic_task_planning_interface/statistics/safety_areas_less_tasks/distance_monitoring_areas_online_25_ago.csv"
-    # file_path = "/home/samuele/Desktop/Temp/distance_monitoring_online_real.csv"
-
-    # file_path = "/home/samuele/Desktop/DatiArticolo/Definitivi/SicurezzaContinua/results/distance_monitoring_online_25_ago.csv"
-
-    file_path = "/home/samuele/Desktop/DatiArticolo/SicurezzaContinua/Risultati/Dati/distance_monitoring_online_new_mar_1.csv"
+    file_path = "/home/samuele/projects/cells_ws/src/hrc_simulator/hrc_simulator/hrc_mosaic_task_planning/hrc_mosaic_task_planning_interface/statistics/iso15066_lun_31/distance_monitoring_online_new_mar_1_with_test.csv"
+    file_path = "/home/samuele/projects/cells_ws/src/hrc_simulator/hrc_simulator/hrc_mosaic_task_planning/hrc_mosaic_task_planning_interface/statistics/safety_areas_less_tasks/distance_monitoring_areas_online_25_ago.csv"
+    file_path = "/home/samuele/projects/cells_ws/src/hrc_simulator/hrc_simulator/hrc_mosaic_task_planning/hrc_mosaic_task_planning_interface/statistics/safety_areas_less_tasks/distance_monitoring_areas_online_25_ago.csv"
+    file_path = "/home/galois/projects/cells_ws/src/hrc_case_study_cell/hrc_case_study/hrc_case_study_task_planning/statistics/distance_monitoring_online_real.csv"
+    file_path = "/home/galois/projects/cells_ws/src/hrc_case_study_cell/hrc_case_study/hrc_case_study_task_planning/statistics/distance_monitoring_real_test_distance_results.csv"
+    file_path = "/home/galois/projects/cells_ws/src/hrc_case_study_cell/hrc_case_study/hrc_case_study_task_planning/statistics/distanze_filtrate.csv"
+    file_path = "/home/samuele/projects/cells_ws/src/hrc_case_study_cell/hrc_case_study/hrc_case_study_results/human_robot_distance_monitoring.csv"
+    file_path = "/home/samuele/projects/cells_ws/src/hrc_case_study_cell/hrc_case_study/hrc_case_study_task_planning/statistics/distanze_filtrate.csv"
     distance_dataset = pd.read_csv(file_path)
-    distance_dataset = distance_dataset.replace(np.inf, 1000)
-    max_val = 4
+    # distance_dataset = distance_dataset.replace(np.inf, 1000)
+    max_value = 2.0
+    distance_dataset = distance_dataset.replace(np.inf, np.nan)
+    distance_dataset = distance_dataset.dropna()
+    distance_dataset : pd.DataFrame
+    # distance_dataset.to_csv("/home/galois/Desktop/Samuele/prova.csv")
+
+    print(distance_dataset)
     fig, ax = plt.subplots(figsize=(16, 8))
     zoom = ZOOM
     if zoom:
@@ -78,12 +83,11 @@ def main():
     percentage_under_risky_dataset = {RECIPE_NAME_COLUMN: [], RECIPE_TYPE_COLUMN: [], RECIPE_PERCENTAGE_COLUMN: [],
                                       RECIPE_S_D_TYPE_COLUMN: []}
     # fig, axes = plt.subplots(2, 1, sharex=True) #, figsize=(10, 5))
-
     min_distances = dict.fromkeys(recipes_to_compare)
     for id_type, recipe_name in enumerate(recipes_to_compare):
-        print(recipe_name)
         single_recipe_type_data = distance_dataset[distance_dataset['Recipe'].str.contains(recipe_name)]
         single_type_recipe_names = single_recipe_type_data.Recipe.unique()
+        print(single_recipe_type_data["Mean"])
         min_distances[recipe_name] = min(single_recipe_type_data["Mean"])
 
         cumulative_dist_recipes = []
@@ -92,17 +96,19 @@ def main():
         min_distance = []
         max_distance = []
         delta_distance = []
-
+        print(single_type_recipe_names)
         for single_recipe in single_type_recipe_names:
             single_recipe_distance_data = distance_dataset.loc[distance_dataset['Recipe'] == single_recipe]  # ["Mean"]
 
             n_bins = len(single_recipe_distance_data["Mean"])
 
+            print((np.nanmin(single_recipe_distance_data["Mean"]),
+                       np.nanmax(max_value)))
             hist, bin_edges = np.histogram(
                 single_recipe_distance_data["Mean"],
                 bins=n_bins,
-                range=(np.nanmin(single_recipe_distance_data["Mean"]),np.nanmax(max_val)))
-
+                range=(0,
+                       np.nanmax(max_value)))
             cumulative_dist_recipes.append(np.cumsum(hist) / float(n_bins))
             bin_edges_recipes.append(bin_edges)
             min_distance.append(min(bin_edges))
@@ -118,16 +124,16 @@ def main():
                 percentage_time_under_risky = tot_time_under_risky / (recipe_timestamp[-1] - recipe_timestamp[0]) * 100
                 print(f"Recipe duration: {recipe_timestamp[-1] - recipe_timestamp[0]}")
                 print(f"Percentage time under risky distance: {percentage_time_under_risky}")
-                percentage_under_risky_dataset[RECIPE_NAME_COLUMN].append(single_recipe)
-                percentage_under_risky_dataset[RECIPE_TYPE_COLUMN].append(recipe_name)
-                percentage_under_risky_dataset[RECIPE_PERCENTAGE_COLUMN].append(percentage_time_under_risky)
-                percentage_under_risky_dataset[RECIPE_S_D_TYPE_COLUMN].append(f"Under {risky_distance} m")
+                # percentage_under_risky_dataset[RECIPE_NAME_COLUMN].append(single_recipe)
+                # percentage_under_risky_dataset[RECIPE_TYPE_COLUMN].append(recipe_name)
+                # percentage_under_risky_dataset[RECIPE_PERCENTAGE_COLUMN].append(percentage_time_under_risky)
+                # percentage_under_risky_dataset[RECIPE_S_D_TYPE_COLUMN].append(f"Under {risky_distance} m")
 
         min_distance_recipes = min(min_distance)
         max_distance_recipes = max(max_distance)
-        delta_distance_recipes = 0.03  # min(delta_distance)
+        delta_distance_recipes = 0.01  # min(delta_distance)
 
-        maximum = max(max_distance_recipes, max_val) + delta_distance_recipes
+        maximum = max(max_distance_recipes, max_value) + delta_distance_recipes
 
         distances = np.arange(min_distance_recipes, maximum, delta_distance_recipes)
         x_axis = []
@@ -146,6 +152,23 @@ def main():
                     val_i.append(0)
             cumulative_distribution.append(np.mean(val_i))
             cumulative_distribution_std.append(np.std(val_i))
+
+        samples_under_risky = []
+        for risky_distance in risky_distances:
+            distance = risky_distance
+            for id_recipe, single_recipe in enumerate(single_type_recipe_names):
+                recipe_bin_edges = bin_edges_recipes[id_recipe]
+                if len(cumulative_dist_recipes[id_recipe][[recipe_bin_edges[1:] <= distance]]) > 0:
+                    samples_under_risky.append(cumulative_dist_recipes[id_recipe][[recipe_bin_edges[1:] <= distance]][-1])
+                else:
+                    samples_under_risky.append(0)
+
+
+                percentage_under_risky_dataset[RECIPE_NAME_COLUMN].append(single_recipe)
+                percentage_under_risky_dataset[RECIPE_TYPE_COLUMN].append(recipe_name)
+                percentage_under_risky_dataset[RECIPE_PERCENTAGE_COLUMN].append(samples_under_risky[-1]*100)
+                percentage_under_risky_dataset[RECIPE_S_D_TYPE_COLUMN].append(f"Under {risky_distance} m")
+                print(percentage_under_risky_dataset)
 
         lower_bound = np.array(cumulative_distribution) - 2 * np.array(cumulative_distribution_std)
         upper_bound = np.array(cumulative_distribution) + 2 * np.array(cumulative_distribution_std)
@@ -223,21 +246,21 @@ def main():
                 max_distance.append(max(bin_edges))
                 delta_distance.append(bin_edges[1] - bin_edges[0])
 
-                recipe_timestamp = np.array(single_recipe_distance_data["Timestamp"])
-                time_intervals = recipe_timestamp[1:] - recipe_timestamp[:-1]
-                for risky_distance in risky_distances:
-                    tot_time_under_risky = np.sum(
-                        time_intervals[single_recipe_distance_data["Mean"][:-1] < risky_distance])
-                    print(f"Tot time under risky: {tot_time_under_risky}")
-
-                    percentage_time_under_risky = tot_time_under_risky / (
-                            recipe_timestamp[-1] - recipe_timestamp[0]) * 100
-                    print(f"Recipe duration: {recipe_timestamp[-1] - recipe_timestamp[0]}")
-                    print(f"Percentage time under risky distance: {percentage_time_under_risky}")
-                    percentage_under_risky_dataset[RECIPE_NAME_COLUMN].append(single_recipe)
-                    percentage_under_risky_dataset[RECIPE_TYPE_COLUMN].append(recipe_name)
-                    percentage_under_risky_dataset[RECIPE_PERCENTAGE_COLUMN].append(percentage_time_under_risky)
-                    percentage_under_risky_dataset[RECIPE_S_D_TYPE_COLUMN].append(f"Under {risky_distance} m")
+                # recipe_timestamp = np.array(single_recipe_distance_data["Timestamp"])
+                # time_intervals = recipe_timestamp[1:] - recipe_timestamp[:-1]
+                # for risky_distance in risky_distances:
+                #     tot_time_under_risky = np.sum(
+                #         time_intervals[single_recipe_distance_data["Mean"][:-1] < risky_distance])
+                #     print(f"Tot time under risky: {tot_time_under_risky}")
+                #
+                #     percentage_time_under_risky = tot_time_under_risky / (
+                #             recipe_timestamp[-1] - recipe_timestamp[0]) * 100
+                #     print(f"Recipe duration: {recipe_timestamp[-1] - recipe_timestamp[0]}")
+                #     print(f"Percentage time under risky distance: {percentage_time_under_risky}")
+                #     percentage_under_risky_dataset[RECIPE_NAME_COLUMN].append(single_recipe)
+                #     percentage_under_risky_dataset[RECIPE_TYPE_COLUMN].append(recipe_name)
+                #     percentage_under_risky_dataset[RECIPE_PERCENTAGE_COLUMN].append(percentage_time_under_risky)
+                #     percentage_under_risky_dataset[RECIPE_S_D_TYPE_COLUMN].append(f"Under {risky_distance} m")
 
             min_distance_recipes = min(min_distance)
             max_distance_recipes = max(max_distance)
@@ -310,7 +333,7 @@ def main():
     #
     # sns.set(rc={'figure.figsize': (25,8)})
     #
-    # plt.savefig(f"{path}comparison_min_distance{zoom_name}.png", bbox_inches='tight')
+    plt.savefig(f"/home/samuele/Desktop/comparison_safety_distances_real_case_filtered_data_distribution.pdf", bbox_inches='tight')
     # plt.savefig(f"{path}comparison_min_distance{zoom_name}.pdf", bbox_inches='tight')
 
     percentage_under_risky_dataset_pd = pandas.DataFrame(percentage_under_risky_dataset)
@@ -318,15 +341,36 @@ def main():
     # fig, ax = plt.subplots(figsize=(16, 8))
     percentage_under_risky_dataset_pd = percentage_under_risky_dataset_pd.rename(columns=RENAME)
     print(percentage_under_risky_dataset_pd.head())
-    sns.catplot(data=percentage_under_risky_dataset_pd, kind="bar", x=RECIPE_S_D_TYPE_COLUMN,
-                y=RECIPE_PERCENTAGE_COLUMN, hue=RECIPE_TYPE_COLUMN, height=8, aspect=1.5)
-    # sns.set(rc={'figure.figsize': (11.7, 8.27)})
 
+    percentage_under_risky_dataset_pd = percentage_under_risky_dataset_pd.rename(columns=RENAME)
+    percentage_under_risky_dataset_pd[RECIPE_TYPE_COLUMN] = percentage_under_risky_dataset_pd[RECIPE_TYPE_COLUMN].replace(RENAME)
+
+
+    graph = sns.catplot(data=percentage_under_risky_dataset_pd, kind="bar", x=RECIPE_S_D_TYPE_COLUMN,
+                y=RECIPE_PERCENTAGE_COLUMN, hue=RECIPE_TYPE_COLUMN, height=8, aspect=1.5, legend=False)
+
+    # sns.set(rc={'figure.figsize': (11.7, 8.27)})
     # plt.gca().yaxis.set_major_formatter(mtick.PercentFormatter())
+
     plt.title("Safety Distance Comparison")
+    plt.legend(title=None)
+    graph.ax.yaxis.set_major_formatter(mtick.PercentFormatter(decimals=0))
+    for item in ([graph.ax.title, graph.ax.xaxis.label, graph.ax.yaxis.label] +
+                 graph.ax.get_xticklabels() + graph.ax.get_yticklabels()):
+        item.set_fontsize(20)
+    plt.legend(fontsize=20)
+
+    plt.savefig(f"/home/samuele/Desktop/comparison_safety_distances_real_case_filtered_data.pdf", bbox_inches='tight')
 
     plt.show()
-    print(min_distances)
+    # import plotly.express as px
+    # fig = px.box(percentage_under_risky_dataset_pd, x=RECIPE_S_D_TYPE_COLUMN, y=RECIPE_PERCENTAGE_COLUMN, color=RECIPE_S_D_TYPE_COLUMN)
+    # fig.show()
+    # print(percentage_under_risky_dataset_pd[percentage_under_risky_dataset_pd[percentage_under_risky_dataset_pd] == "Under 0.4 m"].groupby(RECIPE_S_D_TYPE_COLUMN)[RECIPE_PERCENTAGE_COLUMN])
+    # print(percentage_under_risky_dataset_pd[percentage_under_risky_dataset_pd[RECIPE_S_D_TYPE_COLUMN] == "Under 0.4 m"])
+    print(percentage_under_risky_dataset_pd[percentage_under_risky_dataset_pd[RECIPE_S_D_TYPE_COLUMN] == "Under 0.4 m"].groupby(RECIPE_TYPE_COLUMN).mean())
+
+    # print(min_distances)
     # min_distances_pd = pd.DataFrame(min_distances)
     # min_distances_pd.rename(columns=RENAME)
     # print(min_distances_pd.head())

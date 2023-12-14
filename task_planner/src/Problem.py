@@ -13,13 +13,14 @@ import itertools
 class Problem:
     task_list: List[Task] = field(default_factory=list, init=False)
     agents: List[str]
+    robot_agents: Optional[List[str]] = field(default=None, init=True)
     solution: List[TaskSolution] = field(default_factory=list, init=False)
 
     def __post_init__(self):
-        # rospy.wait_for_service('mongo_handler/check_task_type')
-        # rospy.wait_for_service('mongo_handler/get_task_agents')
-        # rospy.wait_for_service('mongo_handler/get_tasks_statistics')
-        # rospy.wait_for_service('mongo_statistics/get_task_synergies')
+        rospy.wait_for_service('mongo_handler/check_task_type')
+        rospy.wait_for_service('mongo_handler/get_task_agents')
+        rospy.wait_for_service('mongo_handler/get_tasks_statistics')
+        rospy.wait_for_service('mongo_statistics/get_task_synergies')
 
         self.task_check_srv = rospy.ServiceProxy("mongo_handler/check_task_type", TaskType)
         self.get_tasks_info_srv = rospy.ServiceProxy("mongo_handler/get_task_agents", TasksInformation)
@@ -52,7 +53,8 @@ class Problem:
             for soft_precedence_task in task.get_soft_constraints():
                 # Check if exist all soft precedence constraints among task_ids
                 if soft_precedence_task not in tasks_dict.keys():
-                    rospy.logerr(f"The soft precedence task: {soft_precedence_task}, of task: {task.get_id()}, does not exist.")
+                    rospy.logerr(
+                        f"The soft precedence task: {soft_precedence_task}, of task: {task.get_id()}, does not exist.")
                     return False
 
             # Check if all task type exist
@@ -91,8 +93,8 @@ class Problem:
                     return False
                 task.update_agents(task_agents_correspondence[task.get_type()])
 
-            # Check if the specified agent (in task goal) can actually perform it
-            # if not all(required_agent in task_agents_correspondence[task.get_type()] for required_agent in task.get_agents()):
+            # Check if the specified agent (in task goal) can actually perform it if not all(required_agent in
+            # task_agents_correspondence[task.get_type()] for required_agent in task.get_agents()):
             for required_agent in task.get_agents_constraint():
                 # Check if that agent exists at Knowledge-Based
                 if required_agent not in self.agents:
@@ -176,9 +178,9 @@ class Problem:
                 for parallel_agent in synergies_dict:
                     task.update_synergy(agent, parallel_agent, synergies_dict[parallel_agent])
         return True
-                # TODO: Is better to store as an object with all the info. Can i recycle TaskSynergy message? But i cannot add method.
-                # task_synergy.std_err
-                # task_synergy.success_rate
+        # TODO: Is better to store as an object with all the info. Can i recycle TaskSynergy message? But i cannot add method.
+        # task_synergy.std_err
+        # task_synergy.success_rate
 
     def get_combinations(self) -> Dict[Tuple[str, str], str]:
         combinations = {}
@@ -310,13 +312,16 @@ class Problem:
     def task_in_task_list(self, task_id: str) -> bool:
         return any(task.get_id() == task_id for task in self.task_list)
 
+    def get_robot_agents(self) -> Optional[List[str]]:
+        return self.robot_agents
+
     def __repr__(self):
         if self.task_list:
-            str = ""
+            return_str = ""
             for task in self.task_list:
                 print(task.__repr__())
-                str += "\n"
-                str += task.__repr__()
-            return str
+                return_str += "\n"
+                return_str += task.__repr__()
+            return return_str
         else:
-            return "Empty Task List in Problem Definition"
+            return f"Problem instance. \nAgents: {self.agents}. \nEmpty Task List in Problem Definition"

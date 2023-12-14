@@ -120,22 +120,52 @@ def show_timeline_irim(problem_solution: List[TaskSolution],
         "pick_orange_box": "#ffc048",
         "place_orange_box": "peachpuff",  # Arancio più tenue
         "pick_blue_box": "#4a69bd",  # Blu più tenue
+        "place_blue_box": "#6a89cc",  # Blu più tenue
         "place_blue_box_ur5_on_guide": "#6a89cc",  # Blu chiaro
         "place_blue_box_human_right_arm": "#6a89cc",  # Blu chiaro
         "pick_white_box": "#95a5a6",  # Grigio chiaro
-        "place_white_box": "#bdc3c7",  # Bianco fumé
+        "place_white_box": "#bdc3c7",  # Bianco fumé,
+        "place_blue_box_ur5_on_guide": "#6a89cc"
     }
-
-    agent_order = ["ur5_on_guide", "human_right_arm"]  # Sostituisci con gli agenti effettivi
-
+    name_mapping = {
+        "pick_orange_box": "Pick Orange Box",
+        "place_orange_box": "Place Orange Box",  # Arancio più tenue
+        "pick_blue_box": "Pick Blue Box",  # Blu più tenue
+        "place_blue_box": "Place Blue Box",  # Blu più tenue
+        "place_blue_box_ur5_on_guide": "Place Blue Box",  # Blu chiaro
+        "place_blue_box_human_right_arm": "Place Blue Box",  # Blu chiaro
+        "pick_white_box": "Pick White Box",  # Grigio chiaro
+        "place_white_box": "Place White Box",  # Bianco fumé,
+        "place_blue_box_ur5_on_guide": "Place Blue Box"
+    }
+    color_mapping = {
+        "Pick Orange Box": "#ffc048",
+        "Place Orange Box": "peachpuff",  # Arancio più tenue
+        "Pick Blue Box": "#4a69bd",  # Blu più tenue
+        "Place Blue Box": "#6a89cc",  # Blu più tenue
+        "place_blue_box_ur5_on_guide": "#6a89cc",  # Blu chiaro
+        "place_blue_box_human_right_arm": "#6a89cc",  # Blu chiaro
+        "Pick White Box": "#95a5a6",  # Grigio chiaro
+        "Place White Box": "#bdc3c7",  # Bianco fumé,
+        "place_blue_box_ur5_on_guide": "#6a89cc"
+    }
+    agent_order = ["Robot", "Human"]  # Sostituisci con gli agenti effettivi
+    # agent_order = ["ur5_on_guide", "human_right_arm"]  # Sostituisci con gli agenti effettivi
+    AGENT_MAPPING = {"ur5_on_guide": "Robot",
+                     "human_right_arm": "Human"}
     solution = []
     for task in problem_solution:
+
         print(task.get_task().get_type())
-        solution.append(dict(Task=task.get_task().get_type(),
+        agent = AGENT_MAPPING.get(task.get_assignment(), task.get_assignment())
+
+        # solution.append(dict(Task=task.get_task().get_id()[:-2],
+        # solution.append(dict(Task=task.get_task().get_type(),
+        solution.append(dict(Task=name_mapping.get(task.get_task().get_type(),task.get_task().get_type()),
                              Start=datetime.fromtimestamp(task.get_start_time()).strftime("2020-04-06 %I:%M:%S"),
                              Finish=datetime.fromtimestamp(task.get_end_time()).strftime("2020-04-06 %I:%M:%S"),
-                             Agents=task.get_assignment(),
-                             AgentOrder=agent_order.index(task.get_assignment()),  # Ordine degli agenti
+                             Agents=agent,
+                             AgentOrder=agent_order.index(agent),  # Ordine degli agenti
                              TaskColor=color_mapping.get(task.get_task().get_type(), "gray")))
     df = pd.DataFrame(solution)
     df = df.sort_values(by="AgentOrder")
@@ -199,7 +229,7 @@ def save_planning_solution_to_yaml(solution: List[TaskSolution], path: Path, pro
 def show_solution_from_yaml(path: Path,
                             solution_name: Optional[str] = "Timeline"):
     solution = load_solution_from_yaml(path, solution_name)
-    show_timeline(solution, solution_name)
+    show_timeline_irim(solution, solution_name)
 
 
 def load_solution_from_yaml(path: Path,

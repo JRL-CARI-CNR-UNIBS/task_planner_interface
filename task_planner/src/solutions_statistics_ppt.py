@@ -348,22 +348,23 @@ def main():
     # path = Path("/home/samuele/Desktop/DatiArticolo/Definitivi/SicurezzaContinua/soluzioni_solo_usate")
     # path = Path("/home/samuele/Desktop/DatiArticolo/Definitivi/LessTaskSafetyAreas/solutions/safety_areas_less_tasks_usate")
     # path = Path("/home/samuele/Desktop/DatiArticolo/SicurezzaAree/Piani")
-    path = Path("/home/samuele/projects/cells_ws/src/hrc_simulator/hrc_simulator/hrc_mosaic_task_planning/hrc_mosaic_task_planning_interface/solutions/irim2023")
-
+    # path = Path("/home/samuele/projects/cells_ws/src/hrc_simulator/hrc_simulator/hrc_mosaic_task_planning/hrc_mosaic_task_planning_interface/solutions/irim2023")
+    path = Path("/home/samuele/Documents/soluzioni_da_graficare/aware_complete")
     # path = Path("/home/samuele/Desktop/DatiArticolo/SicurezzaContinua/Risultati/Solutions/")
     if (not path.exists()):
         raise ValueError("THe provided file is not a valid, not a file")
     solutions_files = os.listdir(path)
-
+    print(solutions_files)
     recipes = ["base_online", "area", "easier","complete"]
-    recipes = ["base_online"]
+    recipes = ["area"]
     recipe_names = {"base_online": "Baseline TP", "area": "Not Neighboring TP", "easier": "HA-TP (Relaxed)", "complete": "HATP"}
     dati = []
     solutions_list = []
+    AGENT_MAPPING = {"human_right_arm": "human_right_arm", "ur5_on_guide": "ur5_on_guide"}
     for analyzed_recipe in recipes:
         # anylized_recipe = "base_online"
         only_interested_file = [file_name for file_name in solutions_files if analyzed_recipe in file_name]
-
+        print(only_interested_file)
         for solution_name in only_interested_file:
             print(solution_name)
             actual_problem_to_solve = copy.deepcopy(problem_to_solve)
@@ -383,15 +384,17 @@ def main():
                     if all(feature in task_solution.keys() for feature in task_feature):
                         t_start = task_solution["t_start"]
                         t_end = task_solution["t_end"]
-                        agent = task_solution["agent"]
+                        agent = AGENT_MAPPING.get(task_solution["agent"], task_solution["agent"])
+                        
                         solution.append(actual_problem_to_solve.add_task_solution(task_id,
                                                                                   t_start,
                                                                                   t_end,
                                                                                   agent))
+            show_timeline_irim(solution)
             makespan = max([task_sol.get_end_time() for task_sol in solution])
             synergy_index = compute_synergy_val(solution)
-
             # show_timeline(solution)
+            
             dati.append({"Method": recipe_names[analyzed_recipe], "Makespan": makespan, "Synergy Val": synergy_index})
             solutions_list.append({"name":solution_name,
                                    "solution":solution,
@@ -405,6 +408,7 @@ def main():
             print("----------------------------------------")
         # return 0
     df = pd.DataFrame(dati)
+    print(dati)
     media_makespan = df.groupby("Method")["Makespan"].mean()
     media_sinergia = df.groupby("Method")["Synergy Val"].mean()
     stdev_sinergia = df.groupby("Method")["Synergy Val"].std()
@@ -441,6 +445,7 @@ def main():
     
     print("Solution min")
     show_timeline_irim(min_solution["solution"])
+    input()
     print("Solution max")
     show_timeline_irim(max_solution["solution"])
     print(min_solution["makespan"], min_solution["synergy_index"])

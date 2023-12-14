@@ -24,9 +24,7 @@ def main():
     #     rospy.loginfo("Param: distance_topic_name not defined")
     #     return 0
     # recipes_to_compare = rospy.get_param("~recipes_to_compare")
-    recipes_to_compare = ["COMPLETE_HA_SOLVER", "RELAXED_HA", "NOT_NEIGHBORING_TASKS", "BASIC_SOLVER"]
-    # recipes_to_compare = ["COMPLETE_SOLVER", "RELAXED_HA", "NOT_NEIGHBORING_TASKS", "BASIC_SOLVER"]
-
+    recipes_to_compare = ["COMPLETE_SOLVER", "RELAXED_HA", "NOT_NEIGHBORING_TASKS", "BASIC_SOLVER"]
     recipes_to_compare = recipes_to_compare[0:]
     RENAME = {"TEST": "Safety Areas - HA",
               "SAFETY_AREA_NO_AWARE": "Safety Areas - Random",
@@ -35,9 +33,8 @@ def main():
               "RELAXED_HA_SOLVER": "Relaxed HA-TP",
               "BASIC_SOLVER": "Baseline TP",
               "COMPLETE_SOLVER": "HA-TP",
-              "COMPLETE_HA_SOLVER": "HA-TP",
               "TEST_RELAXED": "Relaxed HA-TP",
-              "RELAXED_HA": "Relaxed HA-TP"}
+              "RELAXED_HA":"Relaxed HA-TP"}
     RECIPE_NAME_COLUMN = "Recipe Name"
     RECIPE_TYPE_COLUMN = "Recipe Type"
     RECIPE_PERCENTAGE_COLUMN = "Percentage Under Safety Distance"
@@ -59,15 +56,9 @@ def main():
     # file_path = "/home/samuele/projects/cells_ws/src/hrc_simulator/hrc_simulator/hrc_mosaic_task_planning/hrc_mosaic_task_planning_interface/statistics/iso15066_lun_31/distance_monitoring_online_new_mar_1.csv"
 
     # file_path = "/home/samuele/projects/cells_ws/src/hrc_simulator/hrc_simulator/hrc_mosaic_task_planning/hrc_mosaic_task_planning_interface/statistics/iso15066_lun_31/distance_monitoring_online_new_mar_1_with_test.csv"
-    # file_path = "/home/samuele/projects/cells_ws/src/hrc_simulator/hrc_simulator/hrc_mosaic_task_planning/hrc_mosaic_task_planning_interface/statistics/safety_areas_less_tasks/distance_monitoring_areas_online_25_ago.csv"
-    # file_path = "/home/samuele/Desktop/Temp/distance_monitoring_online_real.csv"
-
-    # file_path = "/home/samuele/Desktop/DatiArticolo/Definitivi/SicurezzaContinua/results/distance_monitoring_online_25_ago.csv"
-
-    file_path = "/home/samuele/Desktop/DatiArticolo/SicurezzaContinua/Risultati/Dati/distance_monitoring_online_new_mar_1.csv"
+    # file_path = "/home/samuele/Desktop/DatiArticolo/SicurezzaAree/Distanze/distance_monitoring_final_version.csv"
+    file_path = "/home/samuele/Desktop/DatiArticolo/DA MANDARE/SicurezzaContinua/results/new.csv"
     distance_dataset = pd.read_csv(file_path)
-    distance_dataset = distance_dataset.replace(np.inf, 1000)
-    max_val = 4
     fig, ax = plt.subplots(figsize=(16, 8))
     zoom = ZOOM
     if zoom:
@@ -78,12 +69,11 @@ def main():
     percentage_under_risky_dataset = {RECIPE_NAME_COLUMN: [], RECIPE_TYPE_COLUMN: [], RECIPE_PERCENTAGE_COLUMN: [],
                                       RECIPE_S_D_TYPE_COLUMN: []}
     # fig, axes = plt.subplots(2, 1, sharex=True) #, figsize=(10, 5))
-
     min_distances = dict.fromkeys(recipes_to_compare)
     for id_type, recipe_name in enumerate(recipes_to_compare):
-        print(recipe_name)
         single_recipe_type_data = distance_dataset[distance_dataset['Recipe'].str.contains(recipe_name)]
         single_type_recipe_names = single_recipe_type_data.Recipe.unique()
+
         min_distances[recipe_name] = min(single_recipe_type_data["Mean"])
 
         cumulative_dist_recipes = []
@@ -100,9 +90,7 @@ def main():
 
             hist, bin_edges = np.histogram(
                 single_recipe_distance_data["Mean"],
-                bins=n_bins,
-                range=(np.nanmin(single_recipe_distance_data["Mean"]),np.nanmax(max_val)))
-
+                bins=n_bins)
             cumulative_dist_recipes.append(np.cumsum(hist) / float(n_bins))
             bin_edges_recipes.append(bin_edges)
             min_distance.append(min(bin_edges))
@@ -125,9 +113,9 @@ def main():
 
         min_distance_recipes = min(min_distance)
         max_distance_recipes = max(max_distance)
-        delta_distance_recipes = 0.03  # min(delta_distance)
+        delta_distance_recipes = 0.01  # min(delta_distance)
 
-        maximum = max(max_distance_recipes, max_val) + delta_distance_recipes
+        maximum = max(max_distance_recipes, 4.8) + delta_distance_recipes
 
         distances = np.arange(min_distance_recipes, maximum, delta_distance_recipes)
         x_axis = []
@@ -172,10 +160,9 @@ def main():
     min_distances_pd["Method"] = min_distances_pd["Method"].replace(RENAME)
 
     baseline_distance = min_distances_pd[min_distances_pd['Method'] == 'Baseline TP']['Min Distance (m)'].values[0]
-    min_distances_pd['Difference from Baseline (m)'] = min_distances_pd['Min Distance (m)'] - baseline_distance
-    not_neigh_distance = \
-    min_distances_pd[min_distances_pd['Method'] == 'Not Neighboring TP']['Min Distance (m)'].values[0]
-    min_distances_pd['Difference from Not Neighboring (m)'] = min_distances_pd['Min Distance (m)'] - not_neigh_distance
+    min_distances_pd['Difference from Baseline (m)'] =  min_distances_pd['Min Distance (m)'] - baseline_distance
+    not_neigh_distance = min_distances_pd[min_distances_pd['Method'] == 'Not Neighboring TP']['Min Distance (m)'].values[0]
+    min_distances_pd['Difference from Not Neighboring (m)'] =  min_distances_pd['Min Distance (m)'] - not_neigh_distance
     latex_table = min_distances_pd.to_latex(index=False)
     from tabulate import tabulate
     latex_table = tabulate(min_distances_pd, headers="keys", tablefmt="latex_raw")
@@ -286,6 +273,7 @@ def main():
     # ax2.set_xlabel('')  # Rimuove il nome dell'asse x
     # ax2.set_ylabel('')  # Rimuove il nome dell'asse y
 
+
     # plt.title("Comparison on cumulative probability density on minimum H-R distance")
     # plt.axvline(x=0.8, ymin=0, ymax=1, ls='--', color="#636E72")
     # plt.annotate(xy=(0, 0.8), xytext=(0.8, 0.8), arrowprops=dict(arrowstyle='<|-|>', color="#636E72", lw=1.5), text="")
@@ -293,7 +281,6 @@ def main():
 
     path = "/home/samuele/projects/cells_ws/src/hrc_simulator/hrc_simulator/hrc_mosaic_task_planning/hrc_mosaic_task_planning_interface/statistics/fig/iso15066/new_version_25_ago/"
     path = "/home/samuele/projects/cells_ws/src/hrc_simulator/hrc_simulator/hrc_mosaic_task_planning/hrc_mosaic_task_planning_interface/statistics/fig/iso15066/new_version_25_ago/"
-    path = "/home/samuele/Desktop/DatiArticolo/Definitivi/LessTaskSafetyAreas/grafici/distance_ok"
 
     # plt.title("Comparison of plan execution duration", pad=20)
     # plt.ylabel("Task Planner Type", labelpad=25)
@@ -307,9 +294,9 @@ def main():
         zoom_name = "_with_zoom"
     # plt.savefig(f"{path}comparison_min_distance_higher_test_prova_smaller_{zoom_name}.png", bbox_inches='tight')
     # plt.savefig(f"{path}comparison_min_distance_higher_test_prova_smaller_{zoom_name}.pdf", bbox_inches='tight')
-    #
+
     # sns.set(rc={'figure.figsize': (25,8)})
-    #
+
     # plt.savefig(f"{path}comparison_min_distance{zoom_name}.png", bbox_inches='tight')
     # plt.savefig(f"{path}comparison_min_distance{zoom_name}.pdf", bbox_inches='tight')
 

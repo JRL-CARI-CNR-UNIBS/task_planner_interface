@@ -4,7 +4,7 @@ import tkinter as tk
 from tkinter import ttk
 import rospy
 from std_msgs.msg import String, Bool, Float32
-
+import os
 
 class TaskRequestApp:
     def __init__(self, root):
@@ -60,6 +60,7 @@ class TaskRequestApp:
         # Callback chiamato quando arriva una nuova richiesta
         # Aggiorna l'interfaccia grafica con la richiesta ricevuta
         self.request_text.set(f"TODO: {data.data}")
+        os.system("play -nq -t alsa synth {} sine {}".format(1.5,440))
         if "end" in data.data:
             rospy.sleep(1)
             self.execution_publisher.publish(True)

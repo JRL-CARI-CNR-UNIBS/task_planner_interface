@@ -1527,6 +1527,7 @@ class MongoStatistics:
 
             #ax = sns.violinplot(data=task_results_data, x="task_name", y="duration", hue="agent_name")
             print(task_results_data)
+
             ax = sns.boxplot(data=task_results_data, x="task_name", y="duration", hue="agent_name",
                              showmeans=True,
                              meanprops={"marker": "o",
@@ -1543,7 +1544,7 @@ class MongoStatistics:
             plt.yticks(fontsize=21, rotation=0)
 
             ax.set_title("Task Durations", fontsize=20)
-            legend = plt.legend(title='Agent Name', loc='upper left', fontsize=20)
+            legend = plt.legend(title='Agent Name', loc='upper right', fontsize=20)
             legend.get_title().set_fontsize('22')
 
             ax.figure.set_size_inches(17, 8)
