@@ -1,0 +1,5 @@
+string task_name
+string agent
+---
+bool exist
+task_planner_interface_msgs/TaskStatistics statistics

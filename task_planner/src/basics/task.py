@@ -1,18 +1,19 @@
 from dataclasses import dataclass, field
-from typing import List, Dict, Optional, overload, Tuple
+from typing import List, Dict, Optional, overload, Tuple, Set
 from enum import Enum
+from .utils import Statistics, Synergy
 
-
+# print(utils)
 @dataclass
 class Task:
     id: str
     type: str
-    agents: List[str] = field(default=None, init=False)
+    agents: Optional[List[str]] = field(default=None, init=False)
     agents_constraint: List[str]
     precedence_constraints: List[str]
     soft_precedence_constraints: List[str]
 
-    exp_duration: Dict[str, float] = field(default=None, init=False)
+    exp_duration: Optional[Dict[str, float]] = field(default=None, init=False)
     synergy: Dict[Tuple[str, str], Dict[str, float]] = field(default_factory=dict, init=False)
 
     def update_duration(self, agent: str, duration: float) -> bool:
@@ -35,7 +36,6 @@ class Task:
         if self.agents is None:
             print(f"Empy agents List")
             return False
-
         assert agent in self.agents
         if agent not in self.agents:
             print(f"Task: {self.id} has no agent: {agent}")
@@ -66,7 +66,8 @@ class Task:
         Raises:
             Exception: If the specified primary agent is not defined for the task.
         """
-
+        if self.agents is None:
+            raise Exception("Agents not set")
         if agent not in self.agents:
             raise Exception(f"Agent {agent} is not defined for task: {self.id}")
         if not all(value >= 0 for value in synergies.values()):
@@ -348,4 +349,94 @@ class TaskExecution:
         return self.task
 
 
+@dataclass
+class TaskAgentCorrespondence:
+    task_name: str
+    agents: Set[str] = field(default_factory=set, init=True)
+
+    def get_task_name(self) -> str:
+        return self.task_name
+
+    def get_agents(self) -> Set[str]:
+        return self.agents
+
+    def is_agent_capable(self, agent):
+        return agent in self.agents
+
+    def __hash__(self):
+        return hash(self.task_name)
+
+
+@dataclass
+class TaskStatistics:
+    task_name: str
+    agent_name: str
+    statistics: Statistics
+
+    def get_expected_duration(self) -> float:
+        return self.statistics.get_expected_duration()
+
+    def get_duration_std_dev(self) -> float:
+        return self.statistics.get_duration_std_dev()
+
+    def get_statistics(self) -> Statistics:
+        return AgentStats(agent_name=self.agent_name,
+                          statistics=self.statistics)
+
+    # def __eq__(self, other):
+    #     return (isinstance(other, TaskStatistics) and
+    #             self.task_name == other.task_name and
+    #             self.agent_name == other.agent_name)
+
+    def __hash__(self):
+        return hash((self.task_name, self.agent_name))
+
+
+@dataclass
+class AgentStats:
+    agent_name: str
+    statistics: Statistics
+
+    def __hash__(self):
+        return hash(self.agent_name)
+
+
+@dataclass
+class TaskSynergies:
+    main_task_name: str
+    main_agent_name: str
+    synergies: Set[Synergy] = field(default_factory=set, init=False)
+
+    def add_synergy(self,
+                    other_task_name: str,
+                    other_agent_name: str,
+                    synergy_value: float,
+                    std_dev: Optional[float] = None):
+        if other_task_name == self.task_name:
+            raise ValueError(f"Other task name: {other_task_name} must differ by task name: {self.task_name}. Not added")
+        synergy = Synergy(
+            other_task_name=other_task_name,
+            other_agent_name=other_agent_name,
+            synergy_value=synergy_value,
+            std_dev=std_dev
+        )
+        if synergy in self.synergies:
+            print(f"Warning, synergy between task: {self.main_task_name} agent: {self.main_agent_name}"
+                  f"and task: {other_task_name} agent: {other_agent_name} duplicated, old removed")
+        self.synergies.add(synergy)
+
+    def get_synergy(self, other_task_name: str, other_agent_name: str) -> Optional[Synergy]:
+        for synergy in self.synergies:
+            if synergy.other_task_name == other_task_name and synergy.other_agent_name == other_agent_name:
+                return synergy
+        return None
+
+    def get_synergies(self, other_agent_name: str) -> set:
+        return {synergy for synergy in self.synergies if synergy.other_agent_name == other_agent_name}
+
+    def get_all_synergies(self) -> set:
+        return self.synergies
+
+    def has_synergy(self, synergy: Synergy):
+        return synergy in self.synergies
 

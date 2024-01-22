@@ -1906,7 +1906,7 @@ class MongoStatistics:
             print("task_group")
             print(task_group)
             fig, axs = plt.subplots(nrows=2, ncols=2, figsize=(12, 10))
-            TODO: Bug fix in this section
+            # TODO: Bug fix in this section
             # chart_title = TASK_NAME_FOR_CHART[task_group["_id"][0]]
             #
             # chart_agent_name = AGENT_NAME_FOR_CHART[agent]

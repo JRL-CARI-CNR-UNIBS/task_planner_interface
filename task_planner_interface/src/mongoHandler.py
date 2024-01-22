@@ -9,7 +9,8 @@ from task_planner_interface_msgs.msg import MotionTaskExecutionRequest, MotionTa
     MotionTaskExecutionFeedback, TaskAgents, TaskStatistics
 from task_planner_interface_msgs.srv import TaskResult, TaskResultResponse, BasicSkill, BasicSkillResponse, TaskType, \
     TaskTypeResponse, PickPlaceSkill, PickPlaceSkillResponse, PauseSkill, PauseSkillResponse, TasksInformation, \
-    TasksInformationResponse, TasksStatistics, TasksStatisticsResponse, DeleteRecipe, DeleteRecipeResponse
+    TasksInformationResponse, TasksStatistics, TasksStatisticsResponse, \
+    DeleteRecipe, DeleteRecipeResponse #TaskStatistics, TaskStatisticsResponse
 
 from task_planner_statistics.msg import TaskSynergy
 from task_planner_statistics.srv import TaskSynergies, TaskSynergiesResponse
@@ -339,6 +340,33 @@ class MongoHandler:
             stats_response.statistics.append(task_stat)
         return stats_response
 
+    # TODO: FINIRE
+    # def getTaskStatistics(self, request):
+    #     rospy.loginfo(SERVICE_CALLBACK.format("for get task statistics"))
+    #     stats_response = TasksStatisticsResponse()
+    #     stats_response.exist = False
+    #     try:
+    #         query_result = self.coll_durations.find({"name": request.task_name, "agent": request.agent},
+    #                                                 {"name": 1, "agent": 1, "expected_duration": 1,
+    #                                                  "duration_stddev": 1, "_id": 0})
+    #     except pymongo.errors.AutoReconnect:  # Db connection failed
+    #         rospy.logerr(CONNECTION_LOST)
+    #     if len(query_result) > 1:
+    #         print(f"Warning: more than one statistics for: {request.task_name}")
+    #     elif len(query_result) == 0:
+    #
+    #     if not all(stat in task_statistics for stat in ["name", "agent", "expected_duration", "duration_stddev"]):
+    #         rospy.logerr(RED + "Statistics not present in db" + END)
+    #         raise Exception
+    #
+    #     task_stat = TaskStatistics()
+    #     task_stat.name = task_statistics["name"]
+    #     task_stat.agent = task_statistics["agent"]
+    #     task_stat.exp_duration = task_statistics["expected_duration"]
+    #     task_stat.duration_std = task_statistics["duration_stddev"]
+    #     stats_response.statistics.append(task_stat)
+    #     return stats_response
+
     def getTaskSynergy(self, request):
         rospy.loginfo(SERVICE_CALLBACK.format("get_task_synergies"))
 
@@ -446,6 +474,8 @@ def main():
 
     rospy.Service("mongo_handler/get_task_agents", TasksInformation, mongo_handler.getTasksAgents)
     rospy.Service("mongo_handler/get_tasks_statistics", TasksStatistics, mongo_handler.getTasksStatistics)
+    # rospy.Service("mongo_handler/get_task_statistics", TaskStatistics, mongo_handler.getTaskStatistics)
+
     rospy.Service("mongo_statistics/get_task_synergies", TaskSynergies, mongo_handler.getTaskSynergy)
     rospy.Service("mongo_handler/delete_recipe", DeleteRecipe, mongo_handler.delete_recipe)
 

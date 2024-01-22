@@ -1,0 +1,65 @@
+tasks_properties:
+  - name: task_1
+    agents:
+      - name: robot1
+        expected_duration: 10
+        duration_std_dev: 2
+      - name: robot2
+        expected_duration: 8
+        duration_std_dev: 1.5
+
+  - name: task_2
+    agents:
+      - name: robot2
+        expected_duration: 12
+        duration_std_dev: 3
+      - name: robot3
+        expected_duration: 15
+        duration_std_dev: 2.5
+
+  - name: task_3
+    agents:
+      - name: robot1
+        expected_duration: 12
+        duration_std_dev: 3
+
+task_synergies:
+  - main_task: task_1
+    main_agent: robot1
+    parallel_tasks:
+      - parallel_task: task_2
+        parallel_agent: robot2
+        synergy_value: 1.2
+        synergy_std: 0.1
+      - parallel_task: task_3
+        parallel_agent: robot1
+        synergy_value: 1.4
+        synergy_std: 0.2
+  - main_task: task_2
+    main_agent: robot2
+    parallel_tasks:
+      - parallel_task: task_2
+        parallel_agent: robot2
+        synergy_value: 1.2
+        synergy_std: 0.1
+      - parallel_task: task_3
+        parallel_agent: robot1
+        synergy_value: 1.4
+        synergy_std: 0.2
+# - task_name_1:
+#   expected_duration:
+#     agent_1 : 1
+#     agent_2 : 3
+# - task_name_2:
+#   expected_duration:
+#     agent_4: 1
+#     agent_5: 4
+# - task_name_3:
+#   expected_duration:
+#     agent1 : 1
+# - task_name_6:
+#   expected_duration:
+#     agent1 : 4
+#   standard_deviation:
+#     agent3 : 1
+# - task_name_6
