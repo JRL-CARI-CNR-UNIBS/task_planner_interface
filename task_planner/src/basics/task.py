@@ -4,18 +4,47 @@ from enum import Enum
 from utils import Statistics, Synergy
 
 
-# print(utils)
+# @dataclass
+# class TaskInstance:
+#     task_id: str
+#     task: Task
+#
+#     agents_constraints: Set[str]
+#
+#     immediate_precedence_constraint: str
+#     precedence_constraints: Set[str]
+#
+#     def __hash__(self):
+#         return hash(self.id)
+
+@dataclass
+class AgentStats:
+    agent_name: str
+    statistics: Statistics
+
+    def __hash__(self):
+        return hash(self.agent_name)
+
+
 @dataclass
 class Task:
-    id: str
-    type: str
-    agents: Optional[List[str]] = field(default=None, init=False)
-    agents_constraint: List[str]
-    precedence_constraints: List[str]
-    soft_precedence_constraints: List[str]
+    # id: str
+    task_name: str  # type
+
+    agents: Optional[Set[str]] = field(default=None, init=False)
+    # agents_constraint: List[str]
+    # precedence_constraints: List[str]
+    # soft_precedence_constraints: List[str]
+
+    statistics: Optional[AgentStats] = field(default=None, init=False)
+    synergyes: Optional[float] = field(default_factory=dict, init=False)
 
     exp_duration: Optional[Dict[str, float]] = field(default=None, init=False)
     synergy: Dict[Tuple[str, str], Dict[str, float]] = field(default_factory=dict, init=False)
+
+    def add_statistics(self, statistics: AgentStats):
+        # TODO: Add statistics
+        pass
 
     def update_duration(self, agent: str, duration: float) -> bool:
         """
@@ -210,6 +239,9 @@ class Task:
     def get_type(self) -> str:
         return self.type
 
+    def get_task_name(self) -> str:
+        return self.task_name
+
     def get_agents(self) -> List[str]:
         return self.agents
 
@@ -237,7 +269,8 @@ class Task:
         return not_enabled_agents
 
     def __eq__(self, other):
-        return isinstance(other, Task) and self.id == other.id
+        return ((isinstance(other, Task) and self.task_name == other.task_name) or
+                (isinstance(other, str) and self.task_name == other))
 
     def __hash__(self):
         return hash(self.id)
@@ -247,6 +280,38 @@ class Task:
             return f"{self.id}, {self.exp_duration}"
         else:
             return f"{self.id}"
+
+
+@dataclass
+class TaskInstance:
+    id: str = field(init=True)
+    task: Optional[Task] = field(default=None, init=False)
+
+    agents_constraints: Set[str] = field(default_factory=set, init=True)
+    immediate_precedence_constraint: Optional[str] = field(default=None,
+                                                           init=True)  # TODO: Di stringa o di TaskInstance?
+    precedence_constraints: Set[str] = field(default_factory=set, init=True)
+
+    def get_id(self):
+        return self.id
+
+    def get_task(self):
+        return self.task
+
+    def get_agents_constraints(self):
+        return self.agents_constraints
+
+    def get_immediate_precedence_constraints(self):
+        return self.immediate_precedence_constraint
+
+    def get_precedence_constraints(self):
+        return self.precedence_constraints
+
+    def __hash__(self):
+        return hash(self.id)
+
+    def __eq__(self, other):
+        return isinstance(other, TaskInstance) and other.id == self.id
 
 
 @dataclass
@@ -372,6 +437,14 @@ class TaskAgentCorrespondence:
     def __hash__(self):
         return hash(self.task_name)
 
+    def __eq__(self, other):
+        return ((isinstance(other, str) and other == self.task_name) or
+                (isinstance(other, TaskAgentCorrespondence) and other.task_name == self.task_name))
+
+
+#     return (isinstance(other, TaskStatistics) and
+#             self.task_name == other.task_name and
+
 
 @dataclass
 class TaskStatistics:
@@ -389,6 +462,9 @@ class TaskStatistics:
         return AgentStats(agent_name=self.agent_name,
                           statistics=self.statistics)
 
+    def get_task_name(self):
+        return self.task_name
+
     # def __eq__(self, other):
     #     return (isinstance(other, TaskStatistics) and
     #             self.task_name == other.task_name and
@@ -397,14 +473,8 @@ class TaskStatistics:
     def __hash__(self):
         return hash((self.task_name, self.agent_name))
 
-
-@dataclass
-class AgentStats:
-    agent_name: str
-    statistics: Statistics
-
-    def __hash__(self):
-        return hash(self.agent_name)
+    # def __eq__(self, other):
+    #     return isinstance(other,str) and other
 
 
 @dataclass
