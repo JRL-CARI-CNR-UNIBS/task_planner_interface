@@ -1,7 +1,8 @@
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional, overload, Tuple, Set
 from enum import Enum
-from .utils import Statistics, Synergy
+from utils import Statistics, Synergy
+
 
 # print(utils)
 @dataclass
@@ -360,8 +361,13 @@ class TaskAgentCorrespondence:
     def get_agents(self) -> Set[str]:
         return self.agents
 
-    def is_agent_capable(self, agent):
+    def is_agent_capable(self, agent: str) -> bool:
         return agent in self.agents
+
+    def add_agent(self, agent: str):
+        if agent in self.agents:
+            print(f"Agent: {agent} already present in agents of task: {self.task_name}")
+        self.agents.add(agent)
 
     def __hash__(self):
         return hash(self.task_name)
@@ -412,8 +418,10 @@ class TaskSynergies:
                     other_agent_name: str,
                     synergy_value: float,
                     std_dev: Optional[float] = None):
-        if other_task_name == self.task_name:
-            raise ValueError(f"Other task name: {other_task_name} must differ by task name: {self.task_name}. Not added")
+        if other_task_name == self.main_task_name and other_agent_name == self.main_agent_name:
+            raise ValueError(
+                f"Other task and agent name: ({other_task_name}, {other_agent_name}) must differ by main one: "
+                f"({self.main_task_name}, {self.main_agent_name}). Not added")
         synergy = Synergy(
             other_task_name=other_task_name,
             other_agent_name=other_agent_name,
@@ -439,4 +447,3 @@ class TaskSynergies:
 
     def has_synergy(self, synergy: Synergy):
         return synergy in self.synergies
-

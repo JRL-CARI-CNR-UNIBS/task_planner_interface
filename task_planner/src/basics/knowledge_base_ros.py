@@ -10,7 +10,7 @@ import rospy
 import rosservice
 from knowledge_base import KnowledgeBaseInterface, DataLoadingError
 from task import TaskAgentCorrespondence, TaskStatistics, TaskSynergies
-from .utils import Color, UserMessages, Statistics
+from utils import Color, UserMessages, Statistics
 
 TIMEOUT = 10
 
@@ -64,10 +64,10 @@ class ROSKnowledgeBase(KnowledgeBaseInterface):
             tasks_agents_result = self.task_agents_srv()
             tasks_agents_correspondence = set()
             for task_info in tasks_agents_result.tasks_info:
-                task_agent_correspondence = TaskAgentCorrespondence(task_name=task_info.name, agents=task_info.agents)
-                if task_agent_correspondence in tasks_agents_correspondence:  # same task name
+                single_task_agents = TaskAgentCorrespondence(task_name=task_info.name, agents=task_info.agents)
+                if single_task_agents in tasks_agents_correspondence:  # same task name
                     print(f"Warning, task agents info of: {task_info.name} duplicated, old removed")
-                tasks_agents_correspondence.add(task_agent_correspondence)
+                tasks_agents_correspondence.add(single_task_agents)
             return tasks_agents_correspondence
         except rospy.ServiceException:
             rospy.logerr(UserMessages.SERVICE_FAILED.value.format(self.task_agents_srv_name))
@@ -78,54 +78,40 @@ class ROSKnowledgeBase(KnowledgeBaseInterface):
             tasks_stats_result: TasksStatistics
             tasks_stats_result = self.task_stats_srv()
             tasks_stats = set()
-            for task_stats in tasks_stats_result.statistics:
-                task_stats_obj = TaskStatistics(task_name=task_stats.name,
-                                                agent_name=task_stats.agent,
-                                                statistics=Statistics(expected_duration=task_stats.exp_duration,
-                                                                      duration_std_dev=task_stats.duration_std))
-                if task_stats_obj in tasks_stats:   # same name and agent
+            for single_task_stats in tasks_stats_result.statistics:
+                single_task_stats_obj = TaskStatistics(task_name=single_task_stats.name,
+                                                       agent_name=single_task_stats.agent,
+                                                       statistics=Statistics(
+                                                           expected_duration=single_task_stats.exp_duration,
+                                                           duration_std_dev=single_task_stats.duration_std))
+                if single_task_stats_obj in tasks_stats:  # same name and agent
                     rospy.loginfo(UserMessages.CUSTOM_ORANGE.value.format
-                                  (f"Warning, task stats of: {task_stats.name} duplicated, old removed"))
-                tasks_stats.add(task_stats_obj)
+                                  (f"Warning, task stats of: {single_task_stats.name}, "
+                                   f"agent: {single_task_stats.agent} duplicated, old removed"))
+                tasks_stats.add(single_task_stats_obj)
             return tasks_stats
         except rospy.ServiceException as e:
             rospy.logerr(UserMessages.SERVICE_FAILED.value.format(self.task_stats_srv_name))
             raise DataLoadingError(UserMessages.SERVICE_FAILED.value.format(self.task_agents_srv_name))
 
     def get_task_stats(self, task_name: str, agent_name: str) -> Statistics:
-        pass
-        # try:
-        #     tasks_stats_result: TasksStatistics
-        #     tasks_stats_result = self.get_tasks_stats_srv()
-        #     tasks_stats = set()
-        #     for task_stats in tasks_stats_result.statistics:
-        #         task_stats_obj = TaskStatistics(task_name=task_name,
-        #                                         agent_name=agent_name,
-        #                                         statistics=Statistics(expected_duration=task_stats.exp_duration,
-        #                                                               duration_std_dev=task_stats.duration_std))
-        #         if task_stats_obj in tasks_stats:
-        #             print(f"Warning, task stats of: {task_stats.name} duplicated")
-        #         tasks_stats.add(task_stats_obj)
-        #     return tasks_stats
-        # except rospy.ServiceException as e:
-        #     rospy.logerr(UserMessages.SERVICE_FAILED.value.format(self.task_stats_srv_name))
-        #     raise DataLoadingError(UserMessages.SERVICE_FAILED.value.format(self.task_agents_srv_name))
+        raise NotImplemented
 
-    def get_tasks_synergies(self, task_name: str, agent: str) -> TaskSynergies:
+    def get_task_synergies(self, main_task_name: str, main_agent_name: str) -> TaskSynergies:
         """
 
         Args:
-            task_name: Main task name
-            agent:  Main agent name
+            main_task_name: Main task name
+            main_agent_name:  Main agent name
 
         Returns: Return the TaskSynergies object of that task and agent with the respect with all the other task-agents
 
         """
         task_synergies_request = TaskSynergiesRequest()
-        task_synergies_request.task_name = task_name
-        task_synergies_request.agent = agent
+        task_synergies_request.task_name = main_task_name
+        task_synergies_request.agent = main_agent_name
 
-        task_synergies_obj = TaskSynergies(task_name, agent)
+        task_synergies_obj = TaskSynergies(main_task_name, main_agent_name)
         try:
             task_synergies_result = self.task_synergies_srv(task_synergies_request)
             for task_synergies in task_synergies_result.synergies:

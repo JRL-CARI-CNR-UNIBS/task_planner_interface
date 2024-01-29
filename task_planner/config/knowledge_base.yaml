@@ -1,27 +1,27 @@
 tasks_properties:
-  - name: task_1
+  - task_name: task_1
     agents:
-      - name: robot1
+      - agent_name: robot1
         expected_duration: 10
-        duration_std_dev: 2
-      - name: robot2
+        duration_std: 2
+      - agent_name: robot2
         expected_duration: 8
-        duration_std_dev: 1.5
+        duration_std: 1.5
 
-  - name: task_2
+  - task_name: task_2
     agents:
-      - name: robot2
+      - agent_name: robot2
         expected_duration: 12
-        duration_std_dev: 3
-      - name: robot3
+        duration_std: 3
+      - agent_name: robot3
         expected_duration: 15
-        duration_std_dev: 2.5
+        duration_std: 2.5
 
-  - name: task_3
+  - task_name: task_3
     agents:
-      - name: robot1
+      - agent_name: robot1
         expected_duration: 12
-        duration_std_dev: 3
+        duration_std: 3
 
 task_synergies:
   - main_task: task_1
