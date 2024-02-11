@@ -2,6 +2,11 @@ from abc import ABC, abstractmethod
 from task import TaskStatistics, TaskAgentCorrespondence, TaskSynergies
 from typing import Set
 
+DEFAULT_KNOWLEDGE_BASES_LIST = [
+    "yaml",
+    "ros"
+]
+
 
 class KnowledgeBaseInterface(ABC):
     @abstractmethod
@@ -23,3 +28,32 @@ class KnowledgeBaseInterface(ABC):
 
 class DataLoadingError(Exception):
     pass
+
+
+class KnowledgeBaseFactory:
+    def __init__(self):
+        self._creators = {}
+
+    def register_format(self, knowledge_base_type: str, creator, *args, **kwargs):
+        self._creators[knowledge_base_type] = (creator, args, kwargs)
+
+    def get_knowledge_base(self, knowledge_base_type: str):
+        creator_info = self._creators.get(knowledge_base_type)
+        if not creator_info:
+            raise ValueError(knowledge_base_type)
+        creator, args, kwargs = creator_info
+        return creator(*args, **kwargs)
+
+
+# class ObjectFactory:
+#     def __init__(self):
+#         self._builders = {}
+#
+#     def register_builder(self, key, builder):
+#         self._builders[key] = builder
+#
+#     def create(self, key, **kwargs):
+#         builder = self._builders.get(key)
+#         if not builder:
+#             raise ValueError(key)
+#         return builder(**kwargs)

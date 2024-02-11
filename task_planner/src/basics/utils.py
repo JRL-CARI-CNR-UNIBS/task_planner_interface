@@ -100,6 +100,15 @@ class Statistics:
 
 
 @dataclass
+class AgentStats:
+    agent_name: str
+    statistics: Statistics
+
+    def __hash__(self):
+        return hash(self.agent_name)
+
+
+@dataclass
 class Synergy:
     other_task_name: str
     other_agent_name: str
@@ -112,3 +121,5 @@ class Synergy:
 
     def __hash__(self):
         return hash((self.other_task_name, self.other_agent_name))
+
+

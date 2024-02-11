@@ -3,7 +3,7 @@ goal:
       task_name: pick_orange_box
       required_agents: []
       precedence_constraints: []
-      soft_precedence_constraints: []
+      immediate_precedence_constraints: []
   - pick_orange_box_2:
       task_name: pick_orange_box
       required_agents: []

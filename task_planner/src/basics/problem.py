@@ -4,11 +4,15 @@ from typing import List, Dict, Tuple, Optional, Set
 
 from knowledge_base import KnowledgeBaseInterface
 from task import TaskAgentCorrespondence, TaskStatistics
+from problem_loader_base import ProblemLoaderBase
 
+class Status(Enum):
 
 @dataclass
 class Problem:
     knowledge_base: KnowledgeBaseInterface = field(default_factory=None, init=True)
+    # TODO: Da analizzare goal_loader
+    problem_loader: ProblemLoaderBase = field(default_factory=None, init=True)
 
     tasks_set: Set[Task] = field(default_factory=set, init=False)
     task_instances_set: Set[TaskInstance] = field(default_factory=set, init=False)
@@ -17,7 +21,6 @@ class Problem:
     robot_agents: Optional[Set[str]] = field(default_factory=set, init=True)
 
     solution: Set[TaskSolution] = field(default_factory=list, init=False)
-
 
     def __post_init__(self):
         if self.robot_agents:
@@ -33,9 +36,9 @@ class Problem:
     def get_task_set_as_dictionary(self) -> Dict[str, Task]:
         return {task.get_task_name(): task for task in self.tasks_set}
 
-    def get_task_instanes_as_dictionary(self):
-        # TODO: Da finire
-        pass
+    def get_task_instances_as_dictionary(self) -> Dict[str, TaskInstance]:
+        return {task_instance.get_id(): task_instance for task_instance in self.task_instances_set}
+        # Todo: OK che dia id?
 
     def consistency_check(self) -> bool:
         tasks_dict = self.get_task_list_as_dictionary()
@@ -88,7 +91,7 @@ class Problem:
     def load_tasks_stats_from_knowledge(self):
         # Todo: Check sulla procedura, può solo se prima ho load i tasks.
         if not self.tasks_set:
-            raise Exception("EMpty tasks set, you have to load_tasks_from_knowledge")
+            raise Exception("Empty tasks set, you have to load_tasks_from_knowledge")
         tasks_stats: Set[TaskStatistics]
         tasks_stats = self.knowledge_base.get_tasks_stats()
         if not tasks_stats:
@@ -104,6 +107,12 @@ class Problem:
                 task.add_statistics(task_stat)
 
     def load_task_instances(self):
+        #Todo: Check sulla procedura, può solo se prima task_set settati.
+        try:
+            self.task_instances_set = self.problem_loader.load_instances(self.tasks_set)
+        except ValueError as exc:
+            raise exc
+
 
 
     def fill_task_agents(self) -> bool:
@@ -122,8 +131,7 @@ class Problem:
         # if not task_agents_correspondence:
         #     print(f"Task info empty from service: check DB!")
         #     return False
-        task_agents_correspondence: Set[TaskAgentCorrespondence]
-        task_agents_correspondence = self.knowledge_base.get_task_agents()
+        task_agents_correspondence: Set[TaskAgentCorrespondence] = self.knowledge_base.get_task_agents()
         if not task_agents_correspondence:
             return ValueError("Empty Knowledge Base")
 

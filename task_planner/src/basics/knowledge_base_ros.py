@@ -34,7 +34,7 @@ class ROSKnowledgeBase(KnowledgeBaseInterface):
                              self.task_agents_srv_name,
                              self.task_stats_srv_name,
                              self.task_synergies_srv_name]:
-            rospy.loginfo("Waiting {service_name}")
+            rospy.loginfo(f"Waiting {service_name}")
             rospy.wait_for_service(service=service_name, timeout=rospy.Duration(secs=TIMEOUT))
             if service_name not in service_list:
                 raise ValueError(f"Service {service_name} not found.")
@@ -97,7 +97,7 @@ class ROSKnowledgeBase(KnowledgeBaseInterface):
     def get_task_stats(self, task_name: str, agent_name: str) -> Statistics:
         raise NotImplemented
 
-    def get_task_synergies(self, main_task_name: str, main_agent_name: str) -> TaskSynergies:
+    def get_task_synergies(self, main_task_name: str, main_agent_name: str) -> Optional[TaskSynergies]:
         """
 
         Args:
@@ -107,6 +107,8 @@ class ROSKnowledgeBase(KnowledgeBaseInterface):
         Returns: Return the TaskSynergies object of that task and agent with the respect with all the other task-agents
 
         """
+        if not self.task_synergies_srv:
+            return None
         task_synergies_request = TaskSynergiesRequest()
         task_synergies_request.task_name = main_task_name
         task_synergies_request.agent = main_agent_name
@@ -126,3 +128,16 @@ class ROSKnowledgeBase(KnowledgeBaseInterface):
             rospy.logerr(UserMessages.SERVICE_FAILED.value.format(self.task_stats_srv_name))
             raise DataLoadingError(UserMessages.SERVICE_FAILED.value.format(self.task_agents_srv_name))
         return task_synergies_obj
+
+
+# class ROSKnowledgeBaseBuilder:
+#     def __init__(self):
+#         self._instance = None
+#
+#     def __call__(self,
+#                  task_type_check_srv_name: str,
+#                  task_agents_srv_name: str,
+#                  task_stats_srv_name: str,
+#                  task_synergies_srv_name: Optional[str], **_ignored):
+#         self._instance = ROSKnowledgeBase(task_type_check_srv_name, task_agents_srv_name, task_stats_srv_name, task_synergies_srv_name)
+#         return self._instance

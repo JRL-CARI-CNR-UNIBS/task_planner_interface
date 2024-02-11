@@ -1,6 +1,6 @@
 from knowledge_base import KnowledgeBaseInterface, DataLoadingError
 from dataclasses import dataclass, field
-from typing import Set
+from typing import Set, Optional
 
 import yaml
 from pathlib import Path
@@ -90,7 +90,7 @@ class YAMLKnowledgeBase(KnowledgeBaseInterface):
                 tasks_stats.add(single_task_stats_obj)
         return tasks_stats
 
-    def get_task_synergies(self, main_task_name: str, main_agent_name: str) -> TaskSynergies:
+    def get_task_synergies(self, main_task_name: str, main_agent_name: str) -> Optional[TaskSynergies]:
         """
 
         Args:
@@ -100,6 +100,8 @@ class YAMLKnowledgeBase(KnowledgeBaseInterface):
         Returns: Return the TaskSynergies object of that task and agent with the respect with all the other task-agents
 
         """
+        if not TASK_SYNERGIES in self.knowledge_base_data:
+            return None
         task_synergies_obj = TaskSynergies(main_task_name, main_agent_name)
         for task_synergy in self.knowledge_base_data[TASK_SYNERGIES]:
             if task_synergy[MAIN_TASK] != main_task_name or task_synergy[MAIN_AGENT] != main_agent_name:
@@ -120,6 +122,7 @@ class YAMLKnowledgeBase(KnowledgeBaseInterface):
         return task_synergies_obj
 
     def _validate_format(self):
+        # TODO: Synergy can also not be there se uno non vuole
         # Check if 'tasks_properties' and 'task_synergies' are present in the YAML data
         if TASK_PROPERTIES not in self.knowledge_base_data or TASK_SYNERGIES not in self.knowledge_base_data:
             raise ValueError(f"Invalid format: '{TASK_PROPERTIES}' and '{TASK_SYNERGIES}' are required.")

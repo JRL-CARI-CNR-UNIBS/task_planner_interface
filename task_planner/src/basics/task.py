@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional, overload, Tuple, Set
 from enum import Enum
-from utils import Statistics, Synergy
+from utils import Statistics, Synergy, AgentStats
 
 
 # @dataclass
@@ -17,13 +17,13 @@ from utils import Statistics, Synergy
 #     def __hash__(self):
 #         return hash(self.id)
 
-@dataclass
-class AgentStats:
-    agent_name: str
-    statistics: Statistics
-
-    def __hash__(self):
-        return hash(self.agent_name)
+# @dataclass
+# class AgentStats:
+#     agent_name: str
+#     statistics: Statistics
+#
+#     def __hash__(self):
+#         return hash(self.agent_name)
 
 
 @dataclass
@@ -272,25 +272,34 @@ class Task:
         return ((isinstance(other, Task) and self.task_name == other.task_name) or
                 (isinstance(other, str) and self.task_name == other))
 
-    def __hash__(self):
-        return hash(self.id)
+    # def __hash__(self):
+    #     return hash(self.id)
 
-    def __repr__(self):
-        if self.exp_duration:
-            return f"{self.id}, {self.exp_duration}"
-        else:
-            return f"{self.id}"
+    # def __repr__(self):
+    #     if self.exp_duration:
+    #         return f"{self.id}, {self.exp_duration}"
+    #     else:
+    #         return f"{self.id}"
 
 
 @dataclass
 class TaskInstance:
     id: str = field(init=True)
-    task: Optional[Task] = field(default=None, init=False)
+    task: Task = field(init=True)
+    # task: Optional[Task] = field(default=None, init=False)
+    # Todo: to reason about init=True, If false then how to fill that field?
 
-    agents_constraints: Set[str] = field(default_factory=set, init=True)
+    agents_constraints: Set[str] = field(default_factory=set, init=True) # TODO: Ha senso un set? Un or tra due agenti?
     immediate_precedence_constraint: Optional[str] = field(default=None,
                                                            init=True)  # TODO: Di stringa o di TaskInstance?
     precedence_constraints: Set[str] = field(default_factory=set, init=True)
+
+    def __post__init(self):
+        # Check agents constraint in task obj
+        for agent in self.agents_constraints:
+            if agent not in self.task.get_agents():
+                raise ValueError(f"Task id has as agents constraints: {agent} "
+                                 f"not present in task: {self.task.get_task_name()} agents.")
 
     def get_id(self):
         return self.id

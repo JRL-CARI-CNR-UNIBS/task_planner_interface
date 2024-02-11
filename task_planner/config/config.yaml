@@ -1,0 +1,15 @@
+knowledge_base:
+  type: ros  
+  parameters:
+    task_type_check_srv_name: valore1
+    task_agents_srv_name: valore2
+    task_stats_srv_name: valore2
+    task_synergies_srv_name: valore2
+  # type: yaml  
+  # parameters:
+  #   yaml_file_path: valore1
+
+optimizer:
+  type: STP
+  parameters:
+    mip_gap: 1
