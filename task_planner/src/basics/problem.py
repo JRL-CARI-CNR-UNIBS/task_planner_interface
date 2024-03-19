@@ -134,18 +134,18 @@ class ProblemManager:
                 statistics = task_statistics_dict[(task_name, agent_name)].get_statistics()
                 task.add_statistics(statistics)
 
-    def load_tasks_synergyes_from_knowledge(self):
-        return
-
+    def load_tasks_synergies_from_knowledge(self):
         if not self.tasks_set:
             raise Exception("Empty tasks set, you have to load_tasks_from_knowledge")
 
         for task in self.tasks_set:
             task_name = task.get_task_name()
             for agent_name in task.get_agents():
-                tasks_synergies = self.knowledge_base.get_task_synergies(main_task_name=task_name,
-                                                                         main_agent_name=agent_name)
-                tasks_synergies.get_agent_synergies()
+                task_agent_synergies = self.knowledge_base.get_task_synergies(main_task_name=task_name,
+                                                                              main_agent_name=agent_name)
+                agent_synergies = task_agent_synergies.get_agent_synergies()
+                for agent_synergy in agent_synergies:
+                    task.add_synergy(agent_synergy)
 
     def load_task_instances(self):
         # Todo: Check sulla procedura, può solo se prima task_set settati.
@@ -158,7 +158,7 @@ class ProblemManager:
         self.load_tasks_from_knowledge()
         self.load_tasks_stats_from_knowledge()
         self.load_task_instances()
-        #TODO: DA SISTEMARE
+        # TODO: DA SISTEMARE
         if not self.consistency_check():
             # TODO: Change status?
             pass

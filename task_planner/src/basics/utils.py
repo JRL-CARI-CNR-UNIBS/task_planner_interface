@@ -132,13 +132,13 @@ class AgentSynergy:
     synergy: Synergy
 
     def __post_init__(self):
-        if self.synergy.other_task_name == self.main_agent_name:
+        if self.synergy.other_agent_name == self.main_agent_name:
             raise ValueError(
                 f"Other agent name: ({self.synergy.other_agent_name}) must differ by main one: "
                 f"({self.main_agent_name})")
 
     def __hash__(self):
-        return hash((self.synergy.other_task_name, self.other_agent_name))
+        return hash((self.synergy.other_agent_name, self.synergy.other_task_name, self.main_agent_name))
 
 
 class DataLoadingError(Exception):

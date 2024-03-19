@@ -37,10 +37,11 @@ class Task:
     # soft_precedence_constraints: List[str]
 
     statistics: Optional[Set[AgentStats]] = field(default=None, init=False)
+    synergyes: Optional[Set[AgentSynergy]] = field(default=None, init=False)
     # synergyes: Optional[float] = field(default_factory=dict, init=False)
 
-    exp_duration: Optional[Dict[str, float]] = field(default=None, init=False)
-    synergy: Dict[Tuple[str, str], Dict[str, float]] = field(default_factory=dict, init=False)
+    # exp_duration: Optional[Dict[str, float]] = field(default=None, init=False)
+    # synergy: Dict[Tuple[str, str], Dict[str, float]] = field(default_factory=dict, init=False)
 
     def add_statistics(self, statistics: AgentStats):
         # TODO: Forse meglio add_agent_statistics?
@@ -84,33 +85,35 @@ class Task:
         self.exp_duration[agent] = duration
         return True
 
-    def update_synergy(self, agent, parallel_agent, synergies: Dict[str, float]) -> None:
-        """
-        Update the synergy value between two agents for a current task.
+    # def update_synergy(self, agent, parallel_agent, synergies: Dict[str, float]) -> None:
+    #     """
+    #     Update the synergy value between two agents for a current task.
+    #
+    #     Args:
+    #         agent: The primary agent for which the synergy is being updated.
+    #         parallel_agent: The secondary agent with which the synergy is being updated.
+    #         synergies (Dict[str, float]): A dictionary containing the synergy values for different tasks.
+    #
+    #     Returns:
+    #         None
+    #
+    #     Raises:
+    #         Exception: If the specified primary agent is not defined for the task.
+    #     """
+    #     if self.agents is None:
+    #         raise Exception("Agents not set")
+    #     if agent not in self.agents:
+    #         raise Exception(f"Agent {agent} is not defined for task: {self.id}")
+    #     if not all(value >= 0 for value in synergies.values()):
+    #         raise ValueError("Synergy values must be non-negative.")
+    #
+    #     # TODO: Check that contains all tasks
+    #     self.synergy[(agent, parallel_agent)] = synergies
+    #     # Alternative solutions: pass only one synergy as single dict {name:, synergy}
+    #     #                        pass one synergy object
+    #     #                        pass a synergy objects list
+    def update_synergy(self, agent_synergy: AgentSynergy) -> None:
 
-        Args:
-            agent: The primary agent for which the synergy is being updated.
-            parallel_agent: The secondary agent with which the synergy is being updated.
-            synergies (Dict[str, float]): A dictionary containing the synergy values for different tasks.
-
-        Returns:
-            None
-
-        Raises:
-            Exception: If the specified primary agent is not defined for the task.
-        """
-        if self.agents is None:
-            raise Exception("Agents not set")
-        if agent not in self.agents:
-            raise Exception(f"Agent {agent} is not defined for task: {self.id}")
-        if not all(value >= 0 for value in synergies.values()):
-            raise ValueError("Synergy values must be non-negative.")
-
-        # TODO: Check that contains all tasks
-        self.synergy[(agent, parallel_agent)] = synergies
-        # Alternative solutions: pass only one synergy as single dict {name:, synergy}
-        #                        pass one synergy object
-        #                        pass a synergy objects list
 
     def update_agents(self, agents: List[str]) -> None:
         """
@@ -270,6 +273,9 @@ class Task:
         if self.agents_constraint:
             not_enabled_agents = list(set(self.agents) - set(self.agents_constraint))
         return not_enabled_agents
+
+    def add_synergy(self, agent_synergy: AgentSynergy):
+        self.synergyes.add(agent_synergy)
 
     def __eq__(self, other):
         return ((isinstance(other, Task) and self.task_name == other.task_name) or
