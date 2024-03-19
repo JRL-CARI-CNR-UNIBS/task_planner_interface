@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Optional, List, Set
+from typing import Optional, Set
 
 from task_planner_interface_msgs.srv import (TaskType, TaskTypeResponse, TasksInformation,
                                              TasksInformationResponse, TasksStatistics)
@@ -8,9 +8,9 @@ from task_planner_statistics.srv import TaskSynergiesRequest
 
 import rospy
 import rosservice
-from knowledge_base import KnowledgeBaseInterface, DataLoadingError
+from knowledge_base import KnowledgeBaseInterface, KnowledgeBaseCreationError
 from task import TaskAgentCorrespondence, TaskStatistics, TaskSynergies
-from utils import Color, UserMessages, Statistics
+from utils import Color, UserMessages, Statistics, DataLoadingError
 
 TIMEOUT = 10
 
@@ -37,7 +37,7 @@ class ROSKnowledgeBase(KnowledgeBaseInterface):
             rospy.loginfo(f"Waiting {service_name}")
             rospy.wait_for_service(service=service_name, timeout=rospy.Duration(secs=TIMEOUT))
             if service_name not in service_list:
-                raise ValueError(f"Service {service_name} not found.")
+                raise KnowledgeBaseCreationError(f"Service {service_name} not found.")
             rospy.loginfo(f"Service Ready: {service_name}")
         # Instantiate services
         self.task_type_check_srv = rospy.ServiceProxy(self.task_type_check_srv_name, TaskType)
@@ -54,7 +54,7 @@ class ROSKnowledgeBase(KnowledgeBaseInterface):
                 rospy.logerr(UserMessages.TASK_NOT_PRESENT.value.format(task_name))
                 return False
             return True
-        except rospy.ServiceException as e:
+        except rospy.ServiceException:
             rospy.logerr(UserMessages.SERVICE_FAILED.value.format(self.task_type_check_srv_name))
             raise DataLoadingError(UserMessages.SERVICE_FAILED.value.format(self.task_type_check_srv_name))
 
@@ -79,22 +79,26 @@ class ROSKnowledgeBase(KnowledgeBaseInterface):
             tasks_stats_result = self.task_stats_srv()
             tasks_stats = set()
             for single_task_stats in tasks_stats_result.statistics:
-                single_task_stats_obj = TaskStatistics(task_name=single_task_stats.name,
-                                                       agent_name=single_task_stats.agent,
-                                                       statistics=Statistics(
-                                                           expected_duration=single_task_stats.exp_duration,
-                                                           duration_std_dev=single_task_stats.duration_std))
+                try:
+                    single_task_stats_obj = TaskStatistics(task_name=single_task_stats.name,
+                                                           agent_name=single_task_stats.agent,
+                                                           statistics=Statistics(
+                                                               expected_duration=single_task_stats.exp_duration,
+                                                               duration_std_dev=single_task_stats.duration_std))
+                except ValueError as exc:
+                    raise DataLoadingError(exc)
                 if single_task_stats_obj in tasks_stats:  # same name and agent
                     rospy.loginfo(UserMessages.CUSTOM_ORANGE.value.format
                                   (f"Warning, task stats of: {single_task_stats.name}, "
                                    f"agent: {single_task_stats.agent} duplicated, old removed"))
                 tasks_stats.add(single_task_stats_obj)
             return tasks_stats
-        except rospy.ServiceException as e:
+        except rospy.ServiceException:
             rospy.logerr(UserMessages.SERVICE_FAILED.value.format(self.task_stats_srv_name))
             raise DataLoadingError(UserMessages.SERVICE_FAILED.value.format(self.task_agents_srv_name))
 
     def get_task_stats(self, task_name: str, agent_name: str) -> Statistics:
+        # TODO: Future development
         raise NotImplemented
 
     def get_task_synergies(self, main_task_name: str, main_agent_name: str) -> Optional[TaskSynergies]:

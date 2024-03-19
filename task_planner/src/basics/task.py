@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional, overload, Tuple, Set
 from enum import Enum
-from utils import Statistics, Synergy, AgentStats
+from utils import Statistics, Synergy, AgentStats, AgentSynergy
 
 
 # @dataclass
@@ -36,15 +36,18 @@ class Task:
     # precedence_constraints: List[str]
     # soft_precedence_constraints: List[str]
 
-    statistics: Optional[AgentStats] = field(default=None, init=False)
-    synergyes: Optional[float] = field(default_factory=dict, init=False)
+    statistics: Optional[Set[AgentStats]] = field(default=None, init=False)
+    # synergyes: Optional[float] = field(default_factory=dict, init=False)
 
     exp_duration: Optional[Dict[str, float]] = field(default=None, init=False)
     synergy: Dict[Tuple[str, str], Dict[str, float]] = field(default_factory=dict, init=False)
 
     def add_statistics(self, statistics: AgentStats):
-        # TODO: Add statistics
-        pass
+        # TODO: Forse meglio add_agent_statistics?
+        if statistics in self.statistics:
+            # TODO: Come gestire l'update?
+            print("Warning: Statistics already present")
+        self.statistics.add(statistics)
 
     def update_duration(self, agent: str, duration: float) -> bool:
         """
@@ -242,7 +245,7 @@ class Task:
     def get_task_name(self) -> str:
         return self.task_name
 
-    def get_agents(self) -> List[str]:
+    def get_agents(self) -> Set[str]:
         return self.agents
 
     def get_agents_constraint(self) -> List[str]:
@@ -289,7 +292,7 @@ class TaskInstance:
     # task: Optional[Task] = field(default=None, init=False)
     # Todo: to reason about init=True, If false then how to fill that field?
 
-    agents_constraints: Set[str] = field(default_factory=set, init=True) # TODO: Ha senso un set? Un or tra due agenti?
+    agents_constraints: Set[str] = field(default_factory=set, init=True)  # TODO: Ha senso un set? Un or tra due agenti?
     immediate_precedence_constraint: Optional[str] = field(default=None,
                                                            init=True)  # TODO: Di stringa o di TaskInstance?
     precedence_constraints: Set[str] = field(default_factory=set, init=True)
@@ -474,6 +477,9 @@ class TaskStatistics:
     def get_task_name(self):
         return self.task_name
 
+    def get_agent_name(self):
+        return self.agent_name
+
     # def __eq__(self, other):
     #     return (isinstance(other, TaskStatistics) and
     #             self.task_name == other.task_name and
@@ -526,3 +532,14 @@ class TaskSynergies:
 
     def has_synergy(self, synergy: Synergy):
         return synergy in self.synergies
+
+    def get_agent_synergies(self):
+        agent_synergies: Set[AgentSynergy] = set()
+        for synergy in self.synergies:
+            try:
+                agent_synergy = AgentSynergy(main_agent_name=self.main_agent_name,
+                                             synergy=synergy)
+                agent_synergies.add(agent_synergy)
+            except ValueError as exc:
+                raise exc
+        return agent_synergies

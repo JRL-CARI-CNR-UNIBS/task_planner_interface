@@ -1,26 +1,38 @@
+from enum import Enum, auto
+
 from task import Task, TaskInstance, TaskSolution
 from dataclasses import dataclass, field
 from typing import List, Dict, Tuple, Optional, Set
 
-from knowledge_base import KnowledgeBaseInterface
+from knowledge_base import KnowledgeBaseInterface, DataLoadingError
 from task import TaskAgentCorrespondence, TaskStatistics
-from problem_loader_base import ProblemLoaderBase
+from problem_loader import ProblemLoaderInterface
+
 
 class Status(Enum):
+    EMPTY = auto()
+    TASK_LOADED = auto()
+    STATS_LOADED = auto()
+    GOAL_LOADED = auto()
+    CONSISTENCY_CHECK = auto()
+
 
 @dataclass
-class Problem:
+class ProblemManager:
     knowledge_base: KnowledgeBaseInterface = field(default_factory=None, init=True)
-    # TODO: Da analizzare goal_loader
-    problem_loader: ProblemLoaderBase = field(default_factory=None, init=True)
+    problem_loader: ProblemLoaderInterface = field(default_factory=None, init=True)
 
     tasks_set: Set[Task] = field(default_factory=set, init=False)
     task_instances_set: Set[TaskInstance] = field(default_factory=set, init=False)
 
+    # TODO: Da verificare la necessita'
     agents: Set[str] = field(default_factory=set, init=False)
     robot_agents: Optional[Set[str]] = field(default_factory=set, init=True)
 
+    # TODO: Da verificare la necessita'
     solution: Set[TaskSolution] = field(default_factory=list, init=False)
+
+    status: Status = field(default_factory=Status.EMPTY, init=False)
 
     def __post_init__(self):
         if self.robot_agents:
@@ -73,47 +85,87 @@ class Problem:
                 return False
         return True
 
+    # TODO: L'ho implementato in knowledge base, da rimuovere da qui
     def load_tasks_from_knowledge(self):
-        task_agents_correspondence: Set[TaskAgentCorrespondence]
-        task_agents_correspondence = self.knowledge_base.get_task_agents()
-        if not task_agents_correspondence:
-            return ValueError("Empty Knowledge Base")
+        try:
+            self.tasks_set = self.knowledge_base.get_tasks()
+        except DataLoadingError as exc:
+            raise exc
 
-        for task_info in task_agents_correspondence:
-            task_name = task_info.get_task_name()
-            agents = task_info.get_agents()
-            if task_name in self.tasks_set:
-                print("Warning: {task_name} already present in tasks set.")
-            task_obj = Task(task_name=task_name, agents=agents)
-
-            self.add_task(task_obj)
+        # task_agents_correspondence: Set[TaskAgentCorrespondence]
+        # task_agents_correspondence = self.knowledge_base.get_task_agents()
+        # if not task_agents_correspondence:
+        #     return Exception("Empty Knowledge Base")
+        #
+        # for task_info in task_agents_correspondence:
+        #     task_name = task_info.get_task_name()
+        #     agents = task_info.get_agents()
+        #     task_obj = Task(task_name=task_name, agents=agents)
+        #     if task_obj in self.tasks_set:
+        #         print(f"Warning: {task_name} already present in tasks set.")
+        #
+        #     self.add_task(task_obj)
 
     def load_tasks_stats_from_knowledge(self):
-        # Todo: Check sulla procedura, può solo se prima ho load i tasks.
+        # Todo: Check sulla procedura: ha senso se prima ho caricato dei tasks.
         if not self.tasks_set:
+            # TODO: Dovrebbe essere solo un warning?
             raise Exception("Empty tasks set, you have to load_tasks_from_knowledge")
-        tasks_stats: Set[TaskStatistics]
-        tasks_stats = self.knowledge_base.get_tasks_stats()
+        tasks_stats: Set[TaskStatistics] = set()
+        try:
+            tasks_stats = self.knowledge_base.get_tasks_stats()
+        except DataLoadingError:
+            raise Exception("Error Loading Statistics")
+
         if not tasks_stats:
-            return ValueError("Empty Knowledge Base")
-        statistics_dict = {(task_stat.task_name, task_stat.agent_name): task_stat for task_stat in tasks_stats}
+            # TODO: Dovrebbe essere solo un warning?
+            return Exception("Empty Knowledge Base Statistics")
+
+        task_statistics_dict: Dict[Tuple[str, str], TaskStatistics] = {
+            (task_stat.task_name, task_stat.agent_name):
+                task_stat for task_stat in tasks_stats
+        }
 
         for task in self.tasks_set:
             task_name = task.get_task_name()
             for agent_name in task.get_agents():
-                if (task_name, agent_name) not in statistics_dict:
+                if (task_name, agent_name) not in task_statistics_dict:
                     raise Exception(f"Missing statistics for task: {task_name}, agent: {agent_name}")
-                task_stat = statistics_dict[(task_name, agent_name)]
-                task.add_statistics(task_stat)
+                statistics = task_statistics_dict[(task_name, agent_name)].get_statistics()
+                task.add_statistics(statistics)
+
+    def load_tasks_synergyes_from_knowledge(self):
+        return
+
+        if not self.tasks_set:
+            raise Exception("Empty tasks set, you have to load_tasks_from_knowledge")
+
+        for task in self.tasks_set:
+            task_name = task.get_task_name()
+            for agent_name in task.get_agents():
+                tasks_synergies = self.knowledge_base.get_task_synergies(main_task_name=task_name,
+                                                                         main_agent_name=agent_name)
+                tasks_synergies.get_agent_synergies()
 
     def load_task_instances(self):
-        #Todo: Check sulla procedura, può solo se prima task_set settati.
+        # Todo: Check sulla procedura, può solo se prima task_set settati.
         try:
             self.task_instances_set = self.problem_loader.load_instances(self.tasks_set)
         except ValueError as exc:
             raise exc
 
+    def init_problem(self):
+        self.load_tasks_from_knowledge()
+        self.load_tasks_stats_from_knowledge()
+        self.load_task_instances()
+        #TODO: DA SISTEMARE
+        if not self.consistency_check():
+            # TODO: Change status?
+            pass
 
+    def update_problem(self):
+        # TODO: Da implementare
+        raise NotImplemented
 
     def fill_task_agents(self) -> bool:
         # try:
@@ -393,3 +445,6 @@ class Problem:
             return return_str
         else:
             return f"Problem instance. \nAgents: {self.agents}. \nEmpty Task List in Problem Definition"
+
+    def _set_internal_status(self, status: Status):
+        self.status = status

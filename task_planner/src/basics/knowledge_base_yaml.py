@@ -1,13 +1,13 @@
-from knowledge_base import KnowledgeBaseInterface, DataLoadingError
+from knowledge_base import KnowledgeBaseInterface, KnowledgeBaseCreationError
 from dataclasses import dataclass, field
 from typing import Set, Optional
 
 import yaml
 from pathlib import Path
-from typing import Dict
+from typing import Dict, List
 
 from task import TaskAgentCorrespondence, TaskStatistics, TaskSynergies
-from utils import UserMessages, Statistics
+from utils import UserMessages, Statistics, DataLoadingError
 
 TASK_NAME = 'task_name'
 AGENT_NAME = 'agent_name'
@@ -33,23 +33,20 @@ class YAMLKnowledgeBase(KnowledgeBaseInterface):
     knowledge_base_data: Dict = field(init=False, default_factory=dict)
 
     def __post_init__(self):
-        if self.yaml_file_path.suffix != '.yaml':
-            raise ValueError(f"File path: {self.yaml_file_path} is not a yaml")
+        # if self.yaml_file_path.suffix != '.yaml':
+        #     raise KnowledgeBaseCreationError(f"File path: {self.yaml_file_path} is not a yaml")
 
         try:
             self.load_yaml_file()
             self._validate_format()
         except (FileNotFoundError, yaml.YAMLError, ValueError) as exc:
-            raise ValueError(exc)
+            raise KnowledgeBaseCreationError(exc)
 
     def load_yaml_file(self):
         try:
             with open(self.yaml_file_path, 'r') as file:
-                try:
-                    self.knowledge_base_data = yaml.safe_load(file)
-                except yaml.YAMLError as exc:
-                    raise exc
-        except FileNotFoundError as exc:
+                self.knowledge_base_data = yaml.safe_load(file)
+        except (FileNotFoundError, yaml.YAMLError) as exc:
             raise exc
 
     def check_task_existence(self, task_name: str) -> bool:
@@ -100,7 +97,7 @@ class YAMLKnowledgeBase(KnowledgeBaseInterface):
         Returns: Return the TaskSynergies object of that task and agent with the respect with all the other task-agents
 
         """
-        if not TASK_SYNERGIES in self.knowledge_base_data:
+        if TASK_SYNERGIES not in self.knowledge_base_data:
             return None
         task_synergies_obj = TaskSynergies(main_task_name, main_agent_name)
         for task_synergy in self.knowledge_base_data[TASK_SYNERGIES]:
@@ -121,10 +118,17 @@ class YAMLKnowledgeBase(KnowledgeBaseInterface):
 
         return task_synergies_obj
 
+    def get_task_stats(self, task_name: str, agent_name: str) -> Statistics:
+        # TODO: Future development
+        raise NotImplemented
+
     def _validate_format(self):
-        # TODO: Synergy can also not be there se uno non vuole
+        def all_keys_present(required_keys: List[str], dictionary_to_check: Dict[str, str]):
+            return all(required_key in dictionary_to_check for required_key in required_keys)
+
         # Check if 'tasks_properties' and 'task_synergies' are present in the YAML data
-        if TASK_PROPERTIES not in self.knowledge_base_data or TASK_SYNERGIES not in self.knowledge_base_data:
+        general_required_keys = [TASK_PROPERTIES, TASK_SYNERGIES]
+        if not all_keys_present(general_required_keys, self.knowledge_base_data):  # TASK_PROPERTIES not in self.knowledge_base_data or TASK_SYNERGIES not in self.knowledge_base_data:
             raise ValueError(f"Invalid format: '{TASK_PROPERTIES}' and '{TASK_SYNERGIES}' are required.")
 
         # Check if 'tasks_properties' is a list
@@ -132,8 +136,9 @@ class YAMLKnowledgeBase(KnowledgeBaseInterface):
             raise ValueError(F"Invalid format: '{TASK_PROPERTIES}' should be a list of task.")
 
         # Validate each task in 'tasks_properties'
+        required_keys_task_properties = [TASK_NAME, AGENTS_INFO]
         for task in self.knowledge_base_data[TASK_PROPERTIES]:
-            if not isinstance(task, dict) or TASK_NAME not in task or AGENTS_INFO not in task:
+            if not isinstance(task, dict) or not all_keys_present(required_keys_task_properties, task):
                 raise ValueError(
                     f"Invalid format: Each task in '{TASK_PROPERTIES}' should be a dictionary with '{TASK_NAME}' and '{AGENTS_INFO}'.")
 
@@ -142,10 +147,12 @@ class YAMLKnowledgeBase(KnowledgeBaseInterface):
                 raise ValueError(f"Invalid format: '{AGENTS_INFO}' in each task should be a list.")
 
             # Validate each agent in 'agents'
-            for agent in task[AGENTS_INFO]:
-                if not isinstance(agent,
-                                  dict) or AGENT_NAME not in agent or EXPECTED_DURATION not in agent or DURATION_STD not in agent:
-                    print(f"Analyze: {agent} info.")
+            required_keys_for_agents = [AGENT_NAME, EXPECTED_DURATION, DURATION_STD]
+            for agent_info in task[AGENTS_INFO]:
+                # all_keys_present = all(key in agent_info for key in required_keys_for_agents)
+                if not isinstance(agent_info,
+                                  dict) or not all_keys_present(required_keys_for_agents, agent_info):
+                    print(f"Analyze: {agent_info} info.")
                     raise ValueError(
                         f"Invalid format: Each agent in '{AGENTS_INFO}' should be a "
                         f"dictionary with '{AGENT_NAME}', '{EXPECTED_DURATION}', and '{DURATION_STD}'.")
@@ -155,11 +162,13 @@ class YAMLKnowledgeBase(KnowledgeBaseInterface):
             raise ValueError("Invalid format: '{TASK_SYNERGIES}' should be a list of synergies.")
 
         # Validate each synergy in 'task_synergies'
+        required_keys_for_synergies = [MAIN_TASK, MAIN_AGENT, PARALLEL_TASKS]
         for synergy in self.knowledge_base_data[TASK_SYNERGIES]:
             if not isinstance(synergy,
-                              dict) or MAIN_TASK not in synergy or MAIN_AGENT not in synergy or PARALLEL_TASKS not in synergy:
+                              dict) or not all_keys_present(required_keys_for_synergies, synergy):
                 raise ValueError(
-                    f"Invalid format: Each synergy in '{TASK_SYNERGIES}' should be a dictionary with '{MAIN_TASK}', '{MAIN_AGENT}', and '{PARALLEL_TASKS}'."
+                    f"Invalid format: Each synergy in '{TASK_SYNERGIES}' should be a "
+                    f"dictionary with '{MAIN_TASK}', '{MAIN_AGENT}', and '{PARALLEL_TASKS}'."
                 )
 
             # Check if 'parallel_tasks' is a list
@@ -167,9 +176,11 @@ class YAMLKnowledgeBase(KnowledgeBaseInterface):
                 raise ValueError(f"Invalid format: '{PARALLEL_TASKS}' in each synergy should be a list.")
 
             # Validate each parallel task in 'parallel_tasks'
+            required_keys_for_parallel_task = [PARALLEL_TASK, PARALLEL_AGENT, SYNERGY_VALUE, SYNERGY_STD]
             for parallel_task in synergy[PARALLEL_TASKS]:
-                if not isinstance(parallel_task,
-                                  dict) or PARALLEL_TASK not in parallel_task or PARALLEL_AGENT not in parallel_task or SYNERGY_VALUE not in parallel_task or SYNERGY_STD not in parallel_task:
+                if not isinstance(parallel_task, dict) or not all_keys_present(required_keys_for_parallel_task,
+                                                                               parallel_task):
                     raise ValueError(
-                        f"Invalid format: Each parallel task in '{PARALLEL_TASKS}' should be a dictionary with '{PARALLEL_TASK}', '{PARALLEL_AGENT}', '{SYNERGY_VALUE}', and '{SYNERGY_STD}'."
+                        f"Invalid format: Each parallel task in '{parallel_task}' should be a "
+                        f"dictionary with '{PARALLEL_TASK}', '{PARALLEL_AGENT}', '{SYNERGY_VALUE}', and '{SYNERGY_STD}'."
                     )
