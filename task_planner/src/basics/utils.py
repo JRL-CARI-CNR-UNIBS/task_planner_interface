@@ -107,23 +107,73 @@ class AgentStats:
     agent_name: str
     statistics: Statistics
 
+    def get_statistics(self):
+        return self.statistics
+
+    def get_agent_name(self):
+        return self.agent_name
+
     def __hash__(self):
         return hash(self.agent_name)
+
+    def __eq__(self, other):
+        return isinstance(other, AgentStats) and self.agent_name == other.agent_name
+
+
+from typing import Set, Optional
+
+
+def get_max_duration(agents_statistics: Set[AgentStats]) -> float:
+    if agents_statistics:
+        return max({agent_stat.get_statistics().get_expected_duration() for agent_stat in agents_statistics})
+    # TODO: Reasonin in what to do.
+    raise ValueError("Agent statistics must ...")
+
+
+class AtomicSynergy:
+    expected_synergy: float
+    synergy_std_dev: Optional[float]
+
+    def __post_init(self):
+        if self.expected_synergy < 0:
+            raise ValueError(UserMessages.SYNERGY_MUST_POSITIVE.value)
+        if self.synergy_std_dev:
+            if self.synergy_std_dev < 0:
+                raise ValueError(UserMessages.SYNERGY_MUST_POSITIVE.value)
 
 
 @dataclass
 class Synergy:
     other_task_name: str
     other_agent_name: str
-    synergy_value: float
-    std_dev: float
+    synergy: AtomicSynergy
 
-    def __post_init__(self):
-        if self.synergy_value < 0 or self.std_dev < 0:
-            raise ValueError(UserMessages.SYNERGY_MUST_POSITIVE.value)
+    # synergy_value: float
+    # std_dev: float
+
+    # def __post__init__(self):
+    #     if self.synergy_value < 0 or self.std_dev < 0:
+    #         raise ValueError(UserMessages.SYNERGY_MUST_POSITIVE.value)
+    def get_parallel_task_name(self):
+        return self.other_task_name
+
+    def get_parallel_agent_name(self):
+        return self.other_agent_name
+
+    def get_synergy(self):
+        return self.synergy
 
     def __hash__(self):
         return hash((self.other_task_name, self.other_agent_name))
+
+    def __eq__(self, other):
+        return (isinstance(other, Synergy) and
+                self.other_task_name == other.other_task_name and
+                self.other_agent_name == other.other_agent_name)
+        # TODO: Check this: where is it used?
+        # and
+        #         self.synergy_value == other.synergy_value and
+        #         self.std_dev == other.std_dev)
 
 
 @dataclass
@@ -137,8 +187,22 @@ class AgentSynergy:
                 f"Other agent name: ({self.synergy.other_agent_name}) must differ by main one: "
                 f"({self.main_agent_name})")
 
+    def get_main_agent(self):
+        return self.main_agent_name
+
+    def get_synergy(self):
+        return self.synergy
+
+    def get_parallel_agent_name(self):
+        return self.synergy.get_parallel_agent_name()
+
     def __hash__(self):
         return hash((self.synergy.other_agent_name, self.synergy.other_task_name, self.main_agent_name))
+
+    def __eq__(self, other):
+        return (isinstance(other, AgentSynergy) and
+                self.main_agent_name == other.main_agent_name and
+                self.synergy == other.synergy)
 
 
 class DataLoadingError(Exception):

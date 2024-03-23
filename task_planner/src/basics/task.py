@@ -1,7 +1,10 @@
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional, overload, Tuple, Set
 from enum import Enum
-from utils import Statistics, Synergy, AgentStats, AgentSynergy
+from utils import Statistics, Synergy, AgentStats, AgentSynergy, AtomicSynergy
+
+
+# from multipledispatch import dispatch
 
 
 # @dataclass
@@ -28,62 +31,156 @@ from utils import Statistics, Synergy, AgentStats, AgentSynergy
 
 @dataclass
 class Task:
-    # id: str
     task_name: str  # type
-
     agents: Optional[Set[str]] = field(default=None, init=False)
-    # agents_constraint: List[str]
-    # precedence_constraints: List[str]
-    # soft_precedence_constraints: List[str]
 
     statistics: Optional[Set[AgentStats]] = field(default=None, init=False)
-    synergyes: Optional[Set[AgentSynergy]] = field(default=None, init=False)
-    # synergyes: Optional[float] = field(default_factory=dict, init=False)
+    synergies: Optional[Set[AgentSynergy]] = field(default=None, init=False)
 
-    # exp_duration: Optional[Dict[str, float]] = field(default=None, init=False)
-    # synergy: Dict[Tuple[str, str], Dict[str, float]] = field(default_factory=dict, init=False)
+    def get_task_name(self) -> str:
+        return self.task_name
 
-    def add_statistics(self, statistics: AgentStats):
-        # TODO: Forse meglio add_agent_statistics?
-        if statistics in self.statistics:
-            # TODO: Come gestire l'update?
+    def get_agents(self) -> Set[str]:
+        return self.agents
+
+    def add_agent_statistics(self, agent_statistics: AgentStats):
+        if agent_statistics in self.statistics:
             print("Warning: Statistics already present")
-        self.statistics.add(statistics)
+        self.statistics.add(agent_statistics)
 
-    def update_duration(self, agent: str, duration: float) -> bool:
+    def update_agent_statistics(self, agent_statistics: AgentStats):
+        if agent_statistics.agent_name not in self.agents:
+            print(f"Warning: Agent ({agent_statistics.agent_name}) not in task: f{self.task_name}")
+        if agent_statistics in self.statistics:
+            self.statistics.remove(agent_statistics)
+            self.statistics.add(agent_statistics)
+
+    def add_agent(self, agent: str) -> None:
+        if agent not in self.agents:
+            self.agents.add(agent)
+
+    def remove_agent(self, agent: str):
+        if agent in self.agents:
+            self.agents.remove(agent)
+
+    def update_agents(self, agents: Set[str]) -> None:
+        # TODO: Da cambiare anche il docstring
         """
-        Update the expected duration of a task when executed by an agent.
+        Update the list of agents associated with the task.
 
         Args:
-            agent (str): The agent for which the duration is to be updated.
-            duration (float): The new expected duration to be assigned to the task.
+            agents (List[str]): The new list of agents.
 
         Returns:
-            bool: True if the update was successful, False otherwise.
+            None
 
         Raises:
-            AssertionError: If the list of agents is empty or if the
-                            specified agent is not present in the list.
-            ValueError: If the duration is not a positive numeric value.
+            ValueError: If the `agents` parameter is not a list or if any item in the list is not a string.
         """
-        assert self.agents is not None
-        if self.agents is None:
-            print(f"Empy agents List")
-            return False
-        assert agent in self.agents
-        if agent not in self.agents:
-            print(f"Task: {self.id} has no agent: {agent}")
-            return False
+        if not (isinstance(agents, set) and all(isinstance(agent, str) for agent in agents)):
+            return ValueError("All items in the agents set must be strings.")
 
-        assert duration > 0
-        if self.exp_duration is None:
-            self.exp_duration = {}
-        if duration < 0:
-            # raise ValueError("Expected duration must be not negative")
-            return False
+        self.agents = agents
 
-        self.exp_duration[agent] = duration
-        return True
+    def get_statistics(self) -> Set[AgentStats]:
+        return self.statistics
+
+    def get_agent_statistics(self, agent_name: str) -> AgentStats:
+        return {agent_statistic for agent_statistic in self.statistics if agent_statistic.agent_name == agent_name}
+        # return set(filter(lambda stat: stat.agent_name == agent_name, self.statistics))
+
+    def get_synergies(self) -> Set[AgentSynergy]:
+        return self.synergies
+
+    def get_agent_synergies(self, main_agent: str) -> Set[AgentSynergy]:
+        if main_agent not in self.agents:
+            return None
+        return {synergy.get_synergy() for synergy in self.synergies if synergy.main_agent_name == main_agent}
+
+    def get_synergies_between_agents(self, main_agent: str, parallel_agent: str) -> Set[AgentSynergy]:
+        if main_agent not in self.agents:
+            return None
+        return {synergy.get_synergy() for synergy in self.synergies if
+                synergy.main_agent_name == main_agent and synergy.get_parallel_agent_name() == parallel_agent}
+
+    def add_synergy(self, agent_synergy: AgentSynergy):
+        if agent_synergy in self.synergies:
+            print("Warning: synergy already present: Neglected.")
+        self.synergies.add(agent_synergy)
+
+    def update_synergy(self, agent_synergy: AgentSynergy):
+        if agent_synergy in self.synergies:
+            self.synergies.remove(agent_synergy)
+        self.synergies.add(agent_synergy)
+
+    def __eq__(self, other):
+        return ((isinstance(other, Task) and self.task_name == other.task_name) or
+                (isinstance(other, str) and self.task_name == other))
+
+    def __repr__(self):
+        return f"Task name: {self.task_name}, Agents: {self.agents}"
+
+    # def update_agents_constraint(self, agents: List[str]) -> None:
+    #     """
+    #     Updates the agents constraint of the task with the provided list of agents.
+    #
+    #     Args:
+    #         agents (List[str]): The list of agents to be set as the new agents constraint.
+    #
+    #     Raises:
+    #         ValueError: If the agents argument is not a list or if any item in the list is not a string.
+    #
+    #     Returns:
+    #         None
+    #     """
+    #
+    #     if not (isinstance(agents, list) and all(isinstance(agent, str) for agent in agents)):
+    #         return ValueError("All items in the agents list must be strings.")
+    #     self.agents_constraint = agents
+
+    # def __hash__(self):
+    #     return hash(self.id)
+
+    # def __repr__(self):
+    #     if self.exp_duration:
+    #         return f"{self.id}, {self.exp_duration}"
+    #     else:
+    #         return f"{self.id}"
+
+    # def update_duration(self, agent: str, duration: float) -> bool:
+    #     """
+    #     Update the expected duration of a task when executed by an agent.
+    #
+    #     Args:
+    #         agent (str): The agent for which the duration is to be updated.
+    #         duration (float): The new expected duration to be assigned to the task.
+    #
+    #     Returns:
+    #         bool: True if the update was successful, False otherwise.
+    #
+    #     Raises:
+    #         AssertionError: If the list of agents is empty or if the
+    #                         specified agent is not present in the list.
+    #         ValueError: If the duration is not a positive numeric value.
+    #     """
+    #     assert self.agents is not None
+    #     if self.agents is None:
+    #         print(f"Empy agents List")
+    #         return False
+    #     assert agent in self.agents
+    #     if agent not in self.agents:
+    #         print(f"Task: {self.id} has no agent: {agent}")
+    #         return False
+    #
+    #     assert duration > 0
+    #     if self.exp_duration is None:
+    #         self.exp_duration = {}
+    #     if duration < 0:
+    #         # raise ValueError("Expected duration must be not negative")
+    #         return False
+    #
+    #     self.exp_duration[agent] = duration
+    #     return True
 
     # def update_synergy(self, agent, parallel_agent, synergies: Dict[str, float]) -> None:
     #     """
@@ -112,183 +209,116 @@ class Task:
     #     # Alternative solutions: pass only one synergy as single dict {name:, synergy}
     #     #                        pass one synergy object
     #     #                        pass a synergy objects list
-    def update_synergy(self, agent_synergy: AgentSynergy) -> None:
+    # def get_agents_constraint(self) -> List[str]:
+    #     return self.agents_constraint
+    #
+    # def get_precedence_constraints(self) -> Optional[List[str]]:
+    #     return self.precedence_constraints
+    #
+    # def get_soft_constraints(self) -> Optional[List[str]]:
+    #     return self.soft_precedence_constraints
+    #
+    # def check_precedence_constraint(self, task: str) -> bool:
+    #     if task in self.precedence_constraints:
+    #         return True
+    #     return False
 
+    # def get_max_duration(self) -> float:
+    #     return max(self.exp_duration.values())
 
-    def update_agents(self, agents: List[str]) -> None:
-        """
-        Update the list of agents associated with the task.
-
-        Args:
-            agents (List[str]): The new list of agents.
-
-        Returns:
-            None
-
-        Raises:
-            ValueError: If the `agents` parameter is not a list or if any item in the list is not a string.
-        """
-        if not (isinstance(agents, list) and all(isinstance(agent, str) for agent in agents)):
-            return ValueError("All items in the agents list must be strings.")
-
-        self.agents = agents
-
-    def update_agents_constraint(self, agents: List[str]) -> None:
-        """
-        Updates the agents constraint of the task with the provided list of agents.
-
-        Args:
-            agents (List[str]): The list of agents to be set as the new agents constraint.
-
-        Raises:
-            ValueError: If the agents argument is not a list or if any item in the list is not a string.
-
-        Returns:
-            None
-        """
-
-        if not (isinstance(agents, list) and all(isinstance(agent, str) for agent in agents)):
-            return ValueError("All items in the agents list must be strings.")
-        self.agents_constraint = agents
-
-    def add_agent(self, agent: str) -> None:
-        if agent not in self.agents:
-            self.agents.append(agent)
-
-    def update_precedence_constraints(self) -> None:
-        pass
-
-    @overload
-    def get_duration(self) -> Dict[str, float]:
-        ...
-
-    @overload
-    def get_duration(self, agent: str) -> float:
-        ...
-
-    def get_duration(self, *args):
-        """
-        Retrieves the expected duration based on the provided arguments.
-
-        If no arguments are provided, it returns the expected durations for all agents as a dictionary.
-        If a single argument (agent) is provided, it returns the expected duration for that agent as a float.
-
-        Args:
-            *args: Variable-length arguments. If a single argument is provided, it is treated as the agent name.
-
-        Returns:
-            Dict[str, float]: The expected durations based on the provided arguments.
-
-        Raises:
-            NotImplemented: If invalid arguments are provided.
-
-        """
-        if len(args) == 1 and isinstance(args[0], str):  # Param: specify agent
-            agent = args[0]
-            assert agent in self.agents
-            if agent not in self.exp_duration.keys():
-                print(f"Task: {self.id} has no exp_duration for agent: {agent}")
-                raise Exception
-            return self.exp_duration[agent]
-        if len(args) == 0:
-            return self.exp_duration
-        raise NotImplementedError("Invalid arguments provided.")
-
-    def get_synergy(self, agent: str, parallel_agent: str, parallel_task: str) -> Optional[str]:
-        """
-        Retrieves the synergy value based on the provided agent, parallel_agent, and parallel_task.
-
-        :param agent: str, the agent for which to retrieve the synergy value.
-        :param parallel_agent: str, the parallel agent involved in the synergy.
-        :param parallel_task: str, the specific task for which to retrieve the synergy value.
-
-        :return: Optional[str], the synergy value corresponding to the provided parameters.
-                 Returns the synergy value if the combination of agent, parallel_agent, and parallel_task exists
-                 in the synergy dictionary. Otherwise, returns None.
-        """
-
-        if (agent, parallel_agent) in self.synergy and parallel_task in self.synergy[(agent, parallel_agent)]:
-            return self.synergy[(agent, parallel_agent)][parallel_task]
-        return None
-
-    def get_synergies(self,
-                      agent: Optional[str] = None,
-                      parallel_agent: Optional[str] = None) -> Optional[Dict[Tuple[str, str], Dict[str, float]]]:
-        """
-        Retrieves the synergies based on the provided agent(s) and parallel agent.
-
-        :param agent: Optional[str], the agent for which to retrieve the synergies. Default is None.
-        :param parallel_agent: Optional[str], the parallel agent to consider for synergies. Default is None.
-
-        :return: Optional[Dict[Tuple[str, str], Dict[str, float]]], the requested synergies.
-                 Returns the entire synergy dictionary if neither agent nor parallel_agent is provided.
-                 Returns the synergies for the specified agent with all parallel agents if only agent is provided.
-                 Raises a ValueError if only parallel_agent is provided, indicating that agent must also be provided.        """
-
-        if agent is None and parallel_agent is None:
-            return self.synergy
-        elif agent is not None and parallel_agent is None:
-            specified_synergy = \
-                {agent: synergies for involved_agents, synergies in self.synergy.items() if involved_agents[0] == agent}
-            return specified_synergy
-        elif agent is not None and parallel_agent is not None:
-            if (agent, parallel_agent) in self.synergy:
-                return self.synergy[(agent, parallel_agent)]
-            raise KeyError(f"Involved agent: ({agent},{parallel_agent}) not defined in synergy for task: {self.type}")
-
-        else:
-            raise ValueError("You must provide both 'agent' and 'parallel_agent'.")
-
-    def get_id(self) -> str:
-        return self.id
-
-    def get_type(self) -> str:
-        return self.type
-
-    def get_task_name(self) -> str:
-        return self.task_name
-
-    def get_agents(self) -> Set[str]:
-        return self.agents
-
-    def get_agents_constraint(self) -> List[str]:
-        return self.agents_constraint
-
-    def get_precedence_constraints(self) -> Optional[List[str]]:
-        return self.precedence_constraints
-
-    def get_soft_constraints(self) -> Optional[List[str]]:
-        return self.soft_precedence_constraints
-
-    def check_precedence_constraint(self, task: str) -> bool:
-        if task in self.precedence_constraints:
-            return True
-        return False
-
-    def get_max_duration(self) -> float:
-        return max(self.exp_duration.values())
-
-    def get_not_enabled_agents(self) -> Optional[List[str]]:
-        not_enabled_agents = []
-        if self.agents_constraint:
-            not_enabled_agents = list(set(self.agents) - set(self.agents_constraint))
-        return not_enabled_agents
-
-    def add_synergy(self, agent_synergy: AgentSynergy):
-        self.synergyes.add(agent_synergy)
-
-    def __eq__(self, other):
-        return ((isinstance(other, Task) and self.task_name == other.task_name) or
-                (isinstance(other, str) and self.task_name == other))
-
-    # def __hash__(self):
-    #     return hash(self.id)
-
-    # def __repr__(self):
-    #     if self.exp_duration:
-    #         return f"{self.id}, {self.exp_duration}"
+    # def get_not_enabled_agents(self) -> Optional[List[str]]:
+    #     not_enabled_agents = []
+    #     if self.agents_constraint:
+    #         not_enabled_agents = list(set(self.agents) - set(self.agents_constraint))
+    #     return not_enabled_agents
+    # def get_synergies(self,
+    #                   agent: Optional[str] = None,
+    #                   parallel_agent: Optional[str] = None) -> Optional[Dict[Tuple[str, str], Dict[str, float]]]:
+    #     """
+    #     Retrieves the synergies based on the provided agent(s) and parallel agent.
+    #
+    #     :param agent: Optional[str], the agent for which to retrieve the synergies. Default is None.
+    #     :param parallel_agent: Optional[str], the parallel agent to consider for synergies. Default is None.
+    #
+    #     :return: Optional[Dict[Tuple[str, str], Dict[str, float]]], the requested synergies.
+    #              Returns the entire synergy dictionary if neither agent nor parallel_agent is provided.
+    #              Returns the synergies for the specified agent with all parallel agents if only agent is provided.
+    #              Raises a ValueError if only parallel_agent is provided, indicating that agent must also be provided.        """
+    #
+    #     if agent is None and parallel_agent is None:
+    #         return self.synergies
+    #     elif agent is not None and parallel_agent is None:
+    #
+    #         specified_synergy = \
+    #             {agent: synergies for involved_agents, synergies in self.synergy.items() if involved_agents[0] == agent}
+    #         return specified_synergy
+    #     elif agent is not None and parallel_agent is not None:
+    #         if (agent, parallel_agent) in self.synergy:
+    #             return self.synergy[(agent, parallel_agent)]
+    #         raise KeyError(f"Involved agent: ({agent},{parallel_agent}) not defined in synergy for task: {self.type}")
+    #
     #     else:
-    #         return f"{self.id}"
+    #         raise ValueError("You must provide both 'agent' and 'parallel_agent'.")
+
+    # def get_id(self) -> str:
+    #     return self.id
+
+    # def get_type(self) -> str:
+    #     return self.type
+    # def get_synergy(self, agent: str, parallel_agent: str, parallel_task: str) -> Optional[str]:
+    #     """
+    #     Retrieves the synergy value based on the provided agent, parallel_agent, and parallel_task.
+    #
+    #     :param agent: str, the agent for which to retrieve the synergy value.
+    #     :param parallel_agent: str, the parallel agent involved in the synergy.
+    #     :param parallel_task: str, the specific task for which to retrieve the synergy value.
+    #
+    #     :return: Optional[str], the synergy value corresponding to the provided parameters.
+    #              Returns the synergy value if the combination of agent, parallel_agent, and parallel_task exists
+    #              in the synergy dictionary. Otherwise, returns None.
+    #     """
+    #
+    #     if (agent, parallel_agent) in self.synergy and parallel_task in self.synergy[(agent, parallel_agent)]:
+    #         return self.synergy[(agent, parallel_agent)][parallel_task]
+    #     return None
+    # def update_precedence_constraints(self) -> None:
+    #     pass
+
+    # @overload
+    # def get_duration(self) -> Dict[str, float]:
+    #     ...
+    #
+    # @overload
+    # def get_duration(self, agent: str) -> float:
+    #     ...
+    #
+    # def get_duration(self, *args):
+    #     """
+    #     Retrieves the expected duration based on the provided arguments.
+    #
+    #     If no arguments are provided, it returns the expected durations for all agents as a dictionary.
+    #     If a single argument (agent) is provided, it returns the expected duration for that agent as a float.
+    #
+    #     Args:
+    #         *args: Variable-length arguments. If a single argument is provided, it is treated as the agent name.
+    #
+    #     Returns:
+    #         Dict[str, float]: The expected durations based on the provided arguments.
+    #
+    #     Raises:
+    #         NotImplemented: If invalid arguments are provided.
+    #
+    #     """
+    #     if len(args) == 1 and isinstance(args[0], str):  # Param: specify agent
+    #         agent = args[0]
+    #         assert agent in self.agents
+    #         if agent not in self.exp_duration.keys():
+    #             print(f"Task: {self.id} has no exp_duration for agent: {agent}")
+    #             raise Exception
+    #         return self.exp_duration[agent]
+    #     if len(args) == 0:
+    #         return self.exp_duration
+    #     raise NotImplementedError("Invalid arguments provided.")
 
 
 @dataclass
@@ -298,32 +328,64 @@ class TaskInstance:
     # task: Optional[Task] = field(default=None, init=False)
     # Todo: to reason about init=True, If false then how to fill that field?
 
-    agents_constraints: Set[str] = field(default_factory=set, init=True)  # TODO: Ha senso un set? Un or tra due agenti?
+    agents_constraints: Set[str] = field(default_factory=set,
+                                         init=True)  # TODO: Ha senso un set? Un or tra due agenti? Forse meglio solo 1. Come era
+    # TODO: Potrei fare così: se solo 1 forzarlo, se di più metto semplicemente a 0 gli altri in agents di task.
     immediate_precedence_constraint: Optional[str] = field(default=None,
                                                            init=True)  # TODO: Di stringa o di TaskInstance?
     precedence_constraints: Set[str] = field(default_factory=set, init=True)
 
-    def __post__init(self):
+    def __post_init(self):
         # Check agents constraint in task obj
         for agent in self.agents_constraints:
             if agent not in self.task.get_agents():
                 raise ValueError(f"Task id has as agents constraints: {agent} "
                                  f"not present in task: {self.task.get_task_name()} agents.")
 
-    def get_id(self):
+    def get_id(self) -> str:
         return self.id
 
-    def get_task(self):
+    def get_task(self) -> Task:
         return self.task
 
-    def get_agents_constraints(self):
+    def get_agents_constraints(self) -> Set[str]:
         return self.agents_constraints
 
-    def get_immediate_precedence_constraints(self):
+    def get_immediate_precedence_constraint(self) -> Optional[str]:
         return self.immediate_precedence_constraint
 
-    def get_precedence_constraints(self):
+    def get_precedence_constraints(self) -> Set[str]:
         return self.precedence_constraints
+
+    def check_precedence_constraint(self, task_name: str) -> bool:
+        if task_name in self.precedence_constraints:  # TODO: or also immediate precedence?
+            return True
+        return False
+
+    def update_agents_constraint(self, agents: Set[str]):
+        if not (isinstance(agents, Set) and all(isinstance(agent, str) for agent in agents)):
+            return ValueError("All items in the agents list must be strings.")
+        self.agents_constraints = agents
+
+    def add_agent_constraint(self, agent: str):
+        if agent not in self.task.get_agents():
+            print(f"Warning: Agent ({agent}) not in Agents of Task: {self.task.get_task_name()}")
+        else:
+            if agent not in self.agents_constraints:
+                self.agents_constraints.add(agent)
+
+    def remove_agent_constraint(self, agent: str):
+        if agent in self.agents_constraints:
+            self.agents_constraints.remove(agent)
+        else:
+            print(f"Warning agent: {agent} not in agents constraints of task: {self.task.get_task_name()}")
+
+    def get_not_enabled_agents(self) -> Set[str]:
+        # TODO: Maybe better get_unable_agents
+        not_enabled_agents = set()
+        if self.agents_constraint:
+            not_enabled_agents = set(self.task.get_agents()) - set(self.agents_constraint)
+        return not_enabled_agents
 
     def __hash__(self):
         return hash(self.id)
@@ -331,10 +393,12 @@ class TaskInstance:
     def __eq__(self, other):
         return isinstance(other, TaskInstance) and other.id == self.id
 
+    def __repr__(self):
+        return f"Task instance id: {self.id}, Type: {self.task.get_task_name()}"
 
 @dataclass
 class TaskSolution:
-    task: Task
+    task: TaskInstance
     t_start: float
     t_end: float
     assignment: str
@@ -352,7 +416,7 @@ class TaskSolution:
     # def set_assignment(self, assignment: str) -> None:
     #     self.assignment = assignment
 
-    def get_task(self) -> Task:
+    def get_task(self) -> TaskInstance:
         return self.task
 
     def get_start_time(self) -> float:
@@ -516,8 +580,10 @@ class TaskSynergies:
         synergy = Synergy(
             other_task_name=other_task_name,
             other_agent_name=other_agent_name,
-            synergy_value=synergy_value,
-            std_dev=std_dev
+            synergy=AtomicSynergy(synergy_value,
+                                  std_dev)
+            # synergy_value=synergy_value,
+            # std_dev=std_dev
         )
         if synergy in self.synergies:
             print(f"Warning, synergy between task: {self.main_task_name} agent: {self.main_agent_name}"
@@ -530,11 +596,14 @@ class TaskSynergies:
                 return synergy
         return None
 
-    def get_synergies(self, other_agent_name: str) -> set:
-        return {synergy for synergy in self.synergies if synergy.other_agent_name == other_agent_name}
+    # def get_agent_synergies(self, other_agent_name: str) -> set:
+    #     return {synergy for synergy in self.synergies if synergy.other_agent_name == other_agent_name}
 
-    def get_all_synergies(self) -> set:
+    def get_synergies(self, ) -> set:
         return self.synergies
+
+    # def get_all_synergies(self) -> set:
+    #     return self.synergies
 
     def has_synergy(self, synergy: Synergy):
         return synergy in self.synergies

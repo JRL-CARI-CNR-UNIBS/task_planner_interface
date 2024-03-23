@@ -9,7 +9,6 @@ DEFAULT_KNOWLEDGE_BASES_LIST = [
     "ros"
 ]
 
-
 class KnowledgeBaseInterface(ABC):
     @abstractmethod
     def check_task_existence(self, task_name: str) -> bool:

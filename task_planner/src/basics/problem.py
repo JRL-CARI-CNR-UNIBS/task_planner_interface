@@ -132,7 +132,7 @@ class ProblemManager:
                 if (task_name, agent_name) not in task_statistics_dict:
                     raise Exception(f"Missing statistics for task: {task_name}, agent: {agent_name}")
                 statistics = task_statistics_dict[(task_name, agent_name)].get_statistics()
-                task.add_statistics(statistics)
+                task.add_agent_statistics(statistics)
 
     def load_tasks_synergies_from_knowledge(self):
         if not self.tasks_set:
@@ -146,6 +146,19 @@ class ProblemManager:
                 agent_synergies = task_agent_synergies.get_agent_synergies()
                 for agent_synergy in agent_synergies:
                     task.add_synergy(agent_synergy)
+
+    def update_tasks_synergies_from_knowledge(self):
+        if not self.tasks_set:
+            raise Exception("Empty tasks set, you have to load_tasks_from_knowledge")
+
+        for task in self.tasks_set:
+            task_name = task.get_task_name()
+            for agent_name in task.get_agents():
+                task_agent_synergies = self.knowledge_base.get_task_synergies(main_task_name=task_name,
+                                                                              main_agent_name=agent_name)
+                agent_synergies = task_agent_synergies.get_agent_synergies()
+                for agent_synergy in agent_synergies:
+                    task.update_synergy(agent_synergy)
 
     def load_task_instances(self):
         # Todo: Check sulla procedura, può solo se prima task_set settati.
@@ -257,6 +270,7 @@ class ProblemManager:
         return True
 
     def update_tasks_synergy(self) -> bool:
+        # TODO: Da riscrivere
         if not self.task_list:
             print("Empty task list")
             return False

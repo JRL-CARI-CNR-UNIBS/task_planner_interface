@@ -10,7 +10,7 @@ import rospy
 import rosservice
 from knowledge_base import KnowledgeBaseInterface, KnowledgeBaseCreationError
 from task import TaskAgentCorrespondence, TaskStatistics, TaskSynergies
-from utils import Color, UserMessages, Statistics, DataLoadingError
+from .utils import Color, UserMessages, Statistics, DataLoadingError, AtomicSynergy
 
 TIMEOUT = 10
 
