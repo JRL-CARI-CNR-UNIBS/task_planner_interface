@@ -9,8 +9,9 @@ from task_planner_statistics.srv import TaskSynergiesRequest
 import rospy
 import rosservice
 from knowledge_base import KnowledgeBaseInterface, KnowledgeBaseCreationError
-from task import TaskAgentCorrespondence, TaskStatistics, TaskSynergies
-from .utils import Color, UserMessages, Statistics, DataLoadingError, AtomicSynergy
+from task import TaskAgentCorrespondence
+from .utils import UserMessages, DataLoadingError
+from statistics_utils import Statistics, AtomicSynergy, TaskStatistics, TaskSynergies
 
 TIMEOUT = 10
 
@@ -122,8 +123,8 @@ class ROSKnowledgeBase(KnowledgeBaseInterface):
             task_synergies_result = self.task_synergies_srv(task_synergies_request)
             for task_synergies in task_synergies_result.synergies:
                 try:
-                    task_synergies_obj.add_synergy(other_task_name=task_synergies.task_name,
-                                                   other_agent_name=task_synergies.agent,
+                    task_synergies_obj.add_synergy(parallel_task_name=task_synergies.task_name,
+                                                   parallel_agent_name=task_synergies.agent,
                                                    synergy_value=task_synergies.synergy,
                                                    std_dev=task_synergies.std_err)
                 except ValueError as exception:

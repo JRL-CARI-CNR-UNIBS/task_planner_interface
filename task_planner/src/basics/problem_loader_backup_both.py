@@ -7,6 +7,7 @@ from utils import DataLoadingError
 from abc import ABC, abstractmethod
 from problem_loader import ProblemLoaderInterface
 
+
 @dataclass
 class ProblemLoaderInterface(ABC):
     @abstractmethod
@@ -63,7 +64,6 @@ class ROSProblemLoader(ProblemLoaderInterface):
 
             task_instances.add(task_instance)
         return task_instances
-
 
 
 GOAL = 'goal'
@@ -182,4 +182,3 @@ def validate_yaml_goal_format(problem_data):
 def validate_ros_goal_format(problem_data):
     if not isinstance(problem_data, list):
         raise ValueError("Yaml fiLE not well formatted: 'goal' must be present and has to be a list.")
-

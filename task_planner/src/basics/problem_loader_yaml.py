@@ -1,4 +1,3 @@
-import rospy
 from task import Task, TaskInstance
 from dataclasses import dataclass, field
 from typing import Dict, Optional, Set

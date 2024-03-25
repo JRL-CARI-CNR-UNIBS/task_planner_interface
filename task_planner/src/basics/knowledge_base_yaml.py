@@ -6,8 +6,9 @@ import yaml
 from pathlib import Path
 from typing import Dict, List
 
-from task import TaskAgentCorrespondence, TaskStatistics, TaskSynergies
-from utils import UserMessages, Statistics, DataLoadingError
+from task import TaskAgentCorrespondence
+from utils import UserMessages, DataLoadingError
+from statistics_utils import Statistics, TaskStatistics, TaskSynergies
 
 TASK_NAME = 'task_name'
 AGENT_NAME = 'agent_name'
@@ -109,8 +110,8 @@ class YAMLKnowledgeBase(KnowledgeBaseInterface):
                 synergy_val = parallel_task_syn[SYNERGY_VALUE]
                 synergy_std = parallel_task_syn.get(SYNERGY_STD, None)
                 try:
-                    task_synergies_obj.add_synergy(other_task_name=parallel_task_name,
-                                                   other_agent_name=parallel_agent_name,
+                    task_synergies_obj.add_synergy(parallel_task_name=parallel_task_name,
+                                                   parallel_agent_name=parallel_agent_name,
                                                    synergy_value=synergy_val,
                                                    std_dev=synergy_std)
                 except ValueError as exception:

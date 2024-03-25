@@ -1,10 +1,8 @@
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional, overload, Tuple, Set
 from enum import Enum
-from utils import Statistics, Synergy, AgentStats, AgentSynergy, AtomicSynergy
-
-
-# from multipledispatch import dispatch
+from statistics_utils import AgentStats, AgentSynergy, TaskSynergies
+from multipledispatch import dispatch
 
 
 # @dataclass
@@ -32,10 +30,10 @@ from utils import Statistics, Synergy, AgentStats, AgentSynergy, AtomicSynergy
 @dataclass
 class Task:
     task_name: str  # type
-    agents: Optional[Set[str]] = field(default=None, init=False)
+    agents: Set[str] = field(default_factory=set, init=False)
 
-    statistics: Optional[Set[AgentStats]] = field(default=None, init=False)
-    synergies: Optional[Set[AgentSynergy]] = field(default=None, init=False)
+    statistics: Set[AgentStats] = field(default_factory=set, init=False) # Erano optional
+    synergies: Set[AgentSynergy] = field(default_factory=set, init=False)
 
     def get_task_name(self) -> str:
         return self.task_name
@@ -45,15 +43,28 @@ class Task:
 
     def add_agent_statistics(self, agent_statistics: AgentStats):
         if agent_statistics in self.statistics:
-            print("Warning: Statistics already present")
+            print("Warning: Statistics already present. Updating the old one")
+            self.statistics.remove(agent_statistics)
+        if agent_statistics.get_agent_name() not in self.agents:
+            print(f"Statistics not added! {agent_statistics.get_agent_name()} not in agents of {self.agents}")
+            return
         self.statistics.add(agent_statistics)
 
-    def update_agent_statistics(self, agent_statistics: AgentStats):
-        if agent_statistics.agent_name not in self.agents:
-            print(f"Warning: Agent ({agent_statistics.agent_name}) not in task: f{self.task_name}")
-        if agent_statistics in self.statistics:
-            self.statistics.remove(agent_statistics)
-            self.statistics.add(agent_statistics)
+
+    # def add_agent_statistics(self, agent_statistics: AgentStats):
+    #     if agent_statistics in self.statistics:
+    #         print("Warning: Statistics already present")
+    #     if agent_statistics.get_agent_name() not in self.agents:
+    #         print(f"Statistics not added! {agent_statistics.get_agent_name()} not in agents of {self.agents}")
+    #         return
+    #     self.statistics.add(agent_statistics)
+
+    # def update_agent_statistics(self, agent_statistics: AgentStats):
+    #     if agent_statistics.get_agent_name() not in self.agents:
+    #         print(f"Warning: Agent ({agent_statistics.agent_name}) not in task: f{self.task_name}")
+    #     if agent_statistics in self.statistics:
+    #         self.statistics.remove(agent_statistics)
+    #         self.statistics.add(agent_statistics)
 
     def add_agent(self, agent: str) -> None:
         if agent not in self.agents:
@@ -86,8 +97,9 @@ class Task:
         return self.statistics
 
     def get_agent_statistics(self, agent_name: str) -> AgentStats:
-        return {agent_statistic for agent_statistic in self.statistics if agent_statistic.agent_name == agent_name}
-        # return set(filter(lambda stat: stat.agent_name == agent_name, self.statistics))
+        for agent_statistic in self.statistics:
+            if agent_statistic.get_agent_name() == agent_name:
+                return agent_statistic
 
     def get_synergies(self) -> Set[AgentSynergy]:
         return self.synergies
@@ -103,19 +115,39 @@ class Task:
         return {synergy.get_synergy() for synergy in self.synergies if
                 synergy.main_agent_name == main_agent and synergy.get_parallel_agent_name() == parallel_agent}
 
+    @dispatch
     def add_synergy(self, agent_synergy: AgentSynergy):
+        if agent_synergy.get_main_agent() not in self.agents:
+            print(f"Warning: Synergy main agent not in task agents: {self.agents}")
+            return
         if agent_synergy in self.synergies:
+            self.synergies.remove(agent_synergy) # Aggiunto per avere add_synergy che fa anche update
             print("Warning: synergy already present: Neglected.")
         self.synergies.add(agent_synergy)
 
-    def update_synergy(self, agent_synergy: AgentSynergy):
-        if agent_synergy in self.synergies:
-            self.synergies.remove(agent_synergy)
-        self.synergies.add(agent_synergy)
+    @dispatch
+    def add_synergy(self, task_synergies: TaskSynergies):
+        if task_synergies.get_main_task_name() != self.task_name:
+            print(f"Warning: Synergy with main task not equal to: {self.task_name}")
+            return
+        if task_synergies.get_main_agent_name() not in self.agents:
+            print(f"Warning: Synergy main agent not in task agents: {self.agents}")
+            return
+        agent_synergies = task_synergies.get_agent_synergies()
+        for agent_synergy in agent_synergies:
+            self.synergies.add(agent_synergy)
+
+    # def update_synergy(self, agent_synergy: AgentSynergy):
+    #     if agent_synergy in self.synergies:
+    #         self.synergies.remove(agent_synergy)
+    #     self.synergies.add(agent_synergy)
 
     def __eq__(self, other):
         return ((isinstance(other, Task) and self.task_name == other.task_name) or
-                (isinstance(other, str) and self.task_name == other))
+                (isinstance(other, str) and self.task_name == other))  # TODO: DA TOGLIERE, dove usato?
+
+    def __hash__(self):
+        return hash(self.task_name)
 
     def __repr__(self):
         return f"Task name: {self.task_name}, Agents: {self.agents}"
@@ -396,6 +428,7 @@ class TaskInstance:
     def __repr__(self):
         return f"Task instance id: {self.id}, Type: {self.task.get_task_name()}"
 
+
 @dataclass
 class TaskSolution:
     task: TaskInstance
@@ -523,98 +556,5 @@ class TaskAgentCorrespondence:
         return ((isinstance(other, str) and other == self.task_name) or
                 (isinstance(other, TaskAgentCorrespondence) and other.task_name == self.task_name))
 
-
 #     return (isinstance(other, TaskStatistics) and
 #             self.task_name == other.task_name and
-
-
-@dataclass
-class TaskStatistics:
-    task_name: str
-    agent_name: str
-    statistics: Statistics
-
-    def get_expected_duration(self) -> float:
-        return self.statistics.get_expected_duration()
-
-    def get_duration_std_dev(self) -> float:
-        return self.statistics.get_duration_std_dev()
-
-    def get_statistics(self) -> Statistics:
-        return AgentStats(agent_name=self.agent_name,
-                          statistics=self.statistics)
-
-    def get_task_name(self):
-        return self.task_name
-
-    def get_agent_name(self):
-        return self.agent_name
-
-    # def __eq__(self, other):
-    #     return (isinstance(other, TaskStatistics) and
-    #             self.task_name == other.task_name and
-    #             self.agent_name == other.agent_name)
-
-    def __hash__(self):
-        return hash((self.task_name, self.agent_name))
-
-    # def __eq__(self, other):
-    #     return isinstance(other,str) and other
-
-
-@dataclass
-class TaskSynergies:
-    main_task_name: str
-    main_agent_name: str
-    synergies: Set[Synergy] = field(default_factory=set, init=False)
-
-    def add_synergy(self,
-                    other_task_name: str,
-                    other_agent_name: str,
-                    synergy_value: float,
-                    std_dev: Optional[float] = None):
-        if other_task_name == self.main_task_name and other_agent_name == self.main_agent_name:
-            raise ValueError(
-                f"Other task and agent name: ({other_task_name}, {other_agent_name}) must differ by main one: "
-                f"({self.main_task_name}, {self.main_agent_name}). Not added")
-        synergy = Synergy(
-            other_task_name=other_task_name,
-            other_agent_name=other_agent_name,
-            synergy=AtomicSynergy(synergy_value,
-                                  std_dev)
-            # synergy_value=synergy_value,
-            # std_dev=std_dev
-        )
-        if synergy in self.synergies:
-            print(f"Warning, synergy between task: {self.main_task_name} agent: {self.main_agent_name}"
-                  f"and task: {other_task_name} agent: {other_agent_name} duplicated, old removed")
-        self.synergies.add(synergy)
-
-    def get_synergy(self, other_task_name: str, other_agent_name: str) -> Optional[Synergy]:
-        for synergy in self.synergies:
-            if synergy.other_task_name == other_task_name and synergy.other_agent_name == other_agent_name:
-                return synergy
-        return None
-
-    # def get_agent_synergies(self, other_agent_name: str) -> set:
-    #     return {synergy for synergy in self.synergies if synergy.other_agent_name == other_agent_name}
-
-    def get_synergies(self, ) -> set:
-        return self.synergies
-
-    # def get_all_synergies(self) -> set:
-    #     return self.synergies
-
-    def has_synergy(self, synergy: Synergy):
-        return synergy in self.synergies
-
-    def get_agent_synergies(self):
-        agent_synergies: Set[AgentSynergy] = set()
-        for synergy in self.synergies:
-            try:
-                agent_synergy = AgentSynergy(main_agent_name=self.main_agent_name,
-                                             synergy=synergy)
-                agent_synergies.add(agent_synergy)
-            except ValueError as exc:
-                raise exc
-        return agent_synergies

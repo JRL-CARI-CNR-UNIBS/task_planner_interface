@@ -1,12 +1,15 @@
 from enum import Enum, auto
-
-from task import Task, TaskInstance, TaskSolution
 from dataclasses import dataclass, field
 from typing import List, Dict, Tuple, Optional, Set
 
-from knowledge_base import KnowledgeBaseInterface, DataLoadingError
-from task import TaskAgentCorrespondence, TaskStatistics
+from task import Task, TaskInstance, TaskSolution
+from knowledge_base import KnowledgeBaseInterface
+
+from statistics_utils import TaskStatistics
 from problem_loader import ProblemLoaderInterface
+from utils import DataLoadingError
+
+from multipledispatch import dispatch
 
 
 class Status(Enum):
@@ -26,8 +29,8 @@ class ProblemManager:
     task_instances_set: Set[TaskInstance] = field(default_factory=set, init=False)
 
     # TODO: Da verificare la necessita'
-    agents: Set[str] = field(default_factory=set, init=False)
-    robot_agents: Optional[Set[str]] = field(default_factory=set, init=True)
+    agents: Set[str] = field(default_factory=set, init=True)
+    robot_agents: Set[str] = field(default_factory=set, init=True)
 
     # TODO: Da verificare la necessita'
     solution: Set[TaskSolution] = field(default_factory=list, init=False)
@@ -43,47 +46,135 @@ class ProblemManager:
         if task not in self.task_list:
             self.tasks_set.add(task)
         else:
-            raise Exception("Task already present")
+            print("Warning: Task Already present")
+            # raise Exception("Task already present")
+
+    @dispatch(Task)
+    def remove_task(self, task: Task):
+        # Remove task instance with task of that type
+        for task_instance in self.task_instances_set:
+            if task_instance.get_task() == task:
+                self.task_instances_set.remove(task_instance)
+        # Remove task type
+        if task in self.tasks_set:
+            self.tasks_set.remove(task)
+        else:
+            print("Warning: Task not present")
+
+    @dispatch(str)
+    def remove_task(self, task_name: str):
+        for task_instance in self.task_instances_set:
+            if task_instance.get_task().get_task_name() == task_name:
+                self.task_instances_set.remove(task_instance)
+        for task in self.tasks_set:
+            if task.get_task_name() == task_name:
+                self.tasks_set.remove(task)
+
+    @dispatch(TaskInstance)
+    def remove_task_instance(self, task_instance: TaskInstance):
+        if task_instance in self.task_instances_set:
+            self.task_instances_set.remove(task_instance)
+        else:
+            print("Warning: Task Intance not present")
+
+    @dispatch(str)
+    def remove_task_instance(self, task_id: str):
+        for task_instance in self.task_instances_set:
+            if task_instance.get_id() == task_id:
+                self.task_instances_set.remove(task_instance)
 
     def get_task_set_as_dictionary(self) -> Dict[str, Task]:
         return {task.get_task_name(): task for task in self.tasks_set}
 
     def get_task_instances_as_dictionary(self) -> Dict[str, TaskInstance]:
         return {task_instance.get_id(): task_instance for task_instance in self.task_instances_set}
-        # Todo: OK che dia id?
+
+    def get_task_ids(self) -> Set[str]:
+        return {task_instance.get_id() for task_instance in self.task_instances_set}
+
+    def get_tasks_name(self) -> Set[str]:
+        return {task.get_task_name() for task in self.tasks_set}
 
     def consistency_check(self) -> bool:
-        tasks_dict = self.get_task_list_as_dictionary()
 
-        # Check precedence consistency (exists & not-loop)
-        for task in self.task_list:
-            # if not any(precedence_task in tasks_dict.keys() for precedence_task in task.get_precedence_constraints()):
-            #     return False
+        task_ids = self.get_task_ids()
+        task_names = self.get_tasks_name()
+        for task_instance in self.task_instances_set:
 
-            for precedence_task in task.get_precedence_constraints():
-                # Check if exist all precedence constraints among task_ids
-                if precedence_task not in tasks_dict.keys():
-                    rospy.logerr(f"The precedence task: {precedence_task}, of task: {task.get_id()}, does not exist.")
+            for precedence_task in task_instance.get_precedence_constraints():
+                if precedence_task not in task_ids:
+                    print(
+                        f"Logerr: The precedence task: {precedence_task}, of task: {task_instance.get_id()}, does not exist.")
+                    return False
+            for immediate_precedence_task in task_instance.get_immediate_precedence_constraint():
+                if immediate_precedence_task not in task_ids:
+                    print(
+                        f"Logerr: The immediate precedence task: {immediate_precedence_task},"
+                        f" of task: {task_instance.get_id()}, does not exist.")
                     return False
 
-            for soft_precedence_task in task.get_soft_constraints():
-                # Check if exist all soft precedence constraints among task_ids
-                if soft_precedence_task not in tasks_dict.keys():
-                    rospy.logerr(
-                        f"The soft precedence task: {soft_precedence_task}, of task: {task.get_id()}, does not exist.")
-                    return False
-
-            # Check if all task type exist
-            try:
-                task_check_result = self.task_check_srv(task.get_type())
-                if not task_check_result.exist:
-                    rospy.logerr(
-                        f"{Color.RED.value} Type {task.get_type()} not present in Knowledge Base {Color.END.value}")
-                    return False
-            except rospy.ServiceException as e:
-                rospy.logerr(UserMessages.SERVICE_FAILED.value.format("check_task_type"))
+            if task_instance.get_task().get_task_name() not in task_names:
+                print(f"Logerr: Task name in task: {task_instance.get_id()} not present in tasks type list.")
                 return False
+            # # Check if all task type exist
+            # try:
+            #     task_check_result = self.task_check_srv(task.get_type())
+            #     if not task_check_result.exist:
+            #         rospy.logerr(
+            #             f"{Color.RED.value} Type {task.get_type()} not present in Knowledge Base {Color.END.value}")
+            #         return False
+            # except rospy.ServiceException as e:
+            #     rospy.logerr(UserMessages.SERVICE_FAILED.value.format("check_task_type"))
+            #     return False
         return True
+
+    # def consistency_check(self) -> bool:
+    #
+    #     task_ids = self.get_task_ids()
+    #
+    #     for task_instance in self.task_instances_set:
+    #
+    #         for precedence_task in task_instance.get_precedence_constraints():
+    #             if precedence_task not in task_ids:
+    #                 print(
+    #                     f"Logerr: The precedence task: {precedence_task}, of task: {task_instance.get_id()}, does not exist.")
+    #                 return False
+    #         for immediate_precedence_task in task_instance.get_immediate_precedence_constraint():
+    #             if immediate_precedence_task not in task_ids:
+    #                 print(
+    #                     f"Logerr: The immediate precedence task: {immediate_precedence_task},"
+    #                     f" of task: {task_instance.get_id()}, does not exist.")
+    #                 return False
+    #
+    #     # Check precedence consistency (exists & not-loop)
+    #     for task in self.task_list:
+    #         # if not any(precedence_task in tasks_dict.keys() for precedence_task in task.get_precedence_constraints()):
+    #         #     return False
+    #
+    #         for precedence_task in task.get_precedence_constraints():
+    #             # Check if exist all precedence constraints among task_ids
+    #             if precedence_task not in tasks_dict.keys():
+    #                 rospy.logerr(f"The precedence task: {precedence_task}, of task: {task.get_id()}, does not exist.")
+    #                 return False
+    #
+    #         for soft_precedence_task in task.get_soft_constraints():
+    #             # Check if exist all soft precedence constraints among task_ids
+    #             if soft_precedence_task not in tasks_dict.keys():
+    #                 rospy.logerr(
+    #                     f"The soft precedence task: {soft_precedence_task}, of task: {task.get_id()}, does not exist.")
+    #                 return False
+    #
+    #         # Check if all task type exist
+    #         try:
+    #             task_check_result = self.task_check_srv(task.get_type())
+    #             if not task_check_result.exist:
+    #                 rospy.logerr(
+    #                     f"{Color.RED.value} Type {task.get_type()} not present in Knowledge Base {Color.END.value}")
+    #                 return False
+    #         except rospy.ServiceException as e:
+    #             rospy.logerr(UserMessages.SERVICE_FAILED.value.format("check_task_type"))
+    #             return False
+    #     return True
 
     # TODO: L'ho implementato in knowledge base, da rimuovere da qui
     def load_tasks_from_knowledge(self):
@@ -111,7 +202,7 @@ class ProblemManager:
         if not self.tasks_set:
             # TODO: Dovrebbe essere solo un warning?
             raise Exception("Empty tasks set, you have to load_tasks_from_knowledge")
-        tasks_stats: Set[TaskStatistics] = set()
+        tasks_stats: Set[TaskStatistics]  # = set()
         try:
             tasks_stats = self.knowledge_base.get_tasks_stats()
         except DataLoadingError:
@@ -147,18 +238,18 @@ class ProblemManager:
                 for agent_synergy in agent_synergies:
                     task.add_synergy(agent_synergy)
 
-    def update_tasks_synergies_from_knowledge(self):
-        if not self.tasks_set:
-            raise Exception("Empty tasks set, you have to load_tasks_from_knowledge")
-
-        for task in self.tasks_set:
-            task_name = task.get_task_name()
-            for agent_name in task.get_agents():
-                task_agent_synergies = self.knowledge_base.get_task_synergies(main_task_name=task_name,
-                                                                              main_agent_name=agent_name)
-                agent_synergies = task_agent_synergies.get_agent_synergies()
-                for agent_synergy in agent_synergies:
-                    task.update_synergy(agent_synergy)
+    # def update_tasks_synergies_from_knowledge(self):
+    #     if not self.tasks_set:
+    #         raise Exception("Empty tasks set, you have to load_tasks_from_knowledge")
+    #
+    #     for task in self.tasks_set:
+    #         task_name = task.get_task_name()
+    #         for agent_name in task.get_agents():
+    #             task_agent_synergies = self.knowledge_base.get_task_synergies(main_task_name=task_name,
+    #                                                                           main_agent_name=agent_name)
+    #             agent_synergies = task_agent_synergies.get_agent_synergies()
+    #             for agent_synergy in agent_synergies:
+    #                 task.update_synergy(agent_synergy)
 
     def load_task_instances(self):
         # Todo: Check sulla procedura, può solo se prima task_set settati.
@@ -177,141 +268,149 @@ class ProblemManager:
             pass
 
     def update_problem(self):
+        self.load_tasks_stats_from_knowledge()
+        self.update_tasks_synergies_from_knowledge()
         # TODO: Da implementare
-        raise NotImplemented
+        # raise NotImplemented
 
-    def fill_task_agents(self) -> bool:
-        # try:
-        #     tasks_info_srv_result = self.get_tasks_info_srv()
-        # except rospy.ServiceException as e:
-        #     rospy.logerr(UserMessages.SERVICE_FAILED.value.format("get_task_agents"))
-        #     return False
-        #
-        # # Retrieve agents-task ability
-        # # task_agents_correspondence = {task_info.name: task_info.agents for task_info in tasks_info_result.tasks_info}
-        # task_agents_correspondence = {}
-        # for task_info in tasks_info_srv_result.tasks_info:
-        #     task_agents_correspondence[task_info.name] = task_info.agents
-        #
-        # if not task_agents_correspondence:
-        #     print(f"Task info empty from service: check DB!")
-        #     return False
-        task_agents_correspondence: Set[TaskAgentCorrespondence] = self.knowledge_base.get_task_agents()
-        if not task_agents_correspondence:
-            return ValueError("Empty Knowledge Base")
+    # def fill_task_agents(self) -> bool:
+    #     # try:
+    #     #     tasks_info_srv_result = self.get_tasks_info_srv()
+    #     # except rospy.ServiceException as e:
+    #     #     rospy.logerr(UserMessages.SERVICE_FAILED.value.format("get_task_agents"))
+    #     #     return False
+    #     #
+    #     # # Retrieve agents-task ability
+    #     # # task_agents_correspondence = {task_info.name: task_info.agents for task_info in tasks_info_result.tasks_info}
+    #     # task_agents_correspondence = {}
+    #     # for task_info in tasks_info_srv_result.tasks_info:
+    #     #     task_agents_correspondence[task_info.name] = task_info.agents
+    #     #
+    #     # if not task_agents_correspondence:
+    #     #     print(f"Task info empty from service: check DB!")
+    #     #     return False
+    #     task_agents_correspondence: Set[TaskAgentCorrespondence] = self.knowledge_base.get_task_agents()
+    #     if not task_agents_correspondence:
+    #         return ValueError("Empty Knowledge Base")
+    #
+    #     for task_info in task_agents_correspondence:
+    #         task_name = task_info.get_task_name()
+    #         agents = task_info.get_agents()
+    #         if task_name in self.tasks_set:
+    #             print("Warning: {task_name} already present in tasks set.")
+    #         task_obj = Task(task_name=task_name,
+    #                         agents=agents)
+    #
+    #         self.tasks_set.add(task_obj)
+    #
+    #     for task in self.tasks_set:
+    #         if not task.get_agents():  # Empty => Take mongoDB agents
+    #             if task.get_task_name() not in task_agents_correspondence:
+    #                 print(f"Task: {task.get_task_name()} not present in agents tasks ability from Knowledge Based")
+    #                 return False
+    #             task.update_agents(task_agents_correspondence[task.get_type()])
+    #
+    #         # Check if the specified agent (in task goal) can actually perform it if not all(required_agent in
+    #         # task_agents_correspondence[task.get_type()] for required_agent in task.get_agents()):
+    #         for required_agent in task.get_agents_constraint():
+    #             # Check if that agent exists at Knowledge-Based
+    #             if required_agent not in self.agents:
+    #                 rospy.loginfo(
+    #                     f"{Color.RED.value}The specified agent: {required_agent}, for task: {task.get_id()},"
+    #                     f" does not exist {Color.END.value}")
+    #                 return False
+    #             # Check if the specified agent (in task goal) can actually perform it
+    #             if required_agent not in task_agents_correspondence[task.get_type()]:
+    #                 rospy.loginfo(
+    #                     f"{Color.RED.value}The specified agent: {required_agent}, "
+    #                     f"for task: {task.get_id()}, cannot perform task: {task.get_id()} {Color.END.value}")
+    #                 return False
+    #     return True
 
-        for task_info in task_agents_correspondence:
-            task_name = task_info.get_task_name()
-            agents = task_info.get_agents()
-            if task_name in self.tasks_set:
-                print("Warning: {task_name} already present in tasks set.")
-            task_obj = Task(task_name=task_name,
-                            agents=agents)
+    # def update_tasks_statistics(self) -> bool:
+    #     try:
+    #         tasks_stats_result = self.get_tasks_stats_srv()
+    #     except rospy.ServiceException as e:
+    #         rospy.logerr(UserMessages.SERVICE_FAILED.value.format("get_tasks_statistics"))
+    #         return False
+    #     # utils: tasks_stasts_dict : {task_name: {agent1: {stats}, agent2: {stats}}}
+    #     if not tasks_stats_result.statistics:
+    #         print("Tasks statistics empty from service. Check DB")
+    #         return False
+    #     tasks_stasts_dict = {}
+    #     for tasks_stats in tasks_stats_result.statistics:
+    #         if tasks_stats.name not in tasks_stasts_dict:
+    #             tasks_stasts_dict[tasks_stats.name] = {}
+    #         if tasks_stats.agent not in tasks_stasts_dict[tasks_stats.name]:
+    #             tasks_stasts_dict[tasks_stats.name][tasks_stats.agent] = {}
+    #
+    #         tasks_stasts_dict[tasks_stats.name][tasks_stats.agent] = {"exp_duration": tasks_stats.exp_duration,
+    #                                                                   "duration_std": tasks_stats.duration_std}
+    #     # TODO: Pass in Task also the duration std
+    #     for task in self.task_list:
+    #         if task.get_type() not in tasks_stasts_dict.keys():
+    #             print(f"Missing task statistics for: {task}")
+    #             return False
+    #         for agent in task.get_agents():
+    #             if agent not in tasks_stasts_dict[task.get_type()].keys():
+    #                 print(f"Missing task statistics for: {task}, for agent: {agent}")
+    #                 return False
+    #             task.update_duration(agent, tasks_stasts_dict[task.get_type()][agent]["exp_duration"])
+    #             # TODO: In future will be usefull store also duration_std
+    #         # Update also statistics for agents present in Knowledge base but not in task-Goal
+    #         # for agent in set(tasks_stasts_dict[task.get_type()].keys()).difference({*task.get_agents()}):    # Agents in KnowledgeBase but not specified in Task-Goal
+    #         #     task.update_duration(agent, tasks_stasts_dict[task.get_type()][agent]["exp_duration"])
+    #     return True
 
-            self.tasks_set.add(task_obj)
-
-        for task in self.tasks_set:
-            if not task.get_agents():  # Empty => Take mongoDB agents
-                if task.get_task_name() not in task_agents_correspondence:
-                    print(f"Task: {task.get_task_name()} not present in agents tasks ability from Knowledge Based")
-                    return False
-                task.update_agents(task_agents_correspondence[task.get_type()])
-
-            # Check if the specified agent (in task goal) can actually perform it if not all(required_agent in
-            # task_agents_correspondence[task.get_type()] for required_agent in task.get_agents()):
-            for required_agent in task.get_agents_constraint():
-                # Check if that agent exists at Knowledge-Based
-                if required_agent not in self.agents:
-                    rospy.loginfo(
-                        f"{Color.RED.value}The specified agent: {required_agent}, for task: {task.get_id()},"
-                        f" does not exist {Color.END.value}")
-                    return False
-                # Check if the specified agent (in task goal) can actually perform it
-                if required_agent not in task_agents_correspondence[task.get_type()]:
-                    rospy.loginfo(
-                        f"{Color.RED.value}The specified agent: {required_agent}, "
-                        f"for task: {task.get_id()}, cannot perform task: {task.get_id()} {Color.END.value}")
-                    return False
-        return True
-
-    def update_tasks_statistics(self) -> bool:
-        try:
-            tasks_stats_result = self.get_tasks_stats_srv()
-        except rospy.ServiceException as e:
-            rospy.logerr(UserMessages.SERVICE_FAILED.value.format("get_tasks_statistics"))
-            return False
-        # utils: tasks_stasts_dict : {task_name: {agent1: {stats}, agent2: {stats}}}
-        if not tasks_stats_result.statistics:
-            print("Tasks statistics empty from service. Check DB")
-            return False
-        tasks_stasts_dict = {}
-        for tasks_stats in tasks_stats_result.statistics:
-            if tasks_stats.name not in tasks_stasts_dict:
-                tasks_stasts_dict[tasks_stats.name] = {}
-            if tasks_stats.agent not in tasks_stasts_dict[tasks_stats.name]:
-                tasks_stasts_dict[tasks_stats.name][tasks_stats.agent] = {}
-
-            tasks_stasts_dict[tasks_stats.name][tasks_stats.agent] = {"exp_duration": tasks_stats.exp_duration,
-                                                                      "duration_std": tasks_stats.duration_std}
-        # TODO: Pass in Task also the duration std
-        for task in self.task_list:
-            if task.get_type() not in tasks_stasts_dict.keys():
-                print(f"Missing task statistics for: {task}")
-                return False
-            for agent in task.get_agents():
-                if agent not in tasks_stasts_dict[task.get_type()].keys():
-                    print(f"Missing task statistics for: {task}, for agent: {agent}")
-                    return False
-                task.update_duration(agent, tasks_stasts_dict[task.get_type()][agent]["exp_duration"])
-                # TODO: In future will be usefull store also duration_std
-            # Update also statistics for agents present in Knowledge base but not in task-Goal
-            # for agent in set(tasks_stasts_dict[task.get_type()].keys()).difference({*task.get_agents()}):    # Agents in KnowledgeBase but not specified in Task-Goal
-            #     task.update_duration(agent, tasks_stasts_dict[task.get_type()][agent]["exp_duration"])
-        return True
-
-    def update_tasks_synergy(self) -> bool:
-        # TODO: Da riscrivere
-        if not self.task_list:
-            print("Empty task list")
-            return False
-        for task in self.task_list:
-            print(task)
-            task_type = task.get_type()
-            task_agents = task.get_agents()
-            if (not task_type) or (not task_agents):
-                print(f"Task type or agents for task: {task} not present in Problem")
-                return False
-            for agent in task_agents:
-                task_synergies_request = TaskSynergiesRequest()
-                task_synergies_request.task_name = task_type
-                task_synergies_request.agent = agent
-                try:
-                    task_synergies_result = self.get_task_synergies_srv(task_synergies_request)
-                except rospy.ServiceException as e:
-                    rospy.logerr(UserMessages.SERVICE_FAILED.value.format("get_task_synergies"))
-                    return False
-                synergies = task_synergies_result.synergies
-                if not synergies:
-                    print(f"Synergies for task: {task_type}, agent: {agent} empty.")
-                    return False
-                synergies_dict = dict()
-                for task_synergy in synergies:
-                    assert task_synergy.agent is not agent
-                    if task_synergy.agent not in synergies_dict:
-                        synergies_dict[task_synergy.agent] = dict()
-                    synergies_dict[task_synergy.agent][task_synergy.task_name] = task_synergy.synergy
-                for parallel_agent in synergies_dict:
-                    task.update_synergy(agent, parallel_agent, synergies_dict[parallel_agent])
-        return True
-        # TODO: Is better to store as an object with all the info. Can i recycle TaskSynergy message? But i cannot add method.
-        # task_synergy.std_err
-        # task_synergy.success_rate
+    # def update_tasks_synergy(self) -> bool:
+    #     # TODO: Da riscrivere
+    #     if not self.task_list:
+    #         print("Empty task list")
+    #         return False
+    #     for task in self.task_list:
+    #         print(task)
+    #         task_type = task.get_type()
+    #         task_agents = task.get_agents()
+    #         if (not task_type) or (not task_agents):
+    #             print(f"Task type or agents for task: {task} not present in Problem")
+    #             return False
+    #         for agent in task_agents:
+    #             task_synergies_request = TaskSynergiesRequest()
+    #             task_synergies_request.task_name = task_type
+    #             task_synergies_request.agent = agent
+    #             try:
+    #                 task_synergies_result = self.get_task_synergies_srv(task_synergies_request)
+    #             except rospy.ServiceException as e:
+    #                 rospy.logerr(UserMessages.SERVICE_FAILED.value.format("get_task_synergies"))
+    #                 return False
+    #             synergies = task_synergies_result.synergies
+    #             if not synergies:
+    #                 print(f"Synergies for task: {task_type}, agent: {agent} empty.")
+    #                 return False
+    #             synergies_dict = dict()
+    #             for task_synergy in synergies:
+    #                 assert task_synergy.agent is not agent
+    #                 if task_synergy.agent not in synergies_dict:
+    #                     synergies_dict[task_synergy.agent] = dict()
+    #                 synergies_dict[task_synergy.agent][task_synergy.task_name] = task_synergy.synergy
+    #             for parallel_agent in synergies_dict:
+    #                 task.update_synergy(agent, parallel_agent, synergies_dict[parallel_agent])
+    #     return True
+    # TODO: Is better to store as an object with all the info. Can i recycle TaskSynergy message? But i cannot add method.
 
     def get_combinations(self) -> Dict[Tuple[str, str], str]:
         combinations = {}
         for task in self.task_list:
             for agent in task.get_agents():
                 combinations[(agent, task.get_id())] = task.get_duration(agent)
+        return combinations
+
+    from statistics_utils import AgentStats
+    def get_combinations(self) -> Dict[Tuple[str, str], AgentStats]:
+        combinations = {}
+        for task_instance in self.task_instances_set:
+            for agent in task_instance.get_task().get_agents():
+                combinations[(agent, task_instance.get_id())] = task_instance.get_task().get_agent_statistics()
         return combinations
 
     def get_tasks_list(self) -> List[str]:

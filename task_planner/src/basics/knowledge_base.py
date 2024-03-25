@@ -1,13 +1,15 @@
 from abc import ABC, abstractmethod
-from task import TaskStatistics, TaskAgentCorrespondence, TaskSynergies
+from task import TaskAgentCorrespondence
 from typing import Set
 from task import Task
 from utils import DataLoadingError
+from statistics_utils import TaskStatistics, TaskSynergies
 
 DEFAULT_KNOWLEDGE_BASES_LIST = [
     "yaml",
     "ros"
 ]
+
 
 class KnowledgeBaseInterface(ABC):
     @abstractmethod
