@@ -71,6 +71,8 @@ def main():
 
     database_name = "hrc_case_study"
     results_collection_name = "real_test_results_test_75_plans"
+    results_collection_name = "task_results_online"
+
     mongo_interface = MongoInterface(database_name)
 
     pipeline = StatisticalPipeline.recipes_duration_pipeline()
@@ -218,7 +220,7 @@ def main():
 
     path = "/home/galois/Desktop/Samuele/"
     plt.ylabel("")
-    plt.savefig(f"{path}iso15066_comparison_plan_duration_test_finished.pdf", bbox_inches='tight')
+    # plt.savefig(f"{path}iso15066_comparison_plan_duration_test_finished.pdf", bbox_inches='tight')
     plt.show()
 
 

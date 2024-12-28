@@ -1,9 +1,9 @@
 from dataclasses import dataclass, field
-from typing import List, Dict, Optional, overload, Tuple, Set
+from typing import List, Dict, Optional, overload, Tuple, Set, Generic, TypeVar
 from enum import Enum
 from statistics_utils import AgentStats, AgentSynergy, TaskSynergies
 from multipledispatch import dispatch
-
+from abc import ABC, abstractmethod
 
 # @dataclass
 # class TaskInstance:
@@ -25,6 +25,19 @@ from multipledispatch import dispatch
 #
 #     def __hash__(self):
 #         return hash(self.agent_name)
+T = TypeVar('T')
+
+
+@dataclass
+class AdditionalProperty(ABC, Generic[T]):
+    property_name: str
+    property_value: T
+
+    def get_property_name(self) -> str:
+        return self.property_name
+
+    def get_property_value(self) -> T:
+        return self.property_value
 
 
 @dataclass
@@ -32,8 +45,10 @@ class Task:
     task_name: str  # type
     agents: Set[str] = field(default_factory=set, init=False)
 
-    statistics: Set[AgentStats] = field(default_factory=set, init=False) # Erano optional
+    statistics: Set[AgentStats] = field(default_factory=set, init=False)  # Erano optional
     synergies: Set[AgentSynergy] = field(default_factory=set, init=False)
+
+    additional_properties: List[AdditionalProperty] = field(default_factory=list, init=False)
 
     def get_task_name(self) -> str:
         return self.task_name
@@ -49,7 +64,6 @@ class Task:
             print(f"Statistics not added! {agent_statistics.get_agent_name()} not in agents of {self.agents}")
             return
         self.statistics.add(agent_statistics)
-
 
     # def add_agent_statistics(self, agent_statistics: AgentStats):
     #     if agent_statistics in self.statistics:
@@ -121,7 +135,7 @@ class Task:
             print(f"Warning: Synergy main agent not in task agents: {self.agents}")
             return
         if agent_synergy in self.synergies:
-            self.synergies.remove(agent_synergy) # Aggiunto per avere add_synergy che fa anche update
+            self.synergies.remove(agent_synergy)  # Aggiunto per avere add_synergy che fa anche update
             print("Warning: synergy already present: Neglected.")
         self.synergies.add(agent_synergy)
 
@@ -136,6 +150,12 @@ class Task:
         agent_synergies = task_synergies.get_agent_synergies()
         for agent_synergy in agent_synergies:
             self.synergies.add(agent_synergy)
+
+    def add_property(self, task_property: AdditionalProperty):
+        self.additional_properties.append(task_property)
+
+    def get_additional_properties(self) -> List[AdditionalProperty]:
+        return self.additional_properties
 
     # def update_synergy(self, agent_synergy: AgentSynergy):
     #     if agent_synergy in self.synergies:

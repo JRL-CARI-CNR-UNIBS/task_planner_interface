@@ -238,6 +238,9 @@ class ProblemManager:
                 for agent_synergy in agent_synergies:
                     task.add_synergy(agent_synergy)
 
+    def update_tasks_synergies_from_knowledge(self):
+        self.load_tasks_stats_from_knowledge()
+
     # def update_tasks_synergies_from_knowledge(self):
     #     if not self.tasks_set:
     #         raise Exception("Empty tasks set, you have to load_tasks_from_knowledge")
@@ -264,13 +267,13 @@ class ProblemManager:
         self.load_task_instances()
         # TODO: DA SISTEMARE
         if not self.consistency_check():
+            print("Logerr: Consistency check not passed.")
             # TODO: Change status?
             pass
 
     def update_problem(self):
         self.load_tasks_stats_from_knowledge()
         self.update_tasks_synergies_from_knowledge()
-        # TODO: Da implementare
         # raise NotImplemented
 
     # def fill_task_agents(self) -> bool:
@@ -443,11 +446,11 @@ class ProblemManager:
                 tasks_per_agent[agent].append(task.get_id())
         return tasks_per_agent
 
-    def get_not_enabled_agents_constraints(self):
-        not_enabled_agents = {}
-        for task in self.task_list:
-            not_enabled_agents[task.get_id()] = task.get_not_enabled_agents()
-        return not_enabled_agents
+    # def get_not_enabled_agents_constraints(self):
+    #     not_enabled_agents = {}
+    #     for task in self.task_list:
+    #         not_enabled_agents[task.get_id()] = task.get_not_enabled_agents()
+    #     return not_enabled_agents
 
     def get_robot_agents(self) -> List[str]:
         return self.robot_agents

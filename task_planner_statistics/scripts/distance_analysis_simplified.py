@@ -333,7 +333,7 @@ def main():
     #
     # sns.set(rc={'figure.figsize': (25,8)})
     #
-    plt.savefig(f"/home/samuele/Desktop/comparison_safety_distances_real_case_filtered_data_distribution.pdf", bbox_inches='tight')
+    # plt.savefig(f"/home/samuele/Desktop/comparison_safety_distances_real_case_filtered_data_distribution.pdf", bbox_inches='tight')
     # plt.savefig(f"{path}comparison_min_distance{zoom_name}.pdf", bbox_inches='tight')
 
     percentage_under_risky_dataset_pd = pandas.DataFrame(percentage_under_risky_dataset)
@@ -360,7 +360,7 @@ def main():
         item.set_fontsize(20)
     plt.legend(fontsize=20)
 
-    plt.savefig(f"/home/samuele/Desktop/comparison_safety_distances_real_case_filtered_data.pdf", bbox_inches='tight')
+    # plt.savefig(f"/home/samuele/Desktop/comparison_safety_distances_real_case_filtered_data.pdf", bbox_inches='tight')
 
     plt.show()
     # import plotly.express as px

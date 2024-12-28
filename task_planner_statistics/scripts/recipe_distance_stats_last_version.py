@@ -11,7 +11,7 @@ from pathlib import Path
 import matplotlib
 import matplotlib.ticker as mtick
 
-ZOOM = True
+ZOOM = False
 
 
 def main():
@@ -64,7 +64,8 @@ def main():
 
     # file_path = "/home/samuele/Desktop/DatiArticolo/Definitivi/SicurezzaContinua/results/distance_monitoring_online_25_ago.csv"
 
-    file_path = "/home/samuele/Desktop/DatiArticolo/SicurezzaContinua/Risultati/Dati/distance_monitoring_online_new_mar_1.csv"
+    # file_path = "/home/samuele/Desktop/DatiArticolo/SicurezzaContinua/Risultati/Dati/distance_monitoring_online_new_mar_1.csv"
+    file_path = "/home/samuele/Desktop/LAST/velocity_scaling/hr_distance.csv"
     distance_dataset = pd.read_csv(file_path)
     distance_dataset = distance_dataset.replace(np.inf, 1000)
     max_val = 4
@@ -291,10 +292,10 @@ def main():
     # plt.annotate(xy=(0, 0.8), xytext=(0.8, 0.8), arrowprops=dict(arrowstyle='<|-|>', color="#636E72", lw=1.5), text="")
     # plt.annotate(xy=(0.08, 0.81), text="RISKY H-R DISTANCE (0.8 m) ")
 
-    path = "/home/samuele/projects/cells_ws/src/hrc_simulator/hrc_simulator/hrc_mosaic_task_planning/hrc_mosaic_task_planning_interface/statistics/fig/iso15066/new_version_25_ago/"
-    path = "/home/samuele/projects/cells_ws/src/hrc_simulator/hrc_simulator/hrc_mosaic_task_planning/hrc_mosaic_task_planning_interface/statistics/fig/iso15066/new_version_25_ago/"
-    path = "/home/samuele/Desktop/DatiArticolo/Definitivi/LessTaskSafetyAreas/grafici/distance_ok"
-
+    # path = "/home/samuele/projects/cells_ws/src/hrc_simulator/hrc_simulator/hrc_mosaic_task_planning/hrc_mosaic_task_planning_interface/statistics/fig/iso15066/new_version_25_ago/"
+    # path = "/home/samuele/projects/cells_ws/src/hrc_simulator/hrc_simulator/hrc_mosaic_task_planning/hrc_mosaic_task_planning_interface/statistics/fig/iso15066/new_version_25_ago/"
+    # path = "/home/samuele/Desktop/DatiArticolo/Definitivi/LessTaskSafetyAreas/grafici/distance_ok"
+    path = "/home/samuele/Desktop/LAST/"
     # plt.title("Comparison of plan execution duration", pad=20)
     # plt.ylabel("Task Planner Type", labelpad=25)
     # plt.xlim(75, 105)
@@ -305,13 +306,13 @@ def main():
     zoom_name = ""
     if zoom:
         zoom_name = "_with_zoom"
-    # plt.savefig(f"{path}comparison_min_distance_higher_test_prova_smaller_{zoom_name}.png", bbox_inches='tight')
-    # plt.savefig(f"{path}comparison_min_distance_higher_test_prova_smaller_{zoom_name}.pdf", bbox_inches='tight')
-    #
-    # sns.set(rc={'figure.figsize': (25,8)})
-    #
-    # plt.savefig(f"{path}comparison_min_distance{zoom_name}.png", bbox_inches='tight')
-    # plt.savefig(f"{path}comparison_min_distance{zoom_name}.pdf", bbox_inches='tight')
+    plt.savefig(f"{path}comparison_min_distance_higher_test_prova_smaller_{zoom_name}.png", bbox_inches='tight')
+    plt.savefig(f"{path}comparison_min_distance_higher_test_prova_smaller_{zoom_name}.pdf", bbox_inches='tight')
+
+    sns.set(rc={'figure.figsize': (25,8)})
+
+    plt.savefig(f"{path}comparison_min_distance{zoom_name}.png", bbox_inches='tight')
+    plt.savefig(f"{path}comparison_min_distance{zoom_name}.pdf", bbox_inches='tight')
 
     percentage_under_risky_dataset_pd = pandas.DataFrame(percentage_under_risky_dataset)
 
